@@ -1,843 +1,908 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState } from "react";
 
-// ─── DESIGN TOKENS ───────────────────────────────────────────
+// ─── COLORS ──────────────────────────────────────────────────
 const C = {
-  navy:       "#0D1F3C",
-  navyMid:    "#162D52",
-  navyLight:  "#1E3E6E",
-  gold:       "#C8911F",
-  goldLight:  "#F0B429",
-  bg:         "#F0F2F7",
-  white:      "#FFFFFF",
-  border:     "#D8DDE8",
-  text:       "#0D1F3C",
-  mid:        "#4B5977",
-  muted:      "#8A95A8",
-  green:      "#15803D",
-  greenBg:    "#DCFCE7",
-  amber:      "#B45309",
-  amberBg:    "#FEF3C7",
-  red:        "#B91C1C",
-  redBg:      "#FEE2E2",
-  blue:       "#1D4ED8",
-  blueBg:     "#EFF6FF",
+  navy:"#0D1F3C", navyL:"#1A3260", navyLL:"#243F6E",
+  gold:"#C8911F", goldL:"#F0B429",
+  bg:"#F0F3F9", white:"#FFFFFF", border:"#D4DAE8",
+  text:"#0D1F3C", mid:"#5A6580", muted:"#9AA3B5",
+  green:"#15803D", greenBg:"#DCFCE7",
+  red:"#DC2626",   redBg:"#FEE2E2",
+  amber:"#D97706", amberBg:"#FEF3C7",
+  blue:"#2563EB",  blueBg:"#DBEAFE",
+  purple:"#7C3AED",purpleBg:"#EDE9FE",
 };
 
-// ─── STAGES ──────────────────────────────────────────────────
-const STAGES = [
-  { id:1,  label:"تسليم الأوراق للطلاب",         short:"تسليم للطلاب",     icon:"📤", color:"#3B82F6", role:"controller" },
-  { id:2,  label:"استلام الأوراق من اللجنة",      short:"استلام من اللجنة", icon:"📥", color:"#8B5CF6", role:"controller" },
-  { id:3,  label:"تسليم المظروف للكنترول",        short:"في الكنترول",      icon:"🗂️", color:"#06B6D4", role:"controller" },
-  { id:4,  label:"تسليم المظروف للمعلم المصحح",   short:"عند المعلم",       icon:"👨‍🏫", color:"#F59E0B", role:"controller" },
-  { id:5,  label:"الأوراق تحت التصحيح",           short:"تحت التصحيح",      icon:"✏️", color:"#EF4444", role:"teacher"    },
-  { id:6,  label:"انتهى التصحيح",                 short:"انتهى التصحيح",    icon:"✅", color:"#10B981", role:"teacher"    },
-  { id:7,  label:"الأوراق تحت المراجعة",          short:"تحت المراجعة",     icon:"🔍", color:"#F97316", role:"reviewer"   },
-  { id:8,  label:"انتهت المراجعة",                short:"انتهت المراجعة",   icon:"✔️", color:"#22C55E", role:"reviewer"   },
-  { id:9,  label:"الأوراق تحت التدقيق النهائي",   short:"تحت التدقيق",      icon:"🔏", color:"#A855F7", role:"auditor"    },
-  { id:10, label:"انتهى التدقيق",                 short:"انتهى التدقيق",    icon:"🎯", color:"#6366F1", role:"auditor"    },
-  { id:11, label:"تم حفظ المظروف في الأرشيف",     short:"محفوظ",            icon:"📁", color:"#14B8A6", role:"archiver"   },
-  { id:12, label:"المعاملة مغلقة نهائياً",        short:"مغلق",             icon:"🔒", color:"#64748B", role:"admin"      },
+const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F97316","#22C55E","#A855F7","#6366F1","#14B8A6","#64748B"];
+const sc = i => PALETTE[i % PALETTE.length];
+
+// ─── INITIAL STATE ────────────────────────────────────────────
+const INIT = {
+  schoolName: "مدرسة النموذجية الثانوية",
+  adminPhone: "+966551121498",  // رقم المدير للواتساب (يُستخدم كمرجع)
+  subjects: ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية"],
+  grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
+  stages: [
+    "تم توزيع الأوراق على الطلاب",
+    "تم استلام الأوراق من اللجنة",
+    "تم تسليم المظروف للكنترول",
+    "تم تسليم المظروف للمعلم",
+    "الأوراق تحت التصحيح",
+    "تم الانتهاء من التصحيح",
+    "الأوراق تحت المراجعة",
+    "تم الانتهاء من المراجعة",
+    "تم الأرشفة والحفظ",
+  ],
+  // teachers with role info + phone number (Saudi)
+  teachers: [
+    { id:"T1", name:"أحمد الغامدي",   email:"ahmed@school.sa",  phone:"+966501234567", subject:"الكيمياء",      role:"corrector" },
+    { id:"T2", name:"سمر الزهراني",   email:"samar@school.sa",  phone:"+966551234568", subject:"الفيزياء",      role:"reviewer"  },
+    { id:"T3", name:"خالد العتيبي",   email:"khalid@school.sa", phone:"+966541234569", subject:"الأحياء",       role:"auditor"   },
+    { id:"T4", name:"نورة القحطاني",  email:"noura@school.sa",  phone:"+966561234570", subject:"الرياضيات",     role:"corrector" },
+    { id:"T5", name:"وليد الشهري",    email:"walid@school.sa",  phone:"+966571234571", subject:"اللغة العربية","role":"reviewer" },
+  ],
+  users: [
+    { id:"U1", name:"مدير النظام",  username:"admin",      password:"admin123", role:"admin"      },
+    { id:"U2", name:"الكنترول",     username:"ctrl",       password:"ctrl123",  role:"controller" },
+    { id:"U3", name:"مسؤول التنبيهات", username:"notify", password:"1234",     role:"notifier"   },
+  ],
+};
+
+// helpers
+function uid()   { return Math.random().toString(36).slice(2,8).toUpperCase(); }
+function nowISO(){ return new Date().toISOString(); }
+function fmt(iso){ return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"}); }
+
+const TEACHER_ROLE_LABEL = { corrector:"مصحح", reviewer:"مراجع", auditor:"مدقق" };
+const NOTIFY_TYPES = [
+  { key:"correction", label:"طلب تصحيح",        icon:"✏️", color:"#EF4444" },
+  { key:"review",     label:"طلب مراجعة",        icon:"🔍", color:"#F97316" },
+  { key:"audit",      label:"طلب تدقيق",         icon:"🔏", color:"#8B5CF6" },
+  { key:"urgent",     label:"مراجعة عاجلة",       icon:"🚨", color:"#DC2626" },
+  { key:"info",       label:"إشعار عام",          icon:"ℹ️", color:"#2563EB" },
 ];
 
-const ROLES = {
-  admin:      { label:"مدير النظام",    can:[1,2,3,4,5,6,7,8,9,10,11,12] },
-  controller: { label:"الكنترول",       can:[1,2,3,4] },
-  teacher:    { label:"المعلم المصحح",  can:[5,6] },
-  reviewer:   { label:"المراجع",        can:[7,8] },
-  auditor:    { label:"المدقق",         can:[9,10] },
-  archiver:   { label:"مسؤول الأرشفة", can:[11,12] },
-};
-
-const DEFAULT_USERS = [
-  { id:1, un:"admin",      pw:"admin123",   name:"أحمد المدير",   role:"admin"      },
-  { id:2, un:"controller", pw:"ctrl123",    name:"سمر الكنترول",  role:"controller" },
-  { id:3, un:"teacher",    pw:"teach123",   name:"خالد المعلم",   role:"teacher"    },
-  { id:4, un:"reviewer",   pw:"review123",  name:"نورة المراجعة", role:"reviewer"   },
-  { id:5, un:"auditor",    pw:"audit123",   name:"فهد المدقق",    role:"auditor"    },
-  { id:6, un:"archiver",   pw:"arch123",    name:"وليد الأرشيف",  role:"archiver"   },
-];
-
-const SUBJECTS  = ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية","التاريخ","الجغرافيا"];
-const GRADES    = ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"];
-const SEMESTERS = ["الفصل الأول","الفصل الثاني","الفصل الثالث"];
-const EXAM_TYPES= ["اختبار نهاية الفصل","اختبار منتصف الفصل","اختبار قصير"];
-
-// ─── HELPERS ─────────────────────────────────────────────────
-function fmtDate(iso) {
-  return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"});
-}
-function hoursSince(iso) {
-  return ((Date.now() - new Date(iso).getTime()) / 3600000).toFixed(1);
-}
-function uid() {
-  return Math.random().toString(36).slice(2,9).toUpperCase();
-}
-function generateBarcode() {
-  return `BND${uid()}`;
-}
-
-// ─── SEED BUNDLES (with varied dates) ────────────────────────
-function seedBundles() {
-  const out = [];
-  const combos = [
-    ["الكيمياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",32],
-    ["الفيزياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",28],
-    ["الأحياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",30],
-    ["الرياضيات","أول ثانوي","الفصل الأول","اختبار نهاية الفصل",35],
-    ["اللغة العربية","ثالث ثانوي","الفصل الأول","اختبار نهاية الفصل",40],
-    ["الكيمياء","أول ثانوي","الفصل الثاني","اختبار منتصف الفصل",27],
-    ["الفيزياء","ثالث ثانوي","الفصل الثاني","اختبار نهاية الفصل",31],
-    ["اللغة الإنجليزية","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",29],
-  ];
-  combos.forEach(([sub, grade, sem, type, count], i) => {
-    const stage = [2,4,5,6,8,10,11,3][i] || 3;
-    const barcode = `BND${String(2025001 + i).padStart(7,"0")}`;
-    const created = new Date(Date.now() - (8-i)*2*86400000);
-    const log = [];
-    for (let s = 1; s <= stage; s++) {
-      log.push({
-        stageId: s,
-        stageLabel: STAGES[s-1].label,
-        ts: new Date(created.getTime() + s*3600000*2).toISOString(),
-        user: DEFAULT_USERS[s % DEFAULT_USERS.length].name,
-        note: "",
-      });
-    }
-    out.push({ id:i+1, barcode, subject:sub, grade, semester:sem, examType:type, paperCount:count, stage, log, created:created.toISOString() });
-  });
-  return out;
-}
-
-// ─── LOAD/SAVE LOCALSTORAGE ──────────────────────────────────
-const STORAGE_KEYS = {
-  BUNDLES: "exam_bundles",
-  USERS: "exam_users",
-};
-
-function loadBundles() {
-  const stored = localStorage.getItem(STORAGE_KEYS.BUNDLES);
-  if (stored) return JSON.parse(stored);
-  return seedBundles();
-}
-
-function saveBundles(bundles) {
-  localStorage.setItem(STORAGE_KEYS.BUNDLES, JSON.stringify(bundles));
-}
-
-function loadUsers() {
-  const stored = localStorage.getItem(STORAGE_KEYS.USERS);
-  if (stored) return JSON.parse(stored);
-  return DEFAULT_USERS;
-}
-
-function saveUsers(users) {
-  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-}
-
-// ─── QR COMPONENT (visual only) ──────────────────────────────
-function QR({ value, size=110, onClick }) {
-  const h = value.split("").reduce((a,c)=>(a*31+c.charCodeAt(0))|0, 0);
-  const N = 9; const cell = size/N;
-  const grid = Array.from({length:N*N},(_,i)=>{
-    const r=Math.floor(i/N), c=i%N;
-    const corner=(r<3&&c<3)||(r<3&&c>N-4)||(r>N-4&&c<3);
-    return corner || !!(Math.abs(h)>>(i%29)&1);
-  });
+// ─── QR VISUAL ───────────────────────────────────────────────
+function QR({ value, size=120 }) {
+  const h = value.split("").reduce((a,c)=>(a*31+c.charCodeAt(0))|0,0);
+  const N=9, cell=size/N;
   return (
-    <svg width={size} height={size} style={{display:"block",borderRadius:6,border:`2px solid ${C.navy}`,cursor: onClick ? "pointer" : "default"}} onClick={onClick}>
-      <rect width={size} height={size} fill="#fff"/>
-      {grid.map((on,i)=>{
-        const r=Math.floor(i/N),c=i%N;
-        return on ? <rect key={i} x={c*cell} y={r*cell} width={cell} height={cell} fill="#111"/> : null;
+    <svg width={size} height={size} style={{border:`2px solid ${C.navy}`,borderRadius:6,display:"block",background:"#fff"}}>
+      {Array.from({length:N*N},(_,k)=>{
+        const r=Math.floor(k/N),c2=k%N;
+        const corner=(r<3&&c2<3)||(r<3&&c2>5)||(r>5&&c2<3);
+        return (corner||!!(Math.abs(h)>>(k%29)&1))
+          ?<rect key={k} x={c2*cell} y={r*cell} width={cell} height={cell} fill="#111"/>:null;
       })}
     </svg>
   );
 }
 
-// ─── STAGE BADGE ─────────────────────────────────────────────
-function StageBadge({ stageId, large }) {
-  const s = STAGES[stageId-1];
-  return (
-    <span style={{
-      display:"inline-flex", alignItems:"center", gap:5,
-      background:`${s.color}20`, color:s.color,
-      border:`1.5px solid ${s.color}50`,
-      padding: large ? "7px 16px" : "3px 10px",
-      borderRadius:999, fontWeight:700,
-      fontSize: large ? 15 : 12,
-    }}>
-      {s.icon} {s.short}
-    </span>
-  );
+// ─── SHARED UI ────────────────────────────────────────────────
+const S = {
+  inp: {
+    width:"100%",padding:"9px 11px",border:`1.5px solid ${C.border}`,
+    borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box",
+    background:"#fff",color:C.text,fontFamily:"'Tajawal',Arial,sans-serif",
+  },
+};
+function Btn({children,color=C.navy,onClick,style,disabled}){
+  return <button onClick={onClick} disabled={disabled}
+    style={{padding:"9px 18px",background:color,color:"#fff",border:"none",borderRadius:8,
+      cursor:disabled?"not-allowed":"pointer",fontSize:13,fontWeight:700,opacity:disabled?.5:1,...style}}>
+    {children}
+  </button>;
+}
+function Card({children,style}){
+  return <div style={{background:C.white,borderRadius:12,padding:18,boxShadow:"0 2px 10px rgba(0,0,0,.07)",...style}}>{children}</div>;
+}
+function Tag({children,color=C.blue,bg=C.blueBg}){
+  return <span style={{background:bg,color,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>{children}</span>;
 }
 
-// ─── PROGRESS BAR ────────────────────────────────────────────
-function ProgressBar({ stageId }) {
-  const pct = Math.round((stageId/12)*100);
-  const s = STAGES[stageId-1];
-  return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-        <span style={{fontSize:11,color:C.muted}}>التقدم الكلي</span>
-        <span style={{fontSize:11,fontWeight:700,color:s.color}}>{pct}%</span>
-      </div>
-      <div style={{height:8,background:C.border,borderRadius:99,overflow:"hidden"}}>
-        <div style={{width:`${pct}%`,height:"100%",background:s.color,borderRadius:99,transition:"width .4s"}}/>
-      </div>
-    </div>
-  );
-}
-
-// ─── TOAST NOTIFICATION ──────────────────────────────────────
-function Toast({ message, type, onClose }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-  return (
-    <div style={{
-      position:"fixed", bottom:28, left:"50%", transform:"translateX(-50%)",
-      background:type==="err"?C.red:C.green, color:"#fff",
-      padding:"12px 28px", borderRadius:14, fontWeight:700, fontSize:14,
-      boxShadow:"0 8px 28px rgba(0,0,0,.2)", zIndex:999,
-      display:"flex", alignItems:"center", gap:10,
-    }}>
-      {type==="err" ? "⚠️" : "✅"} {message}
-    </div>
-  );
-}
-
-// ─── CONFIRM MODAL ───────────────────────────────────────────
-function ConfirmModal({ title, message, onConfirm, onCancel }) {
-  return (
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-      <div style={{background:C.white,borderRadius:16,padding:24,width:320,textAlign:"center"}}>
-        <h3 style={{margin:"0 0 12px",color:C.navy}}>{title}</h3>
-        <p style={{margin:"0 0 20px",color:C.mid}}>{message}</p>
-        <div style={{display:"flex",gap:12}}>
-          <button onClick={onConfirm} style={{flex:1,padding:"10px",background:C.red,color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>تأكيد</button>
-          <button onClick={onCancel} style={{flex:1,padding:"10px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer"}}>إلغاء</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN APP ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [page, setPage] = useState("scan");
+  const [setup,   setSetup]   = useState(INIT);
   const [bundles, setBundles] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [toast, setToast] = useState(null);
-  const [sidebar, setSidebar] = useState(true);
+  const [notifs,  setNotifs]  = useState([]); // sent notifications log
+  const [user,    setUser]    = useState(null);
+  const [page,    setPage]    = useState("home");
+  const [toast,   setToast]   = useState(null);
 
-  // Login state
-  const [lf, setLf] = useState({un:"",pw:""});
-  const [lerr, setLerr] = useState("");
-
-  // Scan page
-  const [scanVal, setScanVal] = useState("");
-  const [scanHit, setScanHit] = useState(null);
-  const [scanErr, setScanErr] = useState("");
-  const [advNote, setAdvNote] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [nextStageId, setNextStageId] = useState(null);
-  const [qrFullscreen, setQrFullscreen] = useState(null);
-
-  // Create page
-  const [form, setForm] = useState({ subject:"الكيمياء", grade:"ثاني ثانوي", semester:"الفصل الأول", examType:"اختبار نهاية الفصل", paperCount:"", note:"" });
-  const [created, setCreated] = useState(null);
-
-  // List page
-  const [search, setSearch] = useState("");
-  const [fStage, setFStage] = useState("");
-  const [fSubject, setFSubject] = useState("");
-  const [detail, setDetail] = useState(null);
-
-  // User management
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [newUser, setNewUser] = useState({ un:"", pw:"", name:"", role:"controller" });
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [editUserData, setEditUserData] = useState({});
-
-  // Load data from localStorage on mount
-  useEffect(() => {
-    setBundles(loadBundles());
-    setUsers(loadUsers());
-  }, []);
-
-  // Save bundles whenever they change
-  useEffect(() => {
-    if (bundles.length) saveBundles(bundles);
-  }, [bundles]);
-
-  // Save users whenever they change
-  useEffect(() => {
-    if (users.length) saveUsers(users);
-  }, [users]);
-
-  function notify(msg, type="ok") {
-    setToast({msg,type});
-  }
-
-  function closeToast() {
-    setToast(null);
-  }
+  function notify(msg,type="ok"){ setToast({msg,type}); setTimeout(()=>setToast(null),3200); }
 
   // ── LOGIN ──
-  function login(e) {
-    e?.preventDefault?.();
-    const u = users.find(u=>u.un===lf.un&&u.pw===lf.pw);
-    if (u) { setUser(u); setLerr(""); }
-    else setLerr("اسم المستخدم أو كلمة المرور غير صحيحة");
+  const [lf,setLf]=useState({u:"",p:""});
+  const [lerr,setLerr]=useState("");
+  function login(){
+    const u=setup.users.find(u=>u.username===lf.u&&u.password===lf.p);
+    if(u){setUser(u);setLerr("");setPage(u.role==="admin"?"admin_setup":u.role==="controller"?"ctrl_scan":"notifier_send");}
+    else setLerr("بيانات الدخول غير صحيحة");
   }
 
-  // ── SCAN ──
-  function doScan() {
-    const v = scanVal.trim();
-    if (!v) return;
-    const b = bundles.find(b=>b.barcode===v);
-    if (!b) { setScanHit(null); setScanErr(`لا يوجد مظروف بالرقم: ${v}`); return; }
-    setScanHit(b); setScanErr(""); setConfirming(false); setNextStageId(null);
-  }
+  // ── SCAN STATE (controller) ──
+  const [scanVal,setScanVal]=useState("");
+  const [hit,setHit]=useState(null);
+  const [scanErr,setScanErr]=useState("");
+  const [confirmStage,setConfirmStage]=useState(null); // stage index to advance to
+  const [stageNote,setStageNote]=useState("");
 
-  function requestAdvance(sid) {
-    if (!ROLES[user.role].can.includes(sid)) { notify("ليس لديك صلاحية هذه المرحلة","err"); return; }
-    setNextStageId(sid); setAdvNote(""); setConfirming(true);
+  function doScan(){
+    const v=scanVal.trim();
+    if(!v)return;
+    const b=bundles.find(b=>b.barcode===v);
+    if(!b){setHit(null);setScanErr(`لا يوجد مظروف بالرقم: ${v}`);return;}
+    setHit(b);setScanErr("");setConfirmStage(null);
   }
-
-  function confirmAdvance() {
-    const sid = nextStageId;
-    const entry = {
-      stageId: sid,
-      stageLabel: STAGES[sid-1].label,
-      ts: new Date().toISOString(),
-      user: user.name,
-      note: advNote,
-    };
-    setBundles(prev=>prev.map(b=>{
-      if (b.id!==scanHit.id) return b;
-      const updated = {...b, stage:sid, log:[...b.log, entry]};
-      setScanHit(updated);
-      return updated;
+  function pickStage(idx){ setConfirmStage(idx); setStageNote(""); }
+  function doAdvance(){
+    const idx=confirmStage;
+    const entry={stageIdx:idx,stageLabel:setup.stages[idx],ts:nowISO(),user:user.name,note:stageNote};
+    setBundles(p=>p.map(b=>{
+      if(b.id!==hit.id)return b;
+      const upd={...b,stage:idx,log:[...b.log,entry]};
+      setHit(upd); return upd;
     }));
-    notify(`تم تحديث الحالة: ${STAGES[sid-1].label}`);
-    setConfirming(false); setNextStageId(null); setAdvNote("");
+    notify(`✅ ${setup.stages[idx]}`);
+    setConfirmStage(null);setStageNote("");
   }
 
-  // ── CREATE ──
-  function createBundle() {
-    if (!form.paperCount || isNaN(form.paperCount) || +form.paperCount < 1) {
-      notify("أدخل عدد الأوراق صحيحاً","err"); return;
+  // ── NOTIFICATION STATE ──
+  const [nf,setNf]=useState({teachers:[],type:"correction",message:"",bundleId:""});
+  // Modified sendNotification to open WhatsApp chats
+  function sendNotification(){
+    if(nf.teachers.length===0){notify("اختر معلماً على الأقل","err");return;}
+    if(!nf.message.trim()){notify("أدخل نص الرسالة","err");return;}
+    const bundle=bundles.find(b=>b.id===nf.bundleId)||null;
+    const typeObj = NOTIFY_TYPES.find(t=>t.key===nf.type);
+    // Build WhatsApp message text
+    let waMessage = `*${typeObj.label}* - ${setup.schoolName}\n\n${nf.message}\n`;
+    if(bundle){
+      waMessage += `\n📦 المظروف: ${bundle.barcode} | ${bundle.subject}${bundle.grade?` - ${bundle.grade}`:""} | عدد الأوراق: ${bundle.count}`;
     }
-    const barcode = generateBarcode();
-    const newB = {
-      id: Date.now(), // simple unique id
-      barcode,
-      subject:form.subject, grade:form.grade,
-      semester:form.semester, examType:form.examType,
-      paperCount:+form.paperCount,
-      stage:1,
-      log: [{
-        stageId:1,
-        stageLabel:STAGES[0].label,
-        ts:new Date().toISOString(),
-        user:user.name,
-        note:form.note || "تم إنشاء المظروف",
-      }],
-      created: new Date().toISOString(),
-    };
-    setBundles(prev=>[...prev,newB]);
-    setCreated(newB);
-    notify("تم إنشاء الباركود بنجاح");
-  }
-
-  // ── DELETE BUNDLE ──
-  function deleteBundle(bundle, onSuccess) {
-    setBundles(prev=>prev.filter(b=>b.id!==bundle.id));
-    notify("تم حذف المظروف بنجاح");
-    if (onSuccess) onSuccess();
-  }
-
-  // ── USER MANAGEMENT ──
-  function addUser() {
-    if (!newUser.un || !newUser.pw || !newUser.name) {
-      notify("جميع الحقول مطلوبة","err");
-      return;
-    }
-    if (users.some(u=>u.un===newUser.un)) {
-      notify("اسم المستخدم موجود بالفعل","err");
-      return;
-    }
-    const newId = Math.max(...users.map(u=>u.id),0)+1;
-    setUsers([...users, {...newUser, id:newId}]);
-    setShowAddUser(false);
-    setNewUser({ un:"", pw:"", name:"", role:"controller" });
-    notify("تم إضافة المستخدم");
-  }
-
-  function deleteUser(userId) {
-    if (users.find(u=>u.id===userId)?.role === "admin" && users.filter(u=>u.role==="admin").length === 1) {
-      notify("لا يمكن حذف آخر مدير في النظام","err");
-      return;
-    }
-    setUsers(users.filter(u=>u.id!==userId));
-    notify("تم حذف المستخدم");
-  }
-
-  function startEditUser(user) {
-    setEditingUserId(user.id);
-    setEditUserData({ pw: user.pw, name: user.name, role: user.role });
-  }
-
-  function saveEditUser(userId) {
-    setUsers(users.map(u=>u.id===userId ? {...u, ...editUserData} : u));
-    setEditingUserId(null);
-    notify("تم تحديث المستخدم");
-  }
-
-  // ── EXPORT CSV ──
-  function exportToCSV() {
-    const headers = ["الباركود","المادة","الصف","الفصل","نوع الاختبار","عدد الأوراق","الحالية","تاريخ الإنشاء"];
-    const rows = bundles.map(b=>[
-      b.barcode, b.subject, b.grade, b.semester, b.examType, b.paperCount,
-      STAGES[b.stage-1].label, fmtDate(b.created)
-    ]);
-    const csv = [headers, ...rows].map(row=>row.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], {type:"text/csv;charset=utf-8;"});
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "mazarif_export.csv";
-    link.click();
-    notify("تم تصدير البيانات");
-  }
-
-  // ── STATS ──
-  const stats = useMemo(() => ({
-    total: bundles.length,
-    byStage: STAGES.map(s=>({...s, count:bundles.filter(b=>b.stage===s.id).length})),
-    done: bundles.filter(b=>b.stage===12).length,
-    active: bundles.filter(b=>b.stage>1&&b.stage<12).length,
-    delayed: bundles.filter(b=>+hoursSince(b.created)>48&&b.stage<6).length,
-  }), [bundles]);
-
-  const filtered = useMemo(() => {
-    return bundles.filter(b=>{
-      const q=search.trim().toLowerCase();
-      return (!q||b.barcode.toLowerCase().includes(q)||b.subject.includes(q)||b.grade.includes(q)||b.semester.includes(q))
-        && (!fStage||b.stage===+fStage)
-        && (!fSubject||b.subject===fSubject);
+    waMessage += `\n\nمرسل من: ${user.name}`;
+    // Encode for URL
+    const encodedMsg = encodeURIComponent(waMessage);
+    // For each selected teacher, open WhatsApp chat link
+    nf.teachers.forEach(teacherId => {
+      const teacher = setup.teachers.find(t=>t.id===teacherId);
+      if(teacher && teacher.phone){
+        const phoneClean = teacher.phone.replace(/[^0-9+]/g, ''); // keep only digits and plus
+        const waUrl = `https://wa.me/${phoneClean}?text=${encodedMsg}`;
+        window.open(waUrl, '_blank');
+      } else {
+        notify(`المعلم ${teacher?.name || 'غير معروف'} ليس لديه رقم جوال مسجل`, "err");
+      }
     });
-  }, [bundles, search, fStage, fSubject]);
+    // Save notification log as before
+    const entry={
+      id:uid(), ts:nowISO(),
+      type:nf.type, typeLabel:typeObj?.label,
+      teachers:nf.teachers.map(tid=>setup.teachers.find(t=>t.id===tid)).filter(Boolean),
+      message:nf.message, bundle, sentBy:user.name,
+    };
+    setNotifs(p=>[entry,...p]);
+    setNf({teachers:[],type:"correction",message:"",bundleId:""});
+    notify(`📧 تم فتح واتساب لـ ${entry.teachers.length} معلم (أرسل الرسالة يدوياً)`);
+  }
 
-  const navItems = [
-    { key:"scan",   icon:"📷", label:"مسح الباركود" },
-    { key:"create", icon:"➕", label:"إنشاء مظروف" },
-    { key:"list",   icon:"📋", label:"كل المظاريف" },
-    { key:"dash",   icon:"📊", label:"لوحة التحكم" },
-    ...(user?.role==="admin"?[{key:"users",icon:"👥",label:"المستخدمون"}]:[]),
-  ];
+  // ── ADMIN — bundle creation ──
+  const [bf,setBf]=useState({subject:"",grade:"",count:"",corrector:"",reviewer:"",auditor:"",note:""});
+  const [newBundle,setNewBundle]=useState(null);
+  function createBundle(){
+    if(!bf.subject){notify("اختر المادة","err");return;}
+    if(!bf.count||isNaN(bf.count)||+bf.count<1){notify("أدخل عدد الأوراق","err");return;}
+    const b={
+      id:uid(),barcode:`M${uid()}`,
+      subject:bf.subject,grade:bf.grade,count:+bf.count,
+      corrector:bf.corrector,reviewer:bf.reviewer,auditor:bf.auditor,
+      note:bf.note, stage:-1, log:[], created:nowISO(),
+    };
+    setBundles(p=>[...p,b]);
+    setNewBundle(b);
+    setBf({subject:"",grade:"",count:"",corrector:"",reviewer:"",auditor:"",note:""});
+    notify("تم إنشاء المظروف وباركوده");
+  }
+  // Delete bundle (admin only)
+  function deleteBundle(id){
+    if(window.confirm("هل أنت متأكد من حذف هذا المظروف؟ لا يمكن التراجع.")){
+      setBundles(p=>p.filter(b=>b.id!==id));
+      if(hit && hit.id===id) setHit(null);
+      notify("تم حذف المظروف");
+    }
+  }
 
-  // ════════════════ LOGIN SCREEN ════════════════
-  if (!user) return (
-    <div style={{minHeight:"100vh",background:`linear-gradient(145deg,${C.navy} 0%,${C.navyLight} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl"}}>
-      <div style={{background:C.white,borderRadius:20,padding:"44px 36px",width:360,boxShadow:"0 32px 80px rgba(0,0,0,.35)"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:64,height:64,background:C.navy,borderRadius:14,margin:"0 auto 14px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30}}>📦</div>
-          <h1 style={{margin:0,fontSize:20,fontWeight:800,color:C.navy}}>تتبع مظاريف الاختبارات</h1>
-          <p style={{margin:"6px 0 0",fontSize:12,color:C.muted}}>نظام إدارة دورة حياة أوراق الإجابة</p>
+  // ── SETTINGS ──
+  const [sTab,setSTab]=useState("general");
+  const [editSchool,setEditSchool]=useState(setup.schoolName);
+  const [editAdminPhone, setEditAdminPhone] = useState(setup.adminPhone);
+  const [ns,setNs]=useState("");       // new subject
+  const [ng,setNg]=useState("");       // new grade
+  const [editStages,setEditStages]=useState(setup.stages);
+  const [nstg,setNstg]=useState("");   // new stage
+  const [newT,setNewT]=useState({name:"",email:"",subject:"",role:"corrector", phone:""});
+  const [newU,setNewU]=useState({name:"",username:"",password:"",role:"controller"});
+
+  function saveSettings(){
+    setSetup(s=>({...s,schoolName:editSchool, adminPhone: editAdminPhone, stages:editStages.filter(x=>x.trim())}));
+    notify("تم حفظ الإعدادات");
+  }
+
+  // ── PAGES available per role ──
+  const PAGES = {
+    admin:[
+      {k:"admin_setup",  icon:"➕", label:"إنشاء مظروف"},
+      {k:"admin_list",   icon:"📋", label:"المظاريف"},
+      {k:"settings",     icon:"⚙️", label:"الإعدادات"},
+    ],
+    controller:[
+      {k:"ctrl_scan",    icon:"📷", label:"مسح الباركود"},
+      {k:"ctrl_list",    icon:"📋", label:"المظاريف"},
+    ],
+    notifier:[
+      {k:"notifier_send",icon:"📧", label:"إرسال تنبيه"},
+      {k:"notifier_log", icon:"📜", label:"سجل التنبيهات"},
+    ],
+  };
+  const pages = user ? (PAGES[user.role]||[]) : [];
+
+  const ROLE_COLOR={admin:[C.gold,C.amberBg],controller:[C.blue,C.blueBg],notifier:[C.purple,C.purpleBg]};
+  const ROLE_LABEL={admin:"مدير النظام",controller:"الكنترول",notifier:"مسؤول التنبيهات"};
+
+  // ══════════════ LOGIN ══════════════
+  if(!user) return (
+    <div style={{minHeight:"100vh",background:`linear-gradient(140deg,${C.navy},${C.navyLL})`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl",padding:16}}>
+      <div style={{background:C.white,borderRadius:20,padding:"40px 30px",width:360,maxWidth:"100%",boxShadow:"0 28px 64px rgba(0,0,0,.35)"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{fontSize:44,marginBottom:6}}>📦</div>
+          <h2 style={{margin:0,color:C.navy,fontSize:19,fontWeight:900}}>{setup.schoolName}</h2>
+          <p style={{margin:"5px 0 0",fontSize:12,color:C.muted}}>نظام تتبع مظاريف الاختبارات</p>
         </div>
-        {lerr&&<div style={{background:C.redBg,color:C.red,borderRadius:8,padding:"10px 14px",fontSize:13,marginBottom:16}}>{lerr}</div>}
-        {[["اسم المستخدم","un","text"],["كلمة المرور","pw","password"]].map(([lbl,k,t])=>(
-          <div key={k} style={{marginBottom:14}}>
-            <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:4}}>{lbl}</label>
-            <input type={t} value={lf[k]} onChange={e=>setLf(f=>({...f,[k]:e.target.value}))}
-              onKeyDown={e=>e.key==="Enter"&&login()}
-              style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",direction:t==="password"?"ltr":"rtl"}}/>
-          </div>
-        ))}
-        <button onClick={login} style={{width:"100%",padding:12,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
-          دخول
-        </button>
-        <div style={{marginTop:22,background:C.bg,borderRadius:10,padding:14}}>
-          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:C.mid}}>حسابات تجريبية:</p>
-          {users.map(u=>(
-            <button key={u.id} onClick={()=>{setLf({un:u.un,pw:u.pw});}}
-              style={{display:"block",width:"100%",textAlign:"right",padding:"4px 0",background:"none",border:"none",cursor:"pointer",fontSize:11,color:C.mid}}>
-              <strong style={{color:C.navy}}>{ROLES[u.role].label}</strong> — {u.un} / {u.pw}
-            </button>
-          ))}
+        {lerr&&<div style={{background:C.redBg,color:C.red,borderRadius:8,padding:"9px 12px",fontSize:12,marginBottom:12}}>{lerr}</div>}
+        <input placeholder="اسم المستخدم" value={lf.u} onChange={e=>setLf(f=>({...f,u:e.target.value}))}
+          style={{...S.inp,marginBottom:10}}/>
+        <input type="password" placeholder="كلمة المرور" value={lf.p} onChange={e=>setLf(f=>({...f,p:e.target.value}))}
+          onKeyDown={e=>e.key==="Enter"&&login()}
+          style={{...S.inp,marginBottom:16,direction:"ltr"}}/>
+        <Btn onClick={login} style={{width:"100%",fontSize:15,padding:"11px"}}>دخول</Btn>
+        <div style={{marginTop:18,background:C.bg,borderRadius:10,padding:"12px 14px"}}>
+          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:C.muted}}>الحسابات التجريبية</p>
+          {setup.users.map(u=>{
+            const [col,bg]=ROLE_COLOR[u.role]||[C.mid,C.bg];
+            return(
+              <button key={u.id} onClick={()=>setLf({u:u.username,p:u.password})}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",cursor:"pointer",padding:"4px 0",textAlign:"right"}}>
+                <span style={{background:bg,color:col,padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:700,flexShrink:0}}>{ROLE_LABEL[u.role]}</span>
+                <span style={{fontSize:11,color:C.mid,fontFamily:"monospace"}}>{u.username} / {u.password}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 
-  // ════════════════ MAIN LAYOUT ════════════════
+  // ══════════════ MAIN SHELL ══════════════
+  const [rc,rb]=ROLE_COLOR[user.role]||[C.mid,C.bg];
   return (
-    <div style={{fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl",display:"flex",minHeight:"100vh",background:C.bg}}>
+    <div style={{minHeight:"100vh",fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl",background:C.bg,display:"flex",flexDirection:"column"}}>
 
-      {/* SIDEBAR */}
-      <aside style={{width:sidebar?210:58,background:C.navy,display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh",overflow:"hidden",transition:"width .22s"}}>
-        <div style={{padding:"18px 14px",borderBottom:`1px solid ${C.navyLight}`,display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,background:C.gold,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>📦</div>
-          {sidebar&&<span style={{color:"#fff",fontSize:13,fontWeight:700,lineHeight:1.2}}>تتبع<br/>المظاريف</span>}
-        </div>
-        <nav style={{padding:"10px 6px",flex:1,overflowY:"auto"}}>
-          {navItems.map(n=>(
-            <button key={n.key} onClick={()=>{setPage(n.key);setCreated(null);setScanHit(null);setScanErr("");setDetail(null);setShowAddUser(false);setEditingUserId(null);}}
-              style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 10px",borderRadius:8,border:"none",cursor:"pointer",background:page===n.key?C.navyLight:"transparent",color:page===n.key?"#fff":"#8A9BBF",fontSize:13,fontWeight:page===n.key?700:400,marginBottom:2,textAlign:"right"}}>
-              <span style={{fontSize:17,flexShrink:0}}>{n.icon}</span>
-              {sidebar&&<span>{n.label}</span>}
-            </button>
-          ))}
-        </nav>
-        <div style={{padding:"12px 6px",borderTop:`1px solid ${C.navyLight}`}}>
-          {sidebar&&<div style={{padding:"8px 10px",background:C.navyLight,borderRadius:8,marginBottom:8}}>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#fff"}}>{user.name}</p>
-            <p style={{margin:"2px 0 0",fontSize:10,color:C.goldLight}}>{ROLES[user.role].label}</p>
-          </div>}
-          <button onClick={()=>setUser(null)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:"none",background:"transparent",cursor:"pointer",color:"#EF4444",fontSize:12,borderRadius:6}}>
-            <span>🚪</span>{sidebar&&"خروج"}
+      {/* HEADER */}
+      <header style={{background:C.navy,padding:"0 18px",height:52,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+        <span style={{fontSize:20}}>📦</span>
+        <span style={{color:"#fff",fontWeight:800,fontSize:14,flex:1}}>{setup.schoolName}</span>
+        <span style={{background:rb,color:rc,padding:"3px 10px",borderRadius:12,fontSize:11,fontWeight:700}}>{ROLE_LABEL[user.role]}</span>
+        <span style={{color:"#8AABCF",fontSize:12,marginRight:4}}>{user.name}</span>
+        <button onClick={()=>{setUser(null);setHit(null);setScanVal("");}} style={{background:"none",border:"none",color:"#EF4444",cursor:"pointer",fontSize:12}}>خروج</button>
+      </header>
+
+      {/* NAV */}
+      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 14px",gap:2,overflowX:"auto"}}>
+        {pages.map(n=>(
+          <button key={n.k} onClick={()=>{setPage(n.k);setNewBundle(null);setConfirmStage(null);}}
+            style={{padding:"11px 14px",border:"none",borderBottom:`3px solid ${page===n.k?C.gold:"transparent"}`,background:"none",cursor:"pointer",color:page===n.k?C.navy:C.muted,fontWeight:page===n.k?800:400,fontSize:13,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+            {n.icon} {n.label}
           </button>
-        </div>
-      </aside>
+        ))}
+      </nav>
 
-      {/* CONTENT */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"auto"}}>
+      {/* TOAST */}
+      {toast&&<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:toast.type==="err"?C.red:C.green,color:"#fff",padding:"10px 26px",borderRadius:12,fontWeight:700,fontSize:14,zIndex:999,boxShadow:"0 6px 20px rgba(0,0,0,.2)"}}>{toast.msg}</div>}
 
-        {/* TOPBAR */}
-        <header style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"11px 24px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:20}}>
-          <button onClick={()=>setSidebar(s=>!s)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:C.mid,padding:4}}>☰</button>
-          <h2 style={{margin:0,flex:1,fontSize:15,fontWeight:800,color:C.navy}}>
-            {navItems.find(n=>n.key===page)?.label}
-          </h2>
-          {stats.delayed>0&&(
-            <span style={{background:C.amberBg,color:C.amber,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700}}>
-              ⚠️ {stats.delayed} مظروف متأخر
-            </span>
-          )}
-          {page==="list" && (
-            <button onClick={exportToCSV} style={{background:C.greenBg,color:C.green,border:"none",padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer"}}>
-              📎 تصدير CSV
-            </button>
-          )}
-        </header>
+      <main style={{flex:1,padding:18,maxWidth:700,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
 
-        {/* TOAST */}
-        {toast && <Toast message={toast.msg} type={toast.type} onClose={closeToast} />}
-
-        <main style={{padding:24,flex:1}}>
-
-          {/* ══════════ SCAN PAGE ══════════ */}
-          {page==="scan"&&(
-            <div style={{maxWidth:640,margin:"0 auto"}}>
-              <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.07)",marginBottom:20}}>
-                <h3 style={{margin:"0 0 6px",color:C.navy,fontSize:17}}>مسح باركود المظروف</h3>
-                <p style={{margin:"0 0 20px",color:C.muted,fontSize:13}}>امسح أو اكتب رقم الباركود لعرض حالة المظروف وتحديثها</p>
-                <div style={{display:"flex",gap:10}}>
-                  <input value={scanVal} onChange={e=>setScanVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doScan()}
-                    placeholder="BND2025001 ..."
-                    style={{flex:1,padding:"12px 14px",border:`2px solid ${C.border}`,borderRadius:10,fontSize:15,outline:"none",fontFamily:"monospace",direction:"ltr",letterSpacing:1}}
-                    autoFocus/>
-                  <button onClick={doScan} style={{padding:"12px 22px",background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                    مسح ▶
-                  </button>
+        {/* ════════ CONTROLLER — SCAN ════════ */}
+        {page==="ctrl_scan"&&(
+          <div>
+            <Card style={{marginBottom:14}}>
+              <p style={{margin:"0 0 12px",fontWeight:800,fontSize:15,color:C.navy}}>📷 مسح باركود المظروف</p>
+              <div style={{display:"flex",gap:8}}>
+                <input value={scanVal} onChange={e=>setScanVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doScan()}
+                  placeholder="أدخل رقم الباركود..."
+                  style={{...S.inp,flex:1,fontFamily:"monospace",fontSize:15,direction:"ltr",letterSpacing:1}} autoFocus/>
+                <Btn onClick={doScan}>مسح</Btn>
+              </div>
+              {bundles.length>0&&(
+                <div style={{marginTop:10}}>
+                  <p style={{fontSize:11,color:C.muted,margin:"0 0 6px"}}>اختر للاختبار السريع:</p>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {bundles.map(b=>(
+                      <button key={b.id} onClick={()=>{setScanVal(b.barcode);setHit(b);setScanErr("");setConfirmStage(null);}}
+                        style={{padding:"3px 9px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,fontSize:11,cursor:"pointer",color:C.mid,fontFamily:"monospace"}}>
+                        {b.barcode}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div style={{marginTop:14,display:"flex",flexWrap:"wrap",gap:6}}>
-                  {bundles.slice(0,6).map(b=>(
-                    <button key={b.id} onClick={()=>{setScanVal(b.barcode);setTimeout(()=>{const bnd=bundles.find(x=>x.barcode===b.barcode);setScanHit(bnd);setScanErr("");setConfirming(false);},50)}}
-                      style={{padding:"4px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,fontSize:11,cursor:"pointer",color:C.mid,fontFamily:"monospace"}}>
-                      {b.barcode}
-                    </button>
+              )}
+              {scanErr&&<p style={{margin:"10px 0 0",color:C.red,fontSize:13,fontWeight:700}}>⚠️ {scanErr}</p>}
+            </Card>
+
+            {/* BUNDLE RESULT */}
+            {hit&&(
+              <Card>
+                {/* Colored header */}
+                <div style={{background:hit.stage<0?C.navyLL:sc(hit.stage),borderRadius:10,padding:"16px 18px",marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{fontSize:32}}>📦</div>
+                    <div style={{flex:1}}>
+                      <p style={{margin:0,color:"rgba(255,255,255,.7)",fontSize:11}}>باركود المظروف</p>
+                      <p style={{margin:"1px 0 6px",color:"#fff",fontFamily:"monospace",fontSize:18,fontWeight:900,letterSpacing:2}}>{hit.barcode}</p>
+                      <div style={{background:"rgba(255,255,255,.2)",display:"inline-block",borderRadius:20,padding:"4px 12px"}}>
+                        <span style={{color:"#fff",fontWeight:700,fontSize:13}}>
+                          {hit.stage<0?"🆕 جديد — لم تبدأ المراحل بعد":setup.stages[hit.stage]}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Meta */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+                  {[
+                    ["المادة",hit.subject],
+                    ["الصف",hit.grade||"—"],
+                    ["عدد الأوراق",`${hit.count} ورقة`],
+                    ["تاريخ الإنشاء",fmt(hit.created)],
+                    ["المصحح",hit.corrector?setup.teachers.find(t=>t.id===hit.corrector)?.name||"—":"—"],
+                    ["المراجع",hit.reviewer?setup.teachers.find(t=>t.id===hit.reviewer)?.name||"—":"—"],
+                    ["المدقق",hit.auditor?setup.teachers.find(t=>t.id===hit.auditor)?.name||"—":"—"],
+                  ].map(([k,v])=>(
+                    <div key={k} style={{background:C.bg,borderRadius:8,padding:"9px 12px"}}>
+                      <p style={{margin:0,fontSize:10,color:C.muted}}>{k}</p>
+                      <p style={{margin:"3px 0 0",fontWeight:700,color:C.text,fontSize:13}}>{v}</p>
+                    </div>
                   ))}
                 </div>
-                {scanErr&&<p style={{margin:"12px 0 0",color:C.red,fontWeight:700,fontSize:13}}>⚠️ {scanErr}</p>}
+
+                {/* Progress */}
+                <div style={{marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:11,color:C.muted}}>مسار الأوراق</span>
+                    <span style={{fontSize:11,fontWeight:700,color:C.navy}}>{hit.stage<0?0:hit.stage+1} / {setup.stages.length}</span>
+                  </div>
+                  <div style={{display:"flex",gap:2}}>
+                    {setup.stages.map((_,i)=>(
+                      <div key={i} title={setup.stages[i]}
+                        style={{flex:1,height:8,borderRadius:4,background:i<=hit.stage?sc(i):C.border,transition:"background .3s"}}/>
+                    ))}
+                  </div>
+                </div>
+
+                {/* STAGE SELECTOR */}
+                {confirmStage===null?(
+                  <div>
+                    <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:C.navy}}>اختر المرحلة الجديدة للمظروف:</p>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {setup.stages.map((s,i)=>{
+                        const done = i <= hit.stage;
+                        const next = i === hit.stage+1;
+                        return (
+                          <button key={i} onClick={()=>!done&&pickStage(i)}
+                            disabled={done}
+                            style={{
+                              display:"flex",alignItems:"center",gap:10,
+                              padding:"10px 14px",borderRadius:9,border:`1.5px solid ${done?C.border:next?sc(i):`${sc(i)}60`}`,
+                              background:done?C.bg:next?`${sc(i)}15`:"#fff",
+                              cursor:done?"default":"pointer",
+                              opacity:done?.6:1,
+                              transition:"all .15s",
+                            }}>
+                            <div style={{width:26,height:26,borderRadius:"50%",background:done?C.green:next?sc(i):C.border,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {done
+                                ?<span style={{color:"#fff",fontSize:13}}>✓</span>
+                                :<span style={{color:next?"#fff":C.muted,fontSize:11,fontWeight:800}}>{i+1}</span>
+                              }
+                            </div>
+                            <span style={{flex:1,fontSize:13,fontWeight:next?700:400,color:done?C.muted:next?sc(i):C.mid,textAlign:"right"}}>{s}</span>
+                            {next&&<span style={{fontSize:11,background:`${sc(i)}20`,color:sc(i),padding:"2px 8px",borderRadius:10,fontWeight:700}}>التالية</span>}
+                            {done&&<span style={{fontSize:11,color:C.green}}>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ):(
+                  // CONFIRM
+                  <div style={{border:`2px solid ${sc(confirmStage)}`,borderRadius:10,padding:16}}>
+                    <p style={{margin:"0 0 4px",fontWeight:800,fontSize:14,color:C.navy}}>تأكيد تحديث المرحلة</p>
+                    <p style={{margin:"0 0 12px",fontSize:12,color:C.mid}}>سيتم تحديث المظروف <strong>{hit.barcode}</strong> إلى:</p>
+                    <div style={{background:`${sc(confirmStage)}15`,borderRadius:8,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:32,height:32,borderRadius:"50%",background:sc(confirmStage),display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800}}>{confirmStage+1}</div>
+                      <span style={{fontWeight:800,color:sc(confirmStage),fontSize:14}}>{setup.stages[confirmStage]}</span>
+                    </div>
+                    <input value={stageNote} onChange={e=>setStageNote(e.target.value)} placeholder="ملاحظة (اختياري)"
+                      style={{...S.inp,marginBottom:10}}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <Btn onClick={doAdvance} color={sc(confirmStage)} style={{flex:1}}>✅ تأكيد</Btn>
+                      <Btn onClick={()=>setConfirmStage(null)} color={C.mid} style={{flex:1}}>إلغاء</Btn>
+                    </div>
+                  </div>
+                )}
+
+                {/* LOG */}
+                {hit.log.length>0&&(
+                  <div style={{marginTop:16,borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+                    <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:C.navy}}>سجل الحركة</p>
+                    {[...hit.log].reverse().map((e,i)=>(
+                      <div key={i} style={{display:"flex",gap:10,marginBottom:8,alignItems:"flex-start"}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:sc(e.stageIdx),marginTop:5,flexShrink:0}}/>
+                        <div>
+                          <span style={{fontSize:12,fontWeight:700,color:C.navy}}>{e.stageLabel}</span>
+                          <span style={{fontSize:11,color:C.muted,marginRight:6}}>{fmt(e.ts)} — {e.user}</span>
+                          {e.note&&<p style={{margin:"1px 0 0",fontSize:11,color:C.mid,fontStyle:"italic"}}>"{e.note}"</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ════════ CONTROLLER — LIST ════════ */}
+        {page==="ctrl_list"&&(
+          <div>
+            {bundles.length===0
+              ?<Card><p style={{textAlign:"center",color:C.muted,padding:"28px 0"}}>لا توجد مظاريف حتى الآن</p></Card>
+              :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {bundles.map(b=>{
+                  const stageName=b.stage<0?"جديد":setup.stages[b.stage]||"—";
+                  const color=b.stage<0?C.muted:sc(b.stage);
+                  const pct=setup.stages.length?Math.round(((b.stage+1)/setup.stages.length)*100):0;
+                  return (
+                    <Card key={b.id} style={{padding:"14px 16px",cursor:"pointer"}}
+                      onClick={()=>{setScanVal(b.barcode);setHit(b);setScanErr("");setConfirmStage(null);setPage("ctrl_scan");}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12}}>
+                        <div style={{width:42,height:42,borderRadius:10,background:`${color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📦</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                            <span style={{fontWeight:800,color:C.navy,fontSize:14}}>{b.subject}</span>
+                            {b.grade&&<span style={{fontSize:11,color:C.muted}}>— {b.grade}</span>}
+                            <span style={{fontSize:11,color:C.muted}}>· {b.count} ورقة</span>
+                          </div>
+                          <p style={{margin:"2px 0 6px",fontFamily:"monospace",fontSize:11,color:C.muted}}>{b.barcode}</p>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <div style={{flex:1,height:5,background:C.border,borderRadius:3}}>
+                              <div style={{width:`${Math.max(pct,0)}%`,height:"100%",background:color,borderRadius:3}}/>
+                            </div>
+                            <span style={{fontSize:10,color:C.muted}}>{Math.max(0,b.stage+1)}/{setup.stages.length}</span>
+                          </div>
+                        </div>
+                        <span style={{background:`${color}20`,color,border:`1px solid ${color}50`,padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:700,textAlign:"center",maxWidth:130,flexShrink:0}}>{stageName}</span>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
+            }
+          </div>
+        )}
 
-              {scanHit&&!confirming&&(
-                <div style={{background:C.white,borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
-                  <div style={{background:STAGES[scanHit.stage-1].color,padding:"20px 24px",display:"flex",alignItems:"center",gap:20}}>
-                    <QR value={scanHit.barcode} size={90} onClick={()=>setQrFullscreen(scanHit.barcode)}/>
-                    <div>
-                      <p style={{margin:0,color:"rgba(255,255,255,.75)",fontSize:12}}>باركود المظروف</p>
-                      <p style={{margin:"2px 0 8px",color:"#fff",fontFamily:"monospace",fontSize:18,fontWeight:800,letterSpacing:2}}>{scanHit.barcode}</p>
-                      <StageBadge stageId={scanHit.stage} large/>
-                    </div>
+        {/* ════════ ADMIN — CREATE BUNDLE ════════ */}
+        {page==="admin_setup"&&(
+          <div>
+            {newBundle?(
+              <Card>
+                <div style={{textAlign:"center",padding:"6px 0 14px"}}>
+                  <div style={{fontSize:44,marginBottom:6}}>✅</div>
+                  <h3 style={{margin:"0 0 4px",color:C.green,fontSize:17}}>تم إنشاء المظروف</h3>
+                  <p style={{margin:"0 0 16px",color:C.mid,fontSize:13}}>{newBundle.subject} {newBundle.grade&&`— ${newBundle.grade}`} · {newBundle.count} ورقة</p>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
+                    <QR value={newBundle.barcode} size={150}/>
                   </div>
-                  <div style={{padding:24}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-                      {[
-                        ["المادة", scanHit.subject], ["الصف الدراسي", scanHit.grade],
-                        ["الفصل الدراسي", scanHit.semester], ["نوع الاختبار", scanHit.examType],
-                        ["عدد الأوراق", `${scanHit.paperCount} ورقة`], ["تاريخ الإنشاء", fmtDate(scanHit.created)],
-                      ].map(([k,v])=>(
-                        <div key={k} style={{background:C.bg,borderRadius:10,padding:"12px 14px"}}>
-                          <p style={{margin:0,fontSize:11,color:C.muted}}>{k}</p>
-                          <p style={{margin:"4px 0 0",fontSize:14,fontWeight:700,color:C.navy}}>{v}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <ProgressBar stageId={scanHit.stage}/>
-                    <div style={{display:"flex",gap:3,margin:"20px 0",overflowX:"auto",paddingBottom:4}}>
-                      {STAGES.map(s=>(
-                        <div key={s.id} title={s.label} style={{flex:1,minWidth:18,height:8,borderRadius:4,background: s.id<scanHit.stage ? C.green : s.id===scanHit.stage ? STAGES[scanHit.stage-1].color : C.border}}/>
-                      ))}
-                    </div>
-                    {scanHit.stage < 12 && (()=>{
-                      const next = scanHit.stage + 1;
-                      const canDo = ROLES[user.role].can.includes(next);
-                      return canDo ? (
-                        <button onClick={()=>requestAdvance(next)} style={{width:"100%",padding:"14px",background:STAGES[next-1].color,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                          <span>{STAGES[next-1].icon}</span> تحديث إلى: {STAGES[next-1].label}
-                        </button>
-                      ) : (
-                        <div style={{background:C.bg,borderRadius:10,padding:"14px 18px",textAlign:"center",color:C.muted,fontSize:13}}>
-                          المرحلة التالية <strong>{STAGES[next-1].label}</strong> — خارج نطاق صلاحياتك
-                        </div>
-                      );
-                    })()}
-                    {scanHit.stage===12&&<div style={{background:C.greenBg,borderRadius:10,padding:"14px 18px",textAlign:"center",color:C.green,fontWeight:700,fontSize:14}}>✅ المعاملة مغلقة نهائياً</div>}
-                    
-                    <div style={{marginTop:24,borderTop:`1px solid ${C.border}`,paddingTop:20}}>
-                      <h4 style={{margin:"0 0 14px",fontSize:13,color:C.navy}}>آخر الحركات</h4>
-                      {scanHit.log.slice(-5).reverse().map((e,i)=>(
-                        <div key={i} style={{display:"flex",gap:12,marginBottom:10,alignItems:"flex-start"}}>
-                          <div style={{width:10,height:10,borderRadius:"50%",background:STAGES[e.stageId-1]?.color||C.muted,marginTop:5}}/>
-                          <div><span style={{fontSize:13,fontWeight:700,color:C.navy}}>{e.stageLabel}</span><span style={{fontSize:11,color:C.muted,marginRight:8}}>{fmtDate(e.ts)}</span><span style={{fontSize:11,color:C.mid}}> — {e.user}</span>{e.note&&<p style={{margin:"2px 0 0",fontSize:11,color:C.mid,fontStyle:"italic"}}>"{e.note}"</p>}</div>
-                        </div>
-                      ))}
-                      {scanHit.log.length > 5 && <p style={{fontSize:11,color:C.muted,marginTop:8}}>... و{scanHit.log.length-5} حركات سابقة</p>}
-                    </div>
+                  <p style={{fontFamily:"monospace",fontSize:20,fontWeight:900,letterSpacing:3,color:C.navy,margin:"0 0 14px"}}>{newBundle.barcode}</p>
+                  <div style={{background:C.amberBg,borderRadius:8,padding:"9px 14px",fontSize:12,color:C.amber,marginBottom:6}}>
+                    المصحح: <strong>{setup.teachers.find(t=>t.id===newBundle.corrector)?.name||"—"}</strong>
+                    &nbsp;·&nbsp;المراجع: <strong>{setup.teachers.find(t=>t.id===newBundle.reviewer)?.name||"—"}</strong>
+                    &nbsp;·&nbsp;المدقق: <strong>{setup.teachers.find(t=>t.id===newBundle.auditor)?.name||"—"}</strong>
+                  </div>
+                  <div style={{background:C.amberBg,borderRadius:8,padding:"9px 14px",fontSize:12,color:C.amber,marginBottom:16}}>
+                    📌 اطبع هذا الباركود وألصقه على المظروف
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <Btn onClick={()=>window.print()} style={{flex:1}}>🖨️ طباعة</Btn>
+                    <Btn onClick={()=>setNewBundle(null)} color={C.mid} style={{flex:1}}>مظروف آخر</Btn>
                   </div>
                 </div>
-              )}
-
-              {confirming&&nextStageId&&(
-                <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.1)",border:`2px solid ${STAGES[nextStageId-1].color}`}}>
-                  <h3 style={{margin:"0 0 6px",color:C.navy}}>تأكيد تحديث الحالة</h3>
-                  <p style={{margin:"0 0 20px",color:C.mid,fontSize:13}}>سيتم تحديث مظروف <strong>{scanHit.barcode}</strong> إلى:</p>
-                  <div style={{background:`${STAGES[nextStageId-1].color}15`,border:`1.5px solid ${STAGES[nextStageId-1].color}40`,borderRadius:10,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
-                    <span style={{fontSize:28}}>{STAGES[nextStageId-1].icon}</span>
-                    <div><p style={{margin:0,fontSize:16,fontWeight:800,color:STAGES[nextStageId-1].color}}>{STAGES[nextStageId-1].label}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted}}>المرحلة {nextStageId} من 12</p></div>
+              </Card>
+            ):(
+              <Card>
+                <p style={{margin:"0 0 16px",fontWeight:800,fontSize:15,color:C.navy}}>➕ إنشاء مظروف جديد</p>
+                {/* Subject & Grade */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div>
+                    <label style={{...lbl}}>المادة *</label>
+                    <select value={bf.subject} onChange={e=>setBf(f=>({...f,subject:e.target.value}))} style={S.inp}>
+                      <option value="">-- اختر --</option>
+                      {setup.subjects.map(s=><option key={s}>{s}</option>)}
+                    </select>
                   </div>
-                  <div style={{marginBottom:20}}>
-                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:6}}>ملاحظة (اختياري)</label>
-                    <input value={advNote} onChange={e=>setAdvNote(e.target.value)} placeholder="أضف ملاحظة إن وجدت..." style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:13}}/>
-                  </div>
-                  <div style={{display:"flex",gap:10}}>
-                    <button onClick={confirmAdvance} style={{flex:1,padding:"12px",background:STAGES[nextStageId-1].color,color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>✅ تأكيد التحديث</button>
-                    <button onClick={()=>{setConfirming(false);setNextStageId(null);}} style={{flex:1,padding:"12px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:10,fontSize:14,cursor:"pointer"}}>إلغاء</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════ CREATE PAGE ══════════ */}
-          {page==="create"&&(
-            <div style={{maxWidth:540,margin:"0 auto"}}>
-              {created ? (
-                <div style={{background:C.white,borderRadius:14,padding:32,boxShadow:"0 2px 12px rgba(0,0,0,.07)",textAlign:"center"}}>
-                  <div style={{fontSize:48,marginBottom:8}}>✅</div>
-                  <h3 style={{margin:"0 0 20px",color:C.green,fontSize:18}}>تم إنشاء الباركود بنجاح!</h3>
-                  <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
-                    <QR value={created.barcode} size={160} onClick={()=>setQrFullscreen(created.barcode)}/>
-                  </div>
-                  <p style={{fontFamily:"monospace",fontSize:22,fontWeight:800,color:C.navy,letterSpacing:3,margin:"0 0 8px"}}>{created.barcode}</p>
-                  <p style={{color:C.mid,fontSize:13,margin:"0 0 20px"}}>{created.subject} — {created.grade} — {created.semester}<br/>{created.paperCount} ورقة</p>
-                  <div style={{background:C.amberBg,borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:C.amber}}>📌 اطبع هذا الباركود وألصقه على المظروف</div>
-                  <div style={{display:"flex",gap:10}}>
-                    <button onClick={()=>window.print()} style={{flex:1,padding:11,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ طباعة</button>
-                    <button onClick={()=>{setCreated(null);setForm({subject:"الكيمياء",grade:"ثاني ثانوي",semester:"الفصل الأول",examType:"اختبار نهاية الفصل",paperCount:"",note:""});}} style={{flex:1,padding:11,background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,cursor:"pointer"}}>إنشاء آخر</button>
+                  <div>
+                    <label style={{...lbl}}>الصف</label>
+                    <select value={bf.grade} onChange={e=>setBf(f=>({...f,grade:e.target.value}))} style={S.inp}>
+                      <option value="">-- اختياري --</option>
+                      {setup.grades.map(g=><option key={g}>{g}</option>)}
+                    </select>
                   </div>
                 </div>
-              ) : (
-                <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
-                  <h3 style={{margin:"0 0 6px",color:C.navy}}>إنشاء مظروف جديد</h3>
-                  <p style={{margin:"0 0 22px",color:C.muted,fontSize:13}}>أدخل بيانات الدفعة لإنشاء باركود المظروف</p>
-                  {[["المادة","subject",SUBJECTS],["الصف الدراسي","grade",GRADES],["الفصل الدراسي","semester",SEMESTERS],["نوع الاختبار","examType",EXAM_TYPES]].map(([lbl,k,opts])=>(
-                    <div key={k} style={{marginBottom:14}}>
-                      <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>{lbl}</label>
-                      <select value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}>
-                        {opts.map(o=><option key={o} value={o}>{o}</option>)}
+                {/* Count */}
+                <div style={{marginBottom:10}}>
+                  <label style={{...lbl}}>عدد الأوراق في المظروف *</label>
+                  <input type="number" min="1" placeholder="مثال: 32" value={bf.count}
+                    onChange={e=>setBf(f=>({...f,count:e.target.value}))} style={S.inp}/>
+                </div>
+                {/* Assignments */}
+                <p style={{margin:"12px 0 8px",fontSize:12,fontWeight:700,color:C.mid}}>تكليفات المظروف</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+                  {[["المصحح","corrector","corrector"],["المراجع","reviewer","reviewer"],["المدقق","auditor","auditor"]].map(([lbl2,k,role])=>(
+                    <div key={k}>
+                      <label style={{...lbl}}>{lbl2}</label>
+                      <select value={bf[k]} onChange={e=>setBf(f=>({...f,[k]:e.target.value}))} style={{...S.inp,fontSize:12}}>
+                        <option value="">-- اختر --</option>
+                        {setup.teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
                   ))}
-                  <div style={{marginBottom:14}}>
-                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>عدد الأوراق في المظروف</label>
-                    <input type="number" min="1" value={form.paperCount} onChange={e=>setForm(f=>({...f,paperCount:e.target.value}))} placeholder="مثال: 32" style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}/>
-                  </div>
-                  <div style={{marginBottom:22}}>
-                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>ملاحظة (اختياري)</label>
-                    <input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}/>
-                  </div>
-                  <button onClick={createBundle} style={{width:"100%",padding:13,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer"}}>إنشاء الباركود ←</button>
                 </div>
-              )}
-            </div>
-          )}
+                {/* Note */}
+                <div style={{marginBottom:16}}>
+                  <label style={{...lbl}}>ملاحظة</label>
+                  <input value={bf.note} onChange={e=>setBf(f=>({...f,note:e.target.value}))} style={S.inp}/>
+                </div>
+                <Btn onClick={createBundle} style={{width:"100%",fontSize:14,padding:"11px"}}>إنشاء الباركود ←</Btn>
+              </Card>
+            )}
+          </div>
+        )}
 
-          {/* ══════════ LIST PAGE ══════════ */}
-          {page==="list"&&(
-            <div>
-              {detail ? (
-                <div>
-                  <button onClick={()=>setDetail(null)} style={{marginBottom:16,padding:"8px 14px",background:"none",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",color:C.mid,fontSize:13}}>← رجوع للقائمة</button>
-                  <div style={{background:C.white,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,.07)",marginBottom:16}}>
-                    <div style={{background:STAGES[detail.stage-1].color,padding:"20px 24px",display:"flex",alignItems:"center",gap:18}}>
-                      <QR value={detail.barcode} size={80} onClick={()=>setQrFullscreen(detail.barcode)}/>
-                      <div><p style={{margin:0,color:"rgba(255,255,255,.7)",fontSize:11}}>رقم الباركود</p><p style={{margin:"2px 0 8px",color:"#fff",fontFamily:"monospace",fontSize:20,fontWeight:800}}>{detail.barcode}</p><StageBadge stageId={detail.stage} large/></div>
-                    </div>
-                    <div style={{padding:24}}>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}>
-                        {[["المادة",detail.subject],["الصف",detail.grade],["الفصل",detail.semester],["نوع الاختبار",detail.examType],["عدد الأوراق",`${detail.paperCount} ورقة`],["تاريخ الإنشاء",fmtDate(detail.created)]].map(([k,v])=>(
-                          <div key={k} style={{background:C.bg,borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:10,color:C.muted}}>{k}</p><p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:C.navy}}>{v}</p></div>
-                        ))}
+        {/* ════════ ADMIN — LIST (with delete) ════════ */}
+        {page==="admin_list"&&(
+          <div>
+            {bundles.length===0
+              ?<Card><p style={{textAlign:"center",color:C.muted,padding:"28px 0"}}>لا توجد مظاريف — أنشئ مظروفاً أولاً</p></Card>
+              :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {bundles.map(b=>{
+                  const stageName=b.stage<0?"جديد":setup.stages[b.stage]||"—";
+                  const color=b.stage<0?C.muted:sc(b.stage);
+                  return (
+                    <Card key={b.id} style={{padding:"14px 16px", position:"relative"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12}}>
+                        <QR value={b.barcode} size={54}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                            <span style={{fontWeight:800,color:C.navy}}>{b.subject}</span>
+                            {b.grade&&<span style={{fontSize:11,color:C.muted}}>{b.grade}</span>}
+                            <Tag>{b.count} ورقة</Tag>
+                          </div>
+                          <p style={{margin:"3px 0 4px",fontFamily:"monospace",fontSize:11,color:C.muted}}>{b.barcode}</p>
+                          <div style={{fontSize:11,color:C.mid,display:"flex",gap:8,flexWrap:"wrap"}}>
+                            {b.corrector&&<span>✏️ {setup.teachers.find(t=>t.id===b.corrector)?.name}</span>}
+                            {b.reviewer&&<span>🔍 {setup.teachers.find(t=>t.id===b.reviewer)?.name}</span>}
+                            {b.auditor&&<span>🔏 {setup.teachers.find(t=>t.id===b.auditor)?.name}</span>}
+                          </div>
+                        </div>
+                        <span style={{background:`${color}20`,color,border:`1px solid ${color}40`,padding:"4px 9px",borderRadius:16,fontSize:11,fontWeight:700,textAlign:"center",maxWidth:130,flexShrink:0}}>{stageName}</span>
+                        {/* Delete button for admin */}
+                        <button onClick={(e)=>{e.stopPropagation(); deleteBundle(b.id);}}
+                          style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:20, marginRight:8, flexShrink:0}} title="حذف المظروف">
+                          🗑️
+                        </button>
                       </div>
-                      <ProgressBar stageId={detail.stage}/>
-                      <div style={{display:"flex",gap:3,margin:"16px 0",overflowX:"auto"}}>
-                        {STAGES.map(s=><div key={s.id} title={s.label} style={{flex:1,minWidth:16,height:8,borderRadius:4,background:s.id<detail.stage?C.green:s.id===detail.stage?STAGES[detail.stage-1].color:C.border}}/>)}
-                      </div>
-                      <h4 style={{margin:"20px 0 12px",fontSize:13,color:C.navy}}>سجل الحركة الكامل</h4>
-                      <div style={{overflowX:"auto"}}>
-                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                          <thead><tr style={{background:C.bg}}>{["المرحلة","التاريخ والوقت","المستخدم","ملاحظة"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"right",color:C.muted,fontWeight:600}}>{h}</th>)}</tr></thead>
-                          <tbody>{detail.log.map((e,i)=>(
-                            <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
-                              <td style={{padding:"9px 12px"}}><StageBadge stageId={e.stageId}/></td>
-                              <td style={{padding:"9px 12px",color:C.muted,fontSize:11}}>{fmtDate(e.ts)}</td>
-                              <td style={{padding:"9px 12px",fontWeight:600,color:C.navy}}>{e.user}</td>
-                              <td style={{padding:"9px 12px",color:C.mid,fontStyle:"italic",fontSize:11}}>{e.note||"—"}</td>
-                            </tr>
-                          ))}</tbody>
-                        </table>
-                      </div>
-                      <div style={{marginTop:24,display:"flex",justifyContent:"flex-end"}}>
-                        <button onClick={()=>{if(window.confirm("هل أنت متأكد من حذف هذا المظروف؟")) deleteBundle(detail,()=>setDetail(null));}} style={{padding:"8px 16px",background:C.redBg,color:C.red,border:"none",borderRadius:8,cursor:"pointer",fontSize:12}}>🗑️ حذف المظروف</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{background:C.white,borderRadius:12,padding:14,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,.05)",display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="بحث بالباركود أو المادة..." style={{flex:1,minWidth:180,padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:13}}/>
-                    <select value={fStage} onChange={e=>setFStage(e.target.value)} style={{padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12}}><option value="">كل المراحل</option>{STAGES.map(s=><option key={s.id} value={s.id}>{s.icon} {s.short}</option>)}</select>
-                    <select value={fSubject} onChange={e=>setFSubject(e.target.value)} style={{padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12}}><option value="">كل المواد</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                    <span style={{fontSize:12,color:C.muted}}>{filtered.length} مظروف</span>
-                  </div>
-                  <div style={{background:C.white,borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,.05)",overflow:"auto"}}>
-                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:680}}>
-                      <thead><tr style={{background:C.navy}}>{["الباركود","المادة","الصف","الفصل","الأوراق","الحالة","التقدم",""].map(h=><th key={h} style={{padding:"12px 14px",textAlign:"right",color:"#fff",fontWeight:600,fontSize:12}}>{h}</th>)}</tr></thead>
-                      <tbody>{filtered.map((b,i)=>(
-                        <tr key={b.id} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?C.white:C.bg}}>
-                          <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,color:C.mid}}>{b.barcode}</td>
-                          <td style={{padding:"10px 14px",fontWeight:700,color:C.navy}}>{b.subject}</td>
-                          <td style={{padding:"10px 14px",color:C.mid,fontSize:12}}>{b.grade}</td>
-                          <td style={{padding:"10px 14px",color:C.mid,fontSize:12}}>{b.semester}</td>
-                          <td style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:C.navy}}>{b.paperCount}</td>
-                          <td style={{padding:"10px 14px"}}><StageBadge stageId={b.stage}/></td>
-                          <td style={{padding:"10px 14px",minWidth:100}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:C.border,borderRadius:3}}><div style={{width:`${(b.stage/12)*100}%`,height:"100%",background:STAGES[b.stage-1].color,borderRadius:3}}/></div><span style={{fontSize:10,color:C.muted}}>{Math.round((b.stage/12)*100)}%</span></div></td>
-                          <td style={{padding:"10px 14px"}}><button onClick={()=>setDetail(b)} style={{padding:"4px 12px",background:"none",border:`1px solid ${C.navy}`,borderRadius:6,cursor:"pointer",color:C.navy,fontSize:11,fontWeight:600}}>عرض</button></td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                    </Card>
+                  );
+                })}
+              </div>
+            }
+          </div>
+        )}
 
-          {/* ══════════ DASHBOARD ══════════ */}
-          {page==="dash"&&(
-            <div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
-                {[{l:"إجمالي المظاريف", v:stats.total, icon:"📦", col:C.navy},{l:"نشطة", v:stats.active, icon:"🔄", col:C.blue},{l:"مكتملة", v:stats.done, icon:"✅", col:C.green},{l:"متأخرة", v:stats.delayed, icon:"⚠️", col:C.red}].map((k,i)=>(
-                  <div key={i} style={{background:C.white,borderRadius:12,padding:"18px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",borderTop:`3px solid ${k.col}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><p style={{margin:0,fontSize:11,color:C.muted}}>{k.l}</p><p style={{margin:"6px 0 0",fontSize:30,fontWeight:900,color:k.col}}>{k.v}</p></div><span style={{fontSize:24}}>{k.icon}</span></div>
-                  </div>
+        {/* ════════ ADMIN — SETTINGS (added admin phone) ════════ */}
+        {page==="settings"&&(
+          <div>
+            {/* Tab bar */}
+            <div style={{display:"flex",gap:2,background:C.white,borderRadius:10,padding:4,marginBottom:14,border:`1px solid ${C.border}`,flexWrap:"wrap"}}>
+              {[["general","🏫"],["subjects","📚"],["grades","🎓"],["stages","🔄"],["teachers","👨‍🏫"],["users","👥"]].map(([k,icon])=>(
+                <button key={k} onClick={()=>setSTab(k)}
+                  style={{flex:1,minWidth:50,padding:"7px 4px",border:"none",borderRadius:7,background:sTab===k?C.navy:"transparent",color:sTab===k?"#fff":C.mid,cursor:"pointer",fontSize:12,fontWeight:sTab===k?700:400}}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+
+            {sTab==="general"&&(
+              <Card>
+                <p style={{margin:"0 0 10px",fontWeight:700,color:C.navy}}>🏫 اسم المدرسة / المؤسسة</p>
+                <input value={editSchool} onChange={e=>setEditSchool(e.target.value)} style={{...S.inp,marginBottom:12}}/>
+                <p style={{margin:"12px 0 10px",fontWeight:700,color:C.navy}}>📱 رقم هاتف المدير (للواستاب)</p>
+                <input value={editAdminPhone} onChange={e=>setEditAdminPhone(e.target.value)} placeholder="+9665XXXXXXXX" style={{...S.inp,marginBottom:12}}/>
+                <Btn onClick={saveSettings}>حفظ</Btn>
+              </Card>
+            )}
+
+            {sTab==="subjects"&&(
+              <Card>
+                <p style={{margin:"0 0 12px",fontWeight:700,color:C.navy}}>📚 المواد الدراسية</p>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  {setup.subjects.map((s,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"9px 12px"}}>
+                      <span style={{flex:1,fontSize:13,color:C.navy}}>{s}</span>
+                      <button onClick={()=>setSetup(p=>({...p,subjects:p.subjects.filter((_,j)=>j!==i)}))}
+                        style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:17,lineHeight:1}}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <input value={ns} onChange={e=>setNs(e.target.value)} onKeyDown={e=>e.key==="Enter"&&ns.trim()&&(setSetup(p=>({...p,subjects:[...p.subjects,ns.trim()]})),setNs(""))}
+                    placeholder="اسم المادة" style={{...S.inp,flex:1}}/>
+                  <Btn onClick={()=>ns.trim()&&(setSetup(p=>({...p,subjects:[...p.subjects,ns.trim()]})),setNs(""))}>إضافة</Btn>
+                </div>
+              </Card>
+            )}
+
+            {sTab==="grades"&&(
+              <Card>
+                <p style={{margin:"0 0 12px",fontWeight:700,color:C.navy}}>🎓 الصفوف الدراسية</p>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  {setup.grades.map((g,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"9px 12px"}}>
+                      <span style={{flex:1,fontSize:13,color:C.navy}}>{g}</span>
+                      <button onClick={()=>setSetup(p=>({...p,grades:p.grades.filter((_,j)=>j!==i)}))}
+                        style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:17,lineHeight:1}}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <input value={ng} onChange={e=>setNg(e.target.value)} placeholder="اسم الصف" style={{...S.inp,flex:1}}/>
+                  <Btn onClick={()=>ng.trim()&&(setSetup(p=>({...p,grades:[...p.grades,ng.trim()]})),setNg(""))}>إضافة</Btn>
+                </div>
+              </Card>
+            )}
+
+            {sTab==="stages"&&(
+              <Card>
+                <p style={{margin:"0 0 4px",fontWeight:700,color:C.navy}}>🔄 مراحل سير المظروف</p>
+                <p style={{margin:"0 0 12px",fontSize:12,color:C.muted}}>عدّل الأسماء، احذف أو أضف مراحل جديدة</p>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  {editStages.map((s,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:24,height:24,borderRadius:"50%",background:sc(i),display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                      <input value={s} onChange={e=>{const a=[...editStages];a[i]=e.target.value;setEditStages(a);}}
+                        style={{...S.inp,flex:1,margin:0}}/>
+                      <button onClick={()=>setEditStages(p=>p.filter((_,j)=>j!==i))}
+                        style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:18,flexShrink:0}}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <input value={nstg} onChange={e=>setNstg(e.target.value)} placeholder="مرحلة جديدة" style={{...S.inp,flex:1}}/>
+                  <Btn onClick={()=>nstg.trim()&&(setEditStages(p=>[...p,nstg.trim()]),setNstg(""))}>إضافة</Btn>
+                </div>
+                <Btn onClick={saveSettings} color={C.green} style={{width:"100%"}}>💾 حفظ المراحل</Btn>
+              </Card>
+            )}
+
+            {sTab==="teachers"&&(
+              <Card>
+                <p style={{margin:"0 0 12px",fontWeight:700,color:C.navy}}>👨‍🏫 المعلمون (المصححون / المراجعون / المدققون)</p>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  {setup.teachers.map((t,i)=>(
+                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"10px 12px", flexWrap:"wrap"}}>
+                      <div style={{flex:1}}>
+                        <span style={{fontWeight:700,color:C.navy,fontSize:13}}>{t.name}</span>
+                        <span style={{fontSize:11,color:C.muted,marginRight:6}}>{t.subject}</span>
+                        <Tag color={C.purple} bg={C.purpleBg}>{TEACHER_ROLE_LABEL[t.role]||t.role}</Tag>
+                        <span style={{fontSize:11,color:C.mid, marginRight:8, direction:"ltr", fontFamily:"monospace"}}>{t.phone}</span>
+                      </div>
+                      <span style={{fontSize:11,color:C.muted,direction:"ltr",fontFamily:"monospace"}}>{t.email}</span>
+                      <button onClick={()=>setSetup(p=>({...p,teachers:p.teachers.filter(x=>x.id!==t.id)}))}
+                        style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:17}}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:C.mid}}>إضافة معلم جديد</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <input placeholder="الاسم" value={newT.name} onChange={e=>setNewT(f=>({...f,name:e.target.value}))} style={S.inp}/>
+                  <input placeholder="البريد الإلكتروني" value={newT.email} onChange={e=>setNewT(f=>({...f,email:e.target.value}))} style={{...S.inp,direction:"ltr"}}/>
+                  <input placeholder="رقم الجوال (مثال +9665XXXXXXXX)" value={newT.phone} onChange={e=>setNewT(f=>({...f,phone:e.target.value}))} style={{...S.inp,direction:"ltr"}}/>
+                  <select value={newT.subject} onChange={e=>setNewT(f=>({...f,subject:e.target.value}))} style={S.inp}>
+                    <option value="">-- المادة --</option>
+                    {setup.subjects.map(s=><option key={s}>{s}</option>)}
+                  </select>
+                  <select value={newT.role} onChange={e=>setNewT(f=>({...f,role:e.target.value}))} style={S.inp}>
+                    <option value="corrector">مصحح</option>
+                    <option value="reviewer">مراجع</option>
+                    <option value="auditor">مدقق</option>
+                  </select>
+                </div>
+                <Btn onClick={()=>{
+                  if(!newT.name||!newT.email||!newT.phone){notify("أدخل الاسم والبريد والجوال","err");return;}
+                  setSetup(p=>({...p,teachers:[...p.teachers,{...newT,id:uid()}]}));
+                  setNewT({name:"",email:"",subject:"",role:"corrector", phone:""});
+                  notify("تم إضافة المعلم");
+                }} style={{width:"100%"}}>إضافة المعلم</Btn>
+              </Card>
+            )}
+
+            {sTab==="users"&&(
+              <Card>
+                <p style={{margin:"0 0 12px",fontWeight:700,color:C.navy}}>👥 حسابات النظام</p>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  {setup.users.map(u=>{
+                    const [col,bg]=ROLE_COLOR[u.role]||[C.mid,C.bg];
+                    return(
+                      <div key={u.id} style={{display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"10px 12px"}}>
+                        <div style={{flex:1}}>
+                          <span style={{fontWeight:700,color:C.navy,fontSize:13}}>{u.name}</span>
+                          <span style={{fontSize:11,color:C.muted,marginRight:6,fontFamily:"monospace"}}>{u.username}</span>
+                        </div>
+                        <Tag color={col} bg={bg}>{ROLE_LABEL[u.role]||u.role}</Tag>
+                        {u.id!==user.id&&<button onClick={()=>setSetup(p=>({...p,users:p.users.filter(x=>x.id!==u.id)}))}
+                          style={{background:"none",border:"none",cursor:"pointer",color:C.red,fontSize:17}}>×</button>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:C.mid}}>إضافة حساب جديد</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <input placeholder="الاسم" value={newU.name} onChange={e=>setNewU(f=>({...f,name:e.target.value}))} style={S.inp}/>
+                  <input placeholder="اسم المستخدم" value={newU.username} onChange={e=>setNewU(f=>({...f,username:e.target.value}))} style={{...S.inp,direction:"ltr"}}/>
+                  <input placeholder="كلمة المرور" value={newU.password} onChange={e=>setNewU(f=>({...f,password:e.target.value}))} style={{...S.inp,direction:"ltr"}}/>
+                  <select value={newU.role} onChange={e=>setNewU(f=>({...f,role:e.target.value}))} style={S.inp}>
+                    <option value="admin">مدير النظام</option>
+                    <option value="controller">الكنترول</option>
+                    <option value="notifier">مسؤول التنبيهات</option>
+                  </select>
+                </div>
+                <Btn onClick={()=>{
+                  if(!newU.name||!newU.username||!newU.password){notify("أكمل البيانات","err");return;}
+                  if(setup.users.find(u=>u.username===newU.username)){notify("اسم المستخدم موجود","err");return;}
+                  setSetup(p=>({...p,users:[...p.users,{...newU,id:uid()}]}));
+                  setNewU({name:"",username:"",password:"",role:"controller"});
+                  notify("تم إضافة الحساب");
+                }} style={{width:"100%"}}>إضافة الحساب</Btn>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ════════ NOTIFIER — SEND (with WhatsApp integration) ════════ */}
+        {page==="notifier_send"&&(
+          <div>
+            <Card>
+              <p style={{margin:"0 0 14px",fontWeight:800,fontSize:15,color:C.navy}}>📧 إرسال تنبيه للمعلمين (عبر واتساب)</p>
+
+              {/* Notification type */}
+              <label style={{...lbl}}>نوع التنبيه</label>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+                {NOTIFY_TYPES.map(t=>(
+                  <button key={t.key} onClick={()=>setNf(f=>({...f,type:t.key}))}
+                    style={{padding:"7px 12px",borderRadius:8,border:`2px solid ${nf.type===t.key?t.color:C.border}`,background:nf.type===t.key?`${t.color}15`:"#fff",color:nf.type===t.key?t.color:C.mid,cursor:"pointer",fontSize:12,fontWeight:nf.type===t.key?800:400,display:"flex",alignItems:"center",gap:5}}>
+                    {t.icon} {t.label}
+                  </button>
                 ))}
               </div>
-              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16}}>
-                <h3 style={{margin:"0 0 18px",fontSize:15,fontWeight:700,color:C.navy}}>توزيع المظاريف حسب المرحلة</h3>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:10}}>
-                  {stats.byStage.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:12,background:C.bg,borderRadius:10,padding:"12px 14px"}}><div style={{width:36,height:36,borderRadius:8,background:`${s.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{s.icon}</div><div style={{flex:1}}><p style={{margin:0,fontSize:11,color:C.muted,lineHeight:1.2}}>{s.short}</p><p style={{margin:"3px 0 0",fontSize:20,fontWeight:800,color:s.color}}>{s.count}</p></div><div style={{width:4,height:36,borderRadius:2,background:s.count>0?s.color:C.border}}/></div>)}
-                </div>
-              </div>
-              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
-                <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:C.navy}}>آخر المظاريف نشاطاً</h3>
-                {bundles.slice(0,5).map(b=><div key={b.id} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:`1px solid ${C.border}`}}><div style={{width:40,height:40,borderRadius:10,background:`${STAGES[b.stage-1].color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{STAGES[b.stage-1].icon}</div><div style={{flex:1}}><p style={{margin:0,fontWeight:700,color:C.navy,fontSize:14}}>{b.subject} — {b.grade}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted}}>{b.barcode} · {b.paperCount} ورقة · {b.semester}</p></div><StageBadge stageId={b.stage}/><button onClick={()=>{setScanVal(b.barcode);setTimeout(()=>{setScanHit(b);setScanErr("");},50);setPage("scan");}} style={{padding:"5px 12px",background:"none",border:`1px solid ${C.border}`,borderRadius:6,cursor:"pointer",color:C.mid,fontSize:11}}>مسح</button></div>)}
-              </div>
-            </div>
-          )}
 
-          {/* ══════════ USERS PAGE ══════════ */}
-          {page==="users"&&user.role==="admin"&&(
-            <div>
-              <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
-                <button onClick={()=>setShowAddUser(true)} style={{padding:"8px 16px",background:C.navy,color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13}}>➕ إضافة مستخدم</button>
+              {/* Teacher selection */}
+              <label style={{...lbl}}>المعلمون المستهدفون (اختر واحداً أو أكثر)</label>
+              <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:14}}>
+                {setup.teachers.map(t=>{
+                  const sel=nf.teachers.includes(t.id);
+                  return(
+                    <button key={t.id} onClick={()=>setNf(f=>({...f,teachers:sel?f.teachers.filter(x=>x!==t.id):[...f.teachers,t.id]}))}
+                      style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:9,border:`1.5px solid ${sel?C.navy:C.border}`,background:sel?`${C.navy}10`:"#fff",cursor:"pointer",textAlign:"right"}}>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:sel?C.navy:C.border,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:800,flexShrink:0}}>
+                        {sel?"✓":t.name.charAt(0)}
+                      </div>
+                      <div style={{flex:1}}>
+                        <span style={{fontWeight:sel?800:400,color:sel?C.navy:C.mid,fontSize:13}}>{t.name}</span>
+                        <span style={{fontSize:11,color:C.muted,marginRight:6}}>{t.subject}</span>
+                        <span style={{fontSize:11,color:C.mid, marginRight:8, direction:"ltr"}}>{t.phone}</span>
+                      </div>
+                      <Tag color={C.purple} bg={C.purpleBg}>{TEACHER_ROLE_LABEL[t.role]||t.role}</Tag>
+                    </button>
+                  );
+                })}
               </div>
-              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)",overflow:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:600}}>
-                  <thead><tr style={{background:C.navy}}>{["المستخدم","الدور","المراحل المسموحة","الحالة","إجراءات"].map(h=><th key={h} style={{padding:"11px 16px",textAlign:"right",color:"#fff",fontWeight:600,fontSize:12}}>{h}</th>)}</tr></thead>
-                  <tbody>{users.map((u,i)=>(
-                    <tr key={u.id} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?C.white:C.bg}}>
-                      <td style={{padding:"12px 16px"}}><p style={{margin:0,fontWeight:700,color:C.navy}}>{u.name}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted,fontFamily:"monospace"}}>{u.un}</p></td>
-                      <td style={{padding:"12px 16px"}}>
-                        {editingUserId === u.id ? (
-                          <select value={editUserData.role} onChange={e=>setEditUserData({...editUserData,role:e.target.value})} style={{padding:"4px 8px",borderRadius:6}}>
-                            {Object.keys(ROLES).map(r=><option key={r} value={r}>{ROLES[r].label}</option>)}
-                          </select>
-                        ) : <span style={{background:C.blueBg,color:C.blue,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700}}>{ROLES[u.role].label}</span>}
-                      </td>
-                      <td style={{padding:"12px 16px",fontSize:12,color:C.mid}}>
-                        {ROLES[u.role].can.map(id=><span key={id} style={{display:"inline-block",background:`${STAGES[id-1].color}20`,color:STAGES[id-1].color,padding:"1px 7px",borderRadius:10,fontSize:10,margin:"2px",fontWeight:600}}>{STAGES[id-1].icon} {STAGES[id-1].short}</span>)}
-                      </td>
-                      <td style={{padding:"12px 16px"}}><span style={{background:C.greenBg,color:C.green,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>فعّال</span></td>
-                      <td style={{padding:"12px 16px"}}>
-                        {editingUserId === u.id ? (
-                          <><button onClick={()=>saveEditUser(u.id)} style={{marginLeft:8,padding:"4px 10px",background:C.green,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>حفظ</button><button onClick={()=>setEditingUserId(null)} style={{padding:"4px 10px",background:C.border,color:C.mid,border:"none",borderRadius:6,cursor:"pointer"}}>إلغاء</button></>
-                        ) : (
-                          <><button onClick={()=>startEditUser(u)} style={{marginLeft:8,padding:"4px 10px",background:C.blue,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>تعديل</button><button onClick={()=>{if(window.confirm(`حذف المستخدم ${u.name}؟`)) deleteUser(u.id);}} style={{padding:"4px 10px",background:C.red,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>حذف</button></>
-                        )}
-                      </td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-              {showAddUser && (
-                <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-                  <div style={{background:C.white,borderRadius:16,padding:24,width:360}}>
-                    <h3 style={{margin:"0 0 16px",color:C.navy}}>إضافة مستخدم جديد</h3>
-                    <input placeholder="اسم المستخدم" value={newUser.un} onChange={e=>setNewUser({...newUser,un:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
-                    <input placeholder="كلمة المرور" type="password" value={newUser.pw} onChange={e=>setNewUser({...newUser,pw:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
-                    <input placeholder="الاسم الكامل" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
-                    <select value={newUser.role} onChange={e=>setNewUser({...newUser,role:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:20,border:`1px solid ${C.border}`,borderRadius:8}}>
-                      {Object.keys(ROLES).map(r=><option key={r} value={r}>{ROLES[r].label}</option>)}
-                    </select>
-                    <div style={{display:"flex",gap:10}}>
-                      <button onClick={addUser} style={{flex:1,padding:"10px",background:C.navy,color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>إضافة</button>
-                      <button onClick={()=>setShowAddUser(false)} style={{flex:1,padding:"10px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer"}}>إلغاء</button>
-                    </div>
+
+              {/* Bundle link (optional) */}
+              <label style={{...lbl}}>ربط بمظروف (اختياري)</label>
+              <select value={nf.bundleId} onChange={e=>setNf(f=>({...f,bundleId:e.target.value}))} style={{...S.inp,marginBottom:14}}>
+                <option value="">-- بدون ربط --</option>
+                {bundles.map(b=><option key={b.id} value={b.id}>{b.barcode} — {b.subject} {b.grade}</option>)}
+              </select>
+
+              {/* Message */}
+              <label style={{...lbl}}>نص الرسالة *</label>
+              <textarea value={nf.message} onChange={e=>setNf(f=>({...f,message:e.target.value}))}
+                rows={3} placeholder="اكتب نص التنبيه هنا..."
+                style={{...S.inp,resize:"vertical",marginBottom:16,lineHeight:1.6}}/>
+
+              {/* Preview */}
+              {nf.teachers.length>0&&nf.message.trim()&&(
+                <div style={{background:C.bg,borderRadius:10,padding:"12px 14px",marginBottom:14,border:`1px solid ${C.border}`}}>
+                  <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:C.mid}}>معاينة الإشعار (سيُرسل عبر واتساب)</p>
+                  <div style={{background:C.white,borderRadius:8,padding:"12px 14px",border:`1px solid ${NOTIFY_TYPES.find(t=>t.key===nf.type)?.color}40`}}>
+                    <p style={{margin:"0 0 4px",fontWeight:800,color:NOTIFY_TYPES.find(t=>t.key===nf.type)?.color,fontSize:13}}>
+                      {NOTIFY_TYPES.find(t=>t.key===nf.type)?.icon} {NOTIFY_TYPES.find(t=>t.key===nf.type)?.label}
+                    </p>
+                    <p style={{margin:"0 0 6px",fontSize:13,color:C.text}}>{nf.message}</p>
+                    <p style={{margin:0,fontSize:11,color:C.muted}}>
+                      إلى: {nf.teachers.map(tid=>setup.teachers.find(t=>t.id===tid)?.name).join("، ")}
+                    </p>
                   </div>
                 </div>
               )}
-            </div>
-          )}
-        </main>
-      </div>
 
-      {/* QR Fullscreen Modal */}
-      {qrFullscreen && (
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1100}} onClick={()=>setQrFullscreen(null)}>
-          <div style={{textAlign:"center"}}>
-            <QR value={qrFullscreen} size={280}/>
-            <p style={{color:"#fff",marginTop:16,fontFamily:"monospace",fontSize:16}}>{qrFullscreen}</p>
-            <button onClick={()=>setQrFullscreen(null)} style={{marginTop:20,padding:"8px 20px",background:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>إغلاق</button>
+              <Btn onClick={sendNotification} color={C.purple} style={{width:"100%",fontSize:14,padding:"11px"}}>
+                📧 إرسال عبر واتساب
+              </Btn>
+              <p style={{fontSize:11, color:C.mid, marginTop:8}}>سيتم فتح محادثة واتساب لكل معلم تلقائياً (قد يُطلب السماح بالنوافذ المنبثقة).</p>
+            </Card>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ════════ NOTIFIER — LOG ════════ */}
+        {page==="notifier_log"&&(
+          <div>
+            {notifs.length===0
+              ?<Card><p style={{textAlign:"center",color:C.muted,padding:"28px 0"}}>لم يتم إرسال أي تنبيهات بعد</p></Card>
+              :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {notifs.map(n=>{
+                  const nt=NOTIFY_TYPES.find(t=>t.key===n.type);
+                  return(
+                    <Card key={n.id} style={{padding:"14px 16px",borderRight:`4px solid ${nt?.color||C.mid}`}}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                        <span style={{fontSize:24,flexShrink:0}}>{nt?.icon}</span>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                            <span style={{fontWeight:800,color:nt?.color||C.navy,fontSize:13}}>{nt?.label}</span>
+                            <span style={{fontSize:11,color:C.muted}}>{fmt(n.ts)}</span>
+                            <span style={{fontSize:11,color:C.muted}}>— {n.sentBy}</span>
+                          </div>
+                          <p style={{margin:"0 0 6px",fontSize:13,color:C.text}}>{n.message}</p>
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                            {n.teachers.map(t=>(
+                              <span key={t.id} style={{background:C.purpleBg,color:C.purple,padding:"2px 9px",borderRadius:12,fontSize:11,fontWeight:700}}>
+                                {t.name} — {t.phone || t.email}
+                              </span>
+                            ))}
+                          </div>
+                          {n.bundle&&<p style={{margin:"5px 0 0",fontSize:11,color:C.muted}}>مظروف: <strong>{n.bundle.barcode}</strong> — {n.bundle.subject}</p>}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            }
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
+
+const lbl = { fontSize:12, color:C.mid, display:"block", marginBottom:5 };
