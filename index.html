@@ -1,0 +1,843 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+// ─── DESIGN TOKENS ───────────────────────────────────────────
+const C = {
+  navy:       "#0D1F3C",
+  navyMid:    "#162D52",
+  navyLight:  "#1E3E6E",
+  gold:       "#C8911F",
+  goldLight:  "#F0B429",
+  bg:         "#F0F2F7",
+  white:      "#FFFFFF",
+  border:     "#D8DDE8",
+  text:       "#0D1F3C",
+  mid:        "#4B5977",
+  muted:      "#8A95A8",
+  green:      "#15803D",
+  greenBg:    "#DCFCE7",
+  amber:      "#B45309",
+  amberBg:    "#FEF3C7",
+  red:        "#B91C1C",
+  redBg:      "#FEE2E2",
+  blue:       "#1D4ED8",
+  blueBg:     "#EFF6FF",
+};
+
+// ─── STAGES ──────────────────────────────────────────────────
+const STAGES = [
+  { id:1,  label:"تسليم الأوراق للطلاب",         short:"تسليم للطلاب",     icon:"📤", color:"#3B82F6", role:"controller" },
+  { id:2,  label:"استلام الأوراق من اللجنة",      short:"استلام من اللجنة", icon:"📥", color:"#8B5CF6", role:"controller" },
+  { id:3,  label:"تسليم المظروف للكنترول",        short:"في الكنترول",      icon:"🗂️", color:"#06B6D4", role:"controller" },
+  { id:4,  label:"تسليم المظروف للمعلم المصحح",   short:"عند المعلم",       icon:"👨‍🏫", color:"#F59E0B", role:"controller" },
+  { id:5,  label:"الأوراق تحت التصحيح",           short:"تحت التصحيح",      icon:"✏️", color:"#EF4444", role:"teacher"    },
+  { id:6,  label:"انتهى التصحيح",                 short:"انتهى التصحيح",    icon:"✅", color:"#10B981", role:"teacher"    },
+  { id:7,  label:"الأوراق تحت المراجعة",          short:"تحت المراجعة",     icon:"🔍", color:"#F97316", role:"reviewer"   },
+  { id:8,  label:"انتهت المراجعة",                short:"انتهت المراجعة",   icon:"✔️", color:"#22C55E", role:"reviewer"   },
+  { id:9,  label:"الأوراق تحت التدقيق النهائي",   short:"تحت التدقيق",      icon:"🔏", color:"#A855F7", role:"auditor"    },
+  { id:10, label:"انتهى التدقيق",                 short:"انتهى التدقيق",    icon:"🎯", color:"#6366F1", role:"auditor"    },
+  { id:11, label:"تم حفظ المظروف في الأرشيف",     short:"محفوظ",            icon:"📁", color:"#14B8A6", role:"archiver"   },
+  { id:12, label:"المعاملة مغلقة نهائياً",        short:"مغلق",             icon:"🔒", color:"#64748B", role:"admin"      },
+];
+
+const ROLES = {
+  admin:      { label:"مدير النظام",    can:[1,2,3,4,5,6,7,8,9,10,11,12] },
+  controller: { label:"الكنترول",       can:[1,2,3,4] },
+  teacher:    { label:"المعلم المصحح",  can:[5,6] },
+  reviewer:   { label:"المراجع",        can:[7,8] },
+  auditor:    { label:"المدقق",         can:[9,10] },
+  archiver:   { label:"مسؤول الأرشفة", can:[11,12] },
+};
+
+const DEFAULT_USERS = [
+  { id:1, un:"admin",      pw:"admin123",   name:"أحمد المدير",   role:"admin"      },
+  { id:2, un:"controller", pw:"ctrl123",    name:"سمر الكنترول",  role:"controller" },
+  { id:3, un:"teacher",    pw:"teach123",   name:"خالد المعلم",   role:"teacher"    },
+  { id:4, un:"reviewer",   pw:"review123",  name:"نورة المراجعة", role:"reviewer"   },
+  { id:5, un:"auditor",    pw:"audit123",   name:"فهد المدقق",    role:"auditor"    },
+  { id:6, un:"archiver",   pw:"arch123",    name:"وليد الأرشيف",  role:"archiver"   },
+];
+
+const SUBJECTS  = ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية","التاريخ","الجغرافيا"];
+const GRADES    = ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"];
+const SEMESTERS = ["الفصل الأول","الفصل الثاني","الفصل الثالث"];
+const EXAM_TYPES= ["اختبار نهاية الفصل","اختبار منتصف الفصل","اختبار قصير"];
+
+// ─── HELPERS ─────────────────────────────────────────────────
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"});
+}
+function hoursSince(iso) {
+  return ((Date.now() - new Date(iso).getTime()) / 3600000).toFixed(1);
+}
+function uid() {
+  return Math.random().toString(36).slice(2,9).toUpperCase();
+}
+function generateBarcode() {
+  return `BND${uid()}`;
+}
+
+// ─── SEED BUNDLES (with varied dates) ────────────────────────
+function seedBundles() {
+  const out = [];
+  const combos = [
+    ["الكيمياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",32],
+    ["الفيزياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",28],
+    ["الأحياء","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",30],
+    ["الرياضيات","أول ثانوي","الفصل الأول","اختبار نهاية الفصل",35],
+    ["اللغة العربية","ثالث ثانوي","الفصل الأول","اختبار نهاية الفصل",40],
+    ["الكيمياء","أول ثانوي","الفصل الثاني","اختبار منتصف الفصل",27],
+    ["الفيزياء","ثالث ثانوي","الفصل الثاني","اختبار نهاية الفصل",31],
+    ["اللغة الإنجليزية","ثاني ثانوي","الفصل الأول","اختبار نهاية الفصل",29],
+  ];
+  combos.forEach(([sub, grade, sem, type, count], i) => {
+    const stage = [2,4,5,6,8,10,11,3][i] || 3;
+    const barcode = `BND${String(2025001 + i).padStart(7,"0")}`;
+    const created = new Date(Date.now() - (8-i)*2*86400000);
+    const log = [];
+    for (let s = 1; s <= stage; s++) {
+      log.push({
+        stageId: s,
+        stageLabel: STAGES[s-1].label,
+        ts: new Date(created.getTime() + s*3600000*2).toISOString(),
+        user: DEFAULT_USERS[s % DEFAULT_USERS.length].name,
+        note: "",
+      });
+    }
+    out.push({ id:i+1, barcode, subject:sub, grade, semester:sem, examType:type, paperCount:count, stage, log, created:created.toISOString() });
+  });
+  return out;
+}
+
+// ─── LOAD/SAVE LOCALSTORAGE ──────────────────────────────────
+const STORAGE_KEYS = {
+  BUNDLES: "exam_bundles",
+  USERS: "exam_users",
+};
+
+function loadBundles() {
+  const stored = localStorage.getItem(STORAGE_KEYS.BUNDLES);
+  if (stored) return JSON.parse(stored);
+  return seedBundles();
+}
+
+function saveBundles(bundles) {
+  localStorage.setItem(STORAGE_KEYS.BUNDLES, JSON.stringify(bundles));
+}
+
+function loadUsers() {
+  const stored = localStorage.getItem(STORAGE_KEYS.USERS);
+  if (stored) return JSON.parse(stored);
+  return DEFAULT_USERS;
+}
+
+function saveUsers(users) {
+  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+}
+
+// ─── QR COMPONENT (visual only) ──────────────────────────────
+function QR({ value, size=110, onClick }) {
+  const h = value.split("").reduce((a,c)=>(a*31+c.charCodeAt(0))|0, 0);
+  const N = 9; const cell = size/N;
+  const grid = Array.from({length:N*N},(_,i)=>{
+    const r=Math.floor(i/N), c=i%N;
+    const corner=(r<3&&c<3)||(r<3&&c>N-4)||(r>N-4&&c<3);
+    return corner || !!(Math.abs(h)>>(i%29)&1);
+  });
+  return (
+    <svg width={size} height={size} style={{display:"block",borderRadius:6,border:`2px solid ${C.navy}`,cursor: onClick ? "pointer" : "default"}} onClick={onClick}>
+      <rect width={size} height={size} fill="#fff"/>
+      {grid.map((on,i)=>{
+        const r=Math.floor(i/N),c=i%N;
+        return on ? <rect key={i} x={c*cell} y={r*cell} width={cell} height={cell} fill="#111"/> : null;
+      })}
+    </svg>
+  );
+}
+
+// ─── STAGE BADGE ─────────────────────────────────────────────
+function StageBadge({ stageId, large }) {
+  const s = STAGES[stageId-1];
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:5,
+      background:`${s.color}20`, color:s.color,
+      border:`1.5px solid ${s.color}50`,
+      padding: large ? "7px 16px" : "3px 10px",
+      borderRadius:999, fontWeight:700,
+      fontSize: large ? 15 : 12,
+    }}>
+      {s.icon} {s.short}
+    </span>
+  );
+}
+
+// ─── PROGRESS BAR ────────────────────────────────────────────
+function ProgressBar({ stageId }) {
+  const pct = Math.round((stageId/12)*100);
+  const s = STAGES[stageId-1];
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+        <span style={{fontSize:11,color:C.muted}}>التقدم الكلي</span>
+        <span style={{fontSize:11,fontWeight:700,color:s.color}}>{pct}%</span>
+      </div>
+      <div style={{height:8,background:C.border,borderRadius:99,overflow:"hidden"}}>
+        <div style={{width:`${pct}%`,height:"100%",background:s.color,borderRadius:99,transition:"width .4s"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── TOAST NOTIFICATION ──────────────────────────────────────
+function Toast({ message, type, onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  return (
+    <div style={{
+      position:"fixed", bottom:28, left:"50%", transform:"translateX(-50%)",
+      background:type==="err"?C.red:C.green, color:"#fff",
+      padding:"12px 28px", borderRadius:14, fontWeight:700, fontSize:14,
+      boxShadow:"0 8px 28px rgba(0,0,0,.2)", zIndex:999,
+      display:"flex", alignItems:"center", gap:10,
+    }}>
+      {type==="err" ? "⚠️" : "✅"} {message}
+    </div>
+  );
+}
+
+// ─── CONFIRM MODAL ───────────────────────────────────────────
+function ConfirmModal({ title, message, onConfirm, onCancel }) {
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+      <div style={{background:C.white,borderRadius:16,padding:24,width:320,textAlign:"center"}}>
+        <h3 style={{margin:"0 0 12px",color:C.navy}}>{title}</h3>
+        <p style={{margin:"0 0 20px",color:C.mid}}>{message}</p>
+        <div style={{display:"flex",gap:12}}>
+          <button onClick={onConfirm} style={{flex:1,padding:"10px",background:C.red,color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>تأكيد</button>
+          <button onClick={onCancel} style={{flex:1,padding:"10px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer"}}>إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [page, setPage] = useState("scan");
+  const [bundles, setBundles] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [sidebar, setSidebar] = useState(true);
+
+  // Login state
+  const [lf, setLf] = useState({un:"",pw:""});
+  const [lerr, setLerr] = useState("");
+
+  // Scan page
+  const [scanVal, setScanVal] = useState("");
+  const [scanHit, setScanHit] = useState(null);
+  const [scanErr, setScanErr] = useState("");
+  const [advNote, setAdvNote] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [nextStageId, setNextStageId] = useState(null);
+  const [qrFullscreen, setQrFullscreen] = useState(null);
+
+  // Create page
+  const [form, setForm] = useState({ subject:"الكيمياء", grade:"ثاني ثانوي", semester:"الفصل الأول", examType:"اختبار نهاية الفصل", paperCount:"", note:"" });
+  const [created, setCreated] = useState(null);
+
+  // List page
+  const [search, setSearch] = useState("");
+  const [fStage, setFStage] = useState("");
+  const [fSubject, setFSubject] = useState("");
+  const [detail, setDetail] = useState(null);
+
+  // User management
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ un:"", pw:"", name:"", role:"controller" });
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [editUserData, setEditUserData] = useState({});
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    setBundles(loadBundles());
+    setUsers(loadUsers());
+  }, []);
+
+  // Save bundles whenever they change
+  useEffect(() => {
+    if (bundles.length) saveBundles(bundles);
+  }, [bundles]);
+
+  // Save users whenever they change
+  useEffect(() => {
+    if (users.length) saveUsers(users);
+  }, [users]);
+
+  function notify(msg, type="ok") {
+    setToast({msg,type});
+  }
+
+  function closeToast() {
+    setToast(null);
+  }
+
+  // ── LOGIN ──
+  function login(e) {
+    e?.preventDefault?.();
+    const u = users.find(u=>u.un===lf.un&&u.pw===lf.pw);
+    if (u) { setUser(u); setLerr(""); }
+    else setLerr("اسم المستخدم أو كلمة المرور غير صحيحة");
+  }
+
+  // ── SCAN ──
+  function doScan() {
+    const v = scanVal.trim();
+    if (!v) return;
+    const b = bundles.find(b=>b.barcode===v);
+    if (!b) { setScanHit(null); setScanErr(`لا يوجد مظروف بالرقم: ${v}`); return; }
+    setScanHit(b); setScanErr(""); setConfirming(false); setNextStageId(null);
+  }
+
+  function requestAdvance(sid) {
+    if (!ROLES[user.role].can.includes(sid)) { notify("ليس لديك صلاحية هذه المرحلة","err"); return; }
+    setNextStageId(sid); setAdvNote(""); setConfirming(true);
+  }
+
+  function confirmAdvance() {
+    const sid = nextStageId;
+    const entry = {
+      stageId: sid,
+      stageLabel: STAGES[sid-1].label,
+      ts: new Date().toISOString(),
+      user: user.name,
+      note: advNote,
+    };
+    setBundles(prev=>prev.map(b=>{
+      if (b.id!==scanHit.id) return b;
+      const updated = {...b, stage:sid, log:[...b.log, entry]};
+      setScanHit(updated);
+      return updated;
+    }));
+    notify(`تم تحديث الحالة: ${STAGES[sid-1].label}`);
+    setConfirming(false); setNextStageId(null); setAdvNote("");
+  }
+
+  // ── CREATE ──
+  function createBundle() {
+    if (!form.paperCount || isNaN(form.paperCount) || +form.paperCount < 1) {
+      notify("أدخل عدد الأوراق صحيحاً","err"); return;
+    }
+    const barcode = generateBarcode();
+    const newB = {
+      id: Date.now(), // simple unique id
+      barcode,
+      subject:form.subject, grade:form.grade,
+      semester:form.semester, examType:form.examType,
+      paperCount:+form.paperCount,
+      stage:1,
+      log: [{
+        stageId:1,
+        stageLabel:STAGES[0].label,
+        ts:new Date().toISOString(),
+        user:user.name,
+        note:form.note || "تم إنشاء المظروف",
+      }],
+      created: new Date().toISOString(),
+    };
+    setBundles(prev=>[...prev,newB]);
+    setCreated(newB);
+    notify("تم إنشاء الباركود بنجاح");
+  }
+
+  // ── DELETE BUNDLE ──
+  function deleteBundle(bundle, onSuccess) {
+    setBundles(prev=>prev.filter(b=>b.id!==bundle.id));
+    notify("تم حذف المظروف بنجاح");
+    if (onSuccess) onSuccess();
+  }
+
+  // ── USER MANAGEMENT ──
+  function addUser() {
+    if (!newUser.un || !newUser.pw || !newUser.name) {
+      notify("جميع الحقول مطلوبة","err");
+      return;
+    }
+    if (users.some(u=>u.un===newUser.un)) {
+      notify("اسم المستخدم موجود بالفعل","err");
+      return;
+    }
+    const newId = Math.max(...users.map(u=>u.id),0)+1;
+    setUsers([...users, {...newUser, id:newId}]);
+    setShowAddUser(false);
+    setNewUser({ un:"", pw:"", name:"", role:"controller" });
+    notify("تم إضافة المستخدم");
+  }
+
+  function deleteUser(userId) {
+    if (users.find(u=>u.id===userId)?.role === "admin" && users.filter(u=>u.role==="admin").length === 1) {
+      notify("لا يمكن حذف آخر مدير في النظام","err");
+      return;
+    }
+    setUsers(users.filter(u=>u.id!==userId));
+    notify("تم حذف المستخدم");
+  }
+
+  function startEditUser(user) {
+    setEditingUserId(user.id);
+    setEditUserData({ pw: user.pw, name: user.name, role: user.role });
+  }
+
+  function saveEditUser(userId) {
+    setUsers(users.map(u=>u.id===userId ? {...u, ...editUserData} : u));
+    setEditingUserId(null);
+    notify("تم تحديث المستخدم");
+  }
+
+  // ── EXPORT CSV ──
+  function exportToCSV() {
+    const headers = ["الباركود","المادة","الصف","الفصل","نوع الاختبار","عدد الأوراق","الحالية","تاريخ الإنشاء"];
+    const rows = bundles.map(b=>[
+      b.barcode, b.subject, b.grade, b.semester, b.examType, b.paperCount,
+      STAGES[b.stage-1].label, fmtDate(b.created)
+    ]);
+    const csv = [headers, ...rows].map(row=>row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], {type:"text/csv;charset=utf-8;"});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "mazarif_export.csv";
+    link.click();
+    notify("تم تصدير البيانات");
+  }
+
+  // ── STATS ──
+  const stats = useMemo(() => ({
+    total: bundles.length,
+    byStage: STAGES.map(s=>({...s, count:bundles.filter(b=>b.stage===s.id).length})),
+    done: bundles.filter(b=>b.stage===12).length,
+    active: bundles.filter(b=>b.stage>1&&b.stage<12).length,
+    delayed: bundles.filter(b=>+hoursSince(b.created)>48&&b.stage<6).length,
+  }), [bundles]);
+
+  const filtered = useMemo(() => {
+    return bundles.filter(b=>{
+      const q=search.trim().toLowerCase();
+      return (!q||b.barcode.toLowerCase().includes(q)||b.subject.includes(q)||b.grade.includes(q)||b.semester.includes(q))
+        && (!fStage||b.stage===+fStage)
+        && (!fSubject||b.subject===fSubject);
+    });
+  }, [bundles, search, fStage, fSubject]);
+
+  const navItems = [
+    { key:"scan",   icon:"📷", label:"مسح الباركود" },
+    { key:"create", icon:"➕", label:"إنشاء مظروف" },
+    { key:"list",   icon:"📋", label:"كل المظاريف" },
+    { key:"dash",   icon:"📊", label:"لوحة التحكم" },
+    ...(user?.role==="admin"?[{key:"users",icon:"👥",label:"المستخدمون"}]:[]),
+  ];
+
+  // ════════════════ LOGIN SCREEN ════════════════
+  if (!user) return (
+    <div style={{minHeight:"100vh",background:`linear-gradient(145deg,${C.navy} 0%,${C.navyLight} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl"}}>
+      <div style={{background:C.white,borderRadius:20,padding:"44px 36px",width:360,boxShadow:"0 32px 80px rgba(0,0,0,.35)"}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:64,height:64,background:C.navy,borderRadius:14,margin:"0 auto 14px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30}}>📦</div>
+          <h1 style={{margin:0,fontSize:20,fontWeight:800,color:C.navy}}>تتبع مظاريف الاختبارات</h1>
+          <p style={{margin:"6px 0 0",fontSize:12,color:C.muted}}>نظام إدارة دورة حياة أوراق الإجابة</p>
+        </div>
+        {lerr&&<div style={{background:C.redBg,color:C.red,borderRadius:8,padding:"10px 14px",fontSize:13,marginBottom:16}}>{lerr}</div>}
+        {[["اسم المستخدم","un","text"],["كلمة المرور","pw","password"]].map(([lbl,k,t])=>(
+          <div key={k} style={{marginBottom:14}}>
+            <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:4}}>{lbl}</label>
+            <input type={t} value={lf[k]} onChange={e=>setLf(f=>({...f,[k]:e.target.value}))}
+              onKeyDown={e=>e.key==="Enter"&&login()}
+              style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",direction:t==="password"?"ltr":"rtl"}}/>
+          </div>
+        ))}
+        <button onClick={login} style={{width:"100%",padding:12,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
+          دخول
+        </button>
+        <div style={{marginTop:22,background:C.bg,borderRadius:10,padding:14}}>
+          <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:C.mid}}>حسابات تجريبية:</p>
+          {users.map(u=>(
+            <button key={u.id} onClick={()=>{setLf({un:u.un,pw:u.pw});}}
+              style={{display:"block",width:"100%",textAlign:"right",padding:"4px 0",background:"none",border:"none",cursor:"pointer",fontSize:11,color:C.mid}}>
+              <strong style={{color:C.navy}}>{ROLES[u.role].label}</strong> — {u.un} / {u.pw}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ════════════════ MAIN LAYOUT ════════════════
+  return (
+    <div style={{fontFamily:"'Tajawal',Arial,sans-serif",direction:"rtl",display:"flex",minHeight:"100vh",background:C.bg}}>
+
+      {/* SIDEBAR */}
+      <aside style={{width:sidebar?210:58,background:C.navy,display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh",overflow:"hidden",transition:"width .22s"}}>
+        <div style={{padding:"18px 14px",borderBottom:`1px solid ${C.navyLight}`,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,background:C.gold,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>📦</div>
+          {sidebar&&<span style={{color:"#fff",fontSize:13,fontWeight:700,lineHeight:1.2}}>تتبع<br/>المظاريف</span>}
+        </div>
+        <nav style={{padding:"10px 6px",flex:1,overflowY:"auto"}}>
+          {navItems.map(n=>(
+            <button key={n.key} onClick={()=>{setPage(n.key);setCreated(null);setScanHit(null);setScanErr("");setDetail(null);setShowAddUser(false);setEditingUserId(null);}}
+              style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 10px",borderRadius:8,border:"none",cursor:"pointer",background:page===n.key?C.navyLight:"transparent",color:page===n.key?"#fff":"#8A9BBF",fontSize:13,fontWeight:page===n.key?700:400,marginBottom:2,textAlign:"right"}}>
+              <span style={{fontSize:17,flexShrink:0}}>{n.icon}</span>
+              {sidebar&&<span>{n.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <div style={{padding:"12px 6px",borderTop:`1px solid ${C.navyLight}`}}>
+          {sidebar&&<div style={{padding:"8px 10px",background:C.navyLight,borderRadius:8,marginBottom:8}}>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:"#fff"}}>{user.name}</p>
+            <p style={{margin:"2px 0 0",fontSize:10,color:C.goldLight}}>{ROLES[user.role].label}</p>
+          </div>}
+          <button onClick={()=>setUser(null)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:"none",background:"transparent",cursor:"pointer",color:"#EF4444",fontSize:12,borderRadius:6}}>
+            <span>🚪</span>{sidebar&&"خروج"}
+          </button>
+        </div>
+      </aside>
+
+      {/* CONTENT */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"auto"}}>
+
+        {/* TOPBAR */}
+        <header style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"11px 24px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:20}}>
+          <button onClick={()=>setSidebar(s=>!s)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:C.mid,padding:4}}>☰</button>
+          <h2 style={{margin:0,flex:1,fontSize:15,fontWeight:800,color:C.navy}}>
+            {navItems.find(n=>n.key===page)?.label}
+          </h2>
+          {stats.delayed>0&&(
+            <span style={{background:C.amberBg,color:C.amber,padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700}}>
+              ⚠️ {stats.delayed} مظروف متأخر
+            </span>
+          )}
+          {page==="list" && (
+            <button onClick={exportToCSV} style={{background:C.greenBg,color:C.green,border:"none",padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer"}}>
+              📎 تصدير CSV
+            </button>
+          )}
+        </header>
+
+        {/* TOAST */}
+        {toast && <Toast message={toast.msg} type={toast.type} onClose={closeToast} />}
+
+        <main style={{padding:24,flex:1}}>
+
+          {/* ══════════ SCAN PAGE ══════════ */}
+          {page==="scan"&&(
+            <div style={{maxWidth:640,margin:"0 auto"}}>
+              <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.07)",marginBottom:20}}>
+                <h3 style={{margin:"0 0 6px",color:C.navy,fontSize:17}}>مسح باركود المظروف</h3>
+                <p style={{margin:"0 0 20px",color:C.muted,fontSize:13}}>امسح أو اكتب رقم الباركود لعرض حالة المظروف وتحديثها</p>
+                <div style={{display:"flex",gap:10}}>
+                  <input value={scanVal} onChange={e=>setScanVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doScan()}
+                    placeholder="BND2025001 ..."
+                    style={{flex:1,padding:"12px 14px",border:`2px solid ${C.border}`,borderRadius:10,fontSize:15,outline:"none",fontFamily:"monospace",direction:"ltr",letterSpacing:1}}
+                    autoFocus/>
+                  <button onClick={doScan} style={{padding:"12px 22px",background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                    مسح ▶
+                  </button>
+                </div>
+                <div style={{marginTop:14,display:"flex",flexWrap:"wrap",gap:6}}>
+                  {bundles.slice(0,6).map(b=>(
+                    <button key={b.id} onClick={()=>{setScanVal(b.barcode);setTimeout(()=>{const bnd=bundles.find(x=>x.barcode===b.barcode);setScanHit(bnd);setScanErr("");setConfirming(false);},50)}}
+                      style={{padding:"4px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,fontSize:11,cursor:"pointer",color:C.mid,fontFamily:"monospace"}}>
+                      {b.barcode}
+                    </button>
+                  ))}
+                </div>
+                {scanErr&&<p style={{margin:"12px 0 0",color:C.red,fontWeight:700,fontSize:13}}>⚠️ {scanErr}</p>}
+              </div>
+
+              {scanHit&&!confirming&&(
+                <div style={{background:C.white,borderRadius:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)",overflow:"hidden"}}>
+                  <div style={{background:STAGES[scanHit.stage-1].color,padding:"20px 24px",display:"flex",alignItems:"center",gap:20}}>
+                    <QR value={scanHit.barcode} size={90} onClick={()=>setQrFullscreen(scanHit.barcode)}/>
+                    <div>
+                      <p style={{margin:0,color:"rgba(255,255,255,.75)",fontSize:12}}>باركود المظروف</p>
+                      <p style={{margin:"2px 0 8px",color:"#fff",fontFamily:"monospace",fontSize:18,fontWeight:800,letterSpacing:2}}>{scanHit.barcode}</p>
+                      <StageBadge stageId={scanHit.stage} large/>
+                    </div>
+                  </div>
+                  <div style={{padding:24}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+                      {[
+                        ["المادة", scanHit.subject], ["الصف الدراسي", scanHit.grade],
+                        ["الفصل الدراسي", scanHit.semester], ["نوع الاختبار", scanHit.examType],
+                        ["عدد الأوراق", `${scanHit.paperCount} ورقة`], ["تاريخ الإنشاء", fmtDate(scanHit.created)],
+                      ].map(([k,v])=>(
+                        <div key={k} style={{background:C.bg,borderRadius:10,padding:"12px 14px"}}>
+                          <p style={{margin:0,fontSize:11,color:C.muted}}>{k}</p>
+                          <p style={{margin:"4px 0 0",fontSize:14,fontWeight:700,color:C.navy}}>{v}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <ProgressBar stageId={scanHit.stage}/>
+                    <div style={{display:"flex",gap:3,margin:"20px 0",overflowX:"auto",paddingBottom:4}}>
+                      {STAGES.map(s=>(
+                        <div key={s.id} title={s.label} style={{flex:1,minWidth:18,height:8,borderRadius:4,background: s.id<scanHit.stage ? C.green : s.id===scanHit.stage ? STAGES[scanHit.stage-1].color : C.border}}/>
+                      ))}
+                    </div>
+                    {scanHit.stage < 12 && (()=>{
+                      const next = scanHit.stage + 1;
+                      const canDo = ROLES[user.role].can.includes(next);
+                      return canDo ? (
+                        <button onClick={()=>requestAdvance(next)} style={{width:"100%",padding:"14px",background:STAGES[next-1].color,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                          <span>{STAGES[next-1].icon}</span> تحديث إلى: {STAGES[next-1].label}
+                        </button>
+                      ) : (
+                        <div style={{background:C.bg,borderRadius:10,padding:"14px 18px",textAlign:"center",color:C.muted,fontSize:13}}>
+                          المرحلة التالية <strong>{STAGES[next-1].label}</strong> — خارج نطاق صلاحياتك
+                        </div>
+                      );
+                    })()}
+                    {scanHit.stage===12&&<div style={{background:C.greenBg,borderRadius:10,padding:"14px 18px",textAlign:"center",color:C.green,fontWeight:700,fontSize:14}}>✅ المعاملة مغلقة نهائياً</div>}
+                    
+                    <div style={{marginTop:24,borderTop:`1px solid ${C.border}`,paddingTop:20}}>
+                      <h4 style={{margin:"0 0 14px",fontSize:13,color:C.navy}}>آخر الحركات</h4>
+                      {scanHit.log.slice(-5).reverse().map((e,i)=>(
+                        <div key={i} style={{display:"flex",gap:12,marginBottom:10,alignItems:"flex-start"}}>
+                          <div style={{width:10,height:10,borderRadius:"50%",background:STAGES[e.stageId-1]?.color||C.muted,marginTop:5}}/>
+                          <div><span style={{fontSize:13,fontWeight:700,color:C.navy}}>{e.stageLabel}</span><span style={{fontSize:11,color:C.muted,marginRight:8}}>{fmtDate(e.ts)}</span><span style={{fontSize:11,color:C.mid}}> — {e.user}</span>{e.note&&<p style={{margin:"2px 0 0",fontSize:11,color:C.mid,fontStyle:"italic"}}>"{e.note}"</p>}</div>
+                        </div>
+                      ))}
+                      {scanHit.log.length > 5 && <p style={{fontSize:11,color:C.muted,marginTop:8}}>... و{scanHit.log.length-5} حركات سابقة</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {confirming&&nextStageId&&(
+                <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.1)",border:`2px solid ${STAGES[nextStageId-1].color}`}}>
+                  <h3 style={{margin:"0 0 6px",color:C.navy}}>تأكيد تحديث الحالة</h3>
+                  <p style={{margin:"0 0 20px",color:C.mid,fontSize:13}}>سيتم تحديث مظروف <strong>{scanHit.barcode}</strong> إلى:</p>
+                  <div style={{background:`${STAGES[nextStageId-1].color}15`,border:`1.5px solid ${STAGES[nextStageId-1].color}40`,borderRadius:10,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+                    <span style={{fontSize:28}}>{STAGES[nextStageId-1].icon}</span>
+                    <div><p style={{margin:0,fontSize:16,fontWeight:800,color:STAGES[nextStageId-1].color}}>{STAGES[nextStageId-1].label}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted}}>المرحلة {nextStageId} من 12</p></div>
+                  </div>
+                  <div style={{marginBottom:20}}>
+                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:6}}>ملاحظة (اختياري)</label>
+                    <input value={advNote} onChange={e=>setAdvNote(e.target.value)} placeholder="أضف ملاحظة إن وجدت..." style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:13}}/>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={confirmAdvance} style={{flex:1,padding:"12px",background:STAGES[nextStageId-1].color,color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>✅ تأكيد التحديث</button>
+                    <button onClick={()=>{setConfirming(false);setNextStageId(null);}} style={{flex:1,padding:"12px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:10,fontSize:14,cursor:"pointer"}}>إلغاء</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════ CREATE PAGE ══════════ */}
+          {page==="create"&&(
+            <div style={{maxWidth:540,margin:"0 auto"}}>
+              {created ? (
+                <div style={{background:C.white,borderRadius:14,padding:32,boxShadow:"0 2px 12px rgba(0,0,0,.07)",textAlign:"center"}}>
+                  <div style={{fontSize:48,marginBottom:8}}>✅</div>
+                  <h3 style={{margin:"0 0 20px",color:C.green,fontSize:18}}>تم إنشاء الباركود بنجاح!</h3>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
+                    <QR value={created.barcode} size={160} onClick={()=>setQrFullscreen(created.barcode)}/>
+                  </div>
+                  <p style={{fontFamily:"monospace",fontSize:22,fontWeight:800,color:C.navy,letterSpacing:3,margin:"0 0 8px"}}>{created.barcode}</p>
+                  <p style={{color:C.mid,fontSize:13,margin:"0 0 20px"}}>{created.subject} — {created.grade} — {created.semester}<br/>{created.paperCount} ورقة</p>
+                  <div style={{background:C.amberBg,borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:13,color:C.amber}}>📌 اطبع هذا الباركود وألصقه على المظروف</div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={()=>window.print()} style={{flex:1,padding:11,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨️ طباعة</button>
+                    <button onClick={()=>{setCreated(null);setForm({subject:"الكيمياء",grade:"ثاني ثانوي",semester:"الفصل الأول",examType:"اختبار نهاية الفصل",paperCount:"",note:""});}} style={{flex:1,padding:11,background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,cursor:"pointer"}}>إنشاء آخر</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{background:C.white,borderRadius:14,padding:28,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}}>
+                  <h3 style={{margin:"0 0 6px",color:C.navy}}>إنشاء مظروف جديد</h3>
+                  <p style={{margin:"0 0 22px",color:C.muted,fontSize:13}}>أدخل بيانات الدفعة لإنشاء باركود المظروف</p>
+                  {[["المادة","subject",SUBJECTS],["الصف الدراسي","grade",GRADES],["الفصل الدراسي","semester",SEMESTERS],["نوع الاختبار","examType",EXAM_TYPES]].map(([lbl,k,opts])=>(
+                    <div key={k} style={{marginBottom:14}}>
+                      <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>{lbl}</label>
+                      <select value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}>
+                        {opts.map(o=><option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                  <div style={{marginBottom:14}}>
+                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>عدد الأوراق في المظروف</label>
+                    <input type="number" min="1" value={form.paperCount} onChange={e=>setForm(f=>({...f,paperCount:e.target.value}))} placeholder="مثال: 32" style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}/>
+                  </div>
+                  <div style={{marginBottom:22}}>
+                    <label style={{fontSize:12,color:C.mid,display:"block",marginBottom:5}}>ملاحظة (اختياري)</label>
+                    <input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:14}}/>
+                  </div>
+                  <button onClick={createBundle} style={{width:"100%",padding:13,background:C.navy,color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer"}}>إنشاء الباركود ←</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════ LIST PAGE ══════════ */}
+          {page==="list"&&(
+            <div>
+              {detail ? (
+                <div>
+                  <button onClick={()=>setDetail(null)} style={{marginBottom:16,padding:"8px 14px",background:"none",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",color:C.mid,fontSize:13}}>← رجوع للقائمة</button>
+                  <div style={{background:C.white,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,.07)",marginBottom:16}}>
+                    <div style={{background:STAGES[detail.stage-1].color,padding:"20px 24px",display:"flex",alignItems:"center",gap:18}}>
+                      <QR value={detail.barcode} size={80} onClick={()=>setQrFullscreen(detail.barcode)}/>
+                      <div><p style={{margin:0,color:"rgba(255,255,255,.7)",fontSize:11}}>رقم الباركود</p><p style={{margin:"2px 0 8px",color:"#fff",fontFamily:"monospace",fontSize:20,fontWeight:800}}>{detail.barcode}</p><StageBadge stageId={detail.stage} large/></div>
+                    </div>
+                    <div style={{padding:24}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}>
+                        {[["المادة",detail.subject],["الصف",detail.grade],["الفصل",detail.semester],["نوع الاختبار",detail.examType],["عدد الأوراق",`${detail.paperCount} ورقة`],["تاريخ الإنشاء",fmtDate(detail.created)]].map(([k,v])=>(
+                          <div key={k} style={{background:C.bg,borderRadius:10,padding:"10px 12px"}}><p style={{margin:0,fontSize:10,color:C.muted}}>{k}</p><p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:C.navy}}>{v}</p></div>
+                        ))}
+                      </div>
+                      <ProgressBar stageId={detail.stage}/>
+                      <div style={{display:"flex",gap:3,margin:"16px 0",overflowX:"auto"}}>
+                        {STAGES.map(s=><div key={s.id} title={s.label} style={{flex:1,minWidth:16,height:8,borderRadius:4,background:s.id<detail.stage?C.green:s.id===detail.stage?STAGES[detail.stage-1].color:C.border}}/>)}
+                      </div>
+                      <h4 style={{margin:"20px 0 12px",fontSize:13,color:C.navy}}>سجل الحركة الكامل</h4>
+                      <div style={{overflowX:"auto"}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                          <thead><tr style={{background:C.bg}}>{["المرحلة","التاريخ والوقت","المستخدم","ملاحظة"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"right",color:C.muted,fontWeight:600}}>{h}</th>)}</tr></thead>
+                          <tbody>{detail.log.map((e,i)=>(
+                            <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                              <td style={{padding:"9px 12px"}}><StageBadge stageId={e.stageId}/></td>
+                              <td style={{padding:"9px 12px",color:C.muted,fontSize:11}}>{fmtDate(e.ts)}</td>
+                              <td style={{padding:"9px 12px",fontWeight:600,color:C.navy}}>{e.user}</td>
+                              <td style={{padding:"9px 12px",color:C.mid,fontStyle:"italic",fontSize:11}}>{e.note||"—"}</td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
+                      <div style={{marginTop:24,display:"flex",justifyContent:"flex-end"}}>
+                        <button onClick={()=>{if(window.confirm("هل أنت متأكد من حذف هذا المظروف؟")) deleteBundle(detail,()=>setDetail(null));}} style={{padding:"8px 16px",background:C.redBg,color:C.red,border:"none",borderRadius:8,cursor:"pointer",fontSize:12}}>🗑️ حذف المظروف</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{background:C.white,borderRadius:12,padding:14,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,.05)",display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="بحث بالباركود أو المادة..." style={{flex:1,minWidth:180,padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:13}}/>
+                    <select value={fStage} onChange={e=>setFStage(e.target.value)} style={{padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12}}><option value="">كل المراحل</option>{STAGES.map(s=><option key={s.id} value={s.id}>{s.icon} {s.short}</option>)}</select>
+                    <select value={fSubject} onChange={e=>setFSubject(e.target.value)} style={{padding:"8px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12}}><option value="">كل المواد</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                    <span style={{fontSize:12,color:C.muted}}>{filtered.length} مظروف</span>
+                  </div>
+                  <div style={{background:C.white,borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,.05)",overflow:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:680}}>
+                      <thead><tr style={{background:C.navy}}>{["الباركود","المادة","الصف","الفصل","الأوراق","الحالة","التقدم",""].map(h=><th key={h} style={{padding:"12px 14px",textAlign:"right",color:"#fff",fontWeight:600,fontSize:12}}>{h}</th>)}</tr></thead>
+                      <tbody>{filtered.map((b,i)=>(
+                        <tr key={b.id} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?C.white:C.bg}}>
+                          <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,color:C.mid}}>{b.barcode}</td>
+                          <td style={{padding:"10px 14px",fontWeight:700,color:C.navy}}>{b.subject}</td>
+                          <td style={{padding:"10px 14px",color:C.mid,fontSize:12}}>{b.grade}</td>
+                          <td style={{padding:"10px 14px",color:C.mid,fontSize:12}}>{b.semester}</td>
+                          <td style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:C.navy}}>{b.paperCount}</td>
+                          <td style={{padding:"10px 14px"}}><StageBadge stageId={b.stage}/></td>
+                          <td style={{padding:"10px 14px",minWidth:100}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:C.border,borderRadius:3}}><div style={{width:`${(b.stage/12)*100}%`,height:"100%",background:STAGES[b.stage-1].color,borderRadius:3}}/></div><span style={{fontSize:10,color:C.muted}}>{Math.round((b.stage/12)*100)}%</span></div></td>
+                          <td style={{padding:"10px 14px"}}><button onClick={()=>setDetail(b)} style={{padding:"4px 12px",background:"none",border:`1px solid ${C.navy}`,borderRadius:6,cursor:"pointer",color:C.navy,fontSize:11,fontWeight:600}}>عرض</button></td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════ DASHBOARD ══════════ */}
+          {page==="dash"&&(
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:22}}>
+                {[{l:"إجمالي المظاريف", v:stats.total, icon:"📦", col:C.navy},{l:"نشطة", v:stats.active, icon:"🔄", col:C.blue},{l:"مكتملة", v:stats.done, icon:"✅", col:C.green},{l:"متأخرة", v:stats.delayed, icon:"⚠️", col:C.red}].map((k,i)=>(
+                  <div key={i} style={{background:C.white,borderRadius:12,padding:"18px 16px",boxShadow:"0 2px 8px rgba(0,0,0,.06)",borderTop:`3px solid ${k.col}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><p style={{margin:0,fontSize:11,color:C.muted}}>{k.l}</p><p style={{margin:"6px 0 0",fontSize:30,fontWeight:900,color:k.col}}>{k.v}</p></div><span style={{fontSize:24}}>{k.icon}</span></div>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)",marginBottom:16}}>
+                <h3 style={{margin:"0 0 18px",fontSize:15,fontWeight:700,color:C.navy}}>توزيع المظاريف حسب المرحلة</h3>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:10}}>
+                  {stats.byStage.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:12,background:C.bg,borderRadius:10,padding:"12px 14px"}}><div style={{width:36,height:36,borderRadius:8,background:`${s.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{s.icon}</div><div style={{flex:1}}><p style={{margin:0,fontSize:11,color:C.muted,lineHeight:1.2}}>{s.short}</p><p style={{margin:"3px 0 0",fontSize:20,fontWeight:800,color:s.color}}>{s.count}</p></div><div style={{width:4,height:36,borderRadius:2,background:s.count>0?s.color:C.border}}/></div>)}
+                </div>
+              </div>
+              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+                <h3 style={{margin:"0 0 14px",fontSize:15,fontWeight:700,color:C.navy}}>آخر المظاريف نشاطاً</h3>
+                {bundles.slice(0,5).map(b=><div key={b.id} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:`1px solid ${C.border}`}}><div style={{width:40,height:40,borderRadius:10,background:`${STAGES[b.stage-1].color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{STAGES[b.stage-1].icon}</div><div style={{flex:1}}><p style={{margin:0,fontWeight:700,color:C.navy,fontSize:14}}>{b.subject} — {b.grade}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted}}>{b.barcode} · {b.paperCount} ورقة · {b.semester}</p></div><StageBadge stageId={b.stage}/><button onClick={()=>{setScanVal(b.barcode);setTimeout(()=>{setScanHit(b);setScanErr("");},50);setPage("scan");}} style={{padding:"5px 12px",background:"none",border:`1px solid ${C.border}`,borderRadius:6,cursor:"pointer",color:C.mid,fontSize:11}}>مسح</button></div>)}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════ USERS PAGE ══════════ */}
+          {page==="users"&&user.role==="admin"&&(
+            <div>
+              <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
+                <button onClick={()=>setShowAddUser(true)} style={{padding:"8px 16px",background:C.navy,color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13}}>➕ إضافة مستخدم</button>
+              </div>
+              <div style={{background:C.white,borderRadius:14,padding:24,boxShadow:"0 2px 8px rgba(0,0,0,.06)",overflow:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:600}}>
+                  <thead><tr style={{background:C.navy}}>{["المستخدم","الدور","المراحل المسموحة","الحالة","إجراءات"].map(h=><th key={h} style={{padding:"11px 16px",textAlign:"right",color:"#fff",fontWeight:600,fontSize:12}}>{h}</th>)}</tr></thead>
+                  <tbody>{users.map((u,i)=>(
+                    <tr key={u.id} style={{borderBottom:`1px solid ${C.border}`,background:i%2===0?C.white:C.bg}}>
+                      <td style={{padding:"12px 16px"}}><p style={{margin:0,fontWeight:700,color:C.navy}}>{u.name}</p><p style={{margin:"2px 0 0",fontSize:11,color:C.muted,fontFamily:"monospace"}}>{u.un}</p></td>
+                      <td style={{padding:"12px 16px"}}>
+                        {editingUserId === u.id ? (
+                          <select value={editUserData.role} onChange={e=>setEditUserData({...editUserData,role:e.target.value})} style={{padding:"4px 8px",borderRadius:6}}>
+                            {Object.keys(ROLES).map(r=><option key={r} value={r}>{ROLES[r].label}</option>)}
+                          </select>
+                        ) : <span style={{background:C.blueBg,color:C.blue,padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:700}}>{ROLES[u.role].label}</span>}
+                      </td>
+                      <td style={{padding:"12px 16px",fontSize:12,color:C.mid}}>
+                        {ROLES[u.role].can.map(id=><span key={id} style={{display:"inline-block",background:`${STAGES[id-1].color}20`,color:STAGES[id-1].color,padding:"1px 7px",borderRadius:10,fontSize:10,margin:"2px",fontWeight:600}}>{STAGES[id-1].icon} {STAGES[id-1].short}</span>)}
+                      </td>
+                      <td style={{padding:"12px 16px"}}><span style={{background:C.greenBg,color:C.green,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>فعّال</span></td>
+                      <td style={{padding:"12px 16px"}}>
+                        {editingUserId === u.id ? (
+                          <><button onClick={()=>saveEditUser(u.id)} style={{marginLeft:8,padding:"4px 10px",background:C.green,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>حفظ</button><button onClick={()=>setEditingUserId(null)} style={{padding:"4px 10px",background:C.border,color:C.mid,border:"none",borderRadius:6,cursor:"pointer"}}>إلغاء</button></>
+                        ) : (
+                          <><button onClick={()=>startEditUser(u)} style={{marginLeft:8,padding:"4px 10px",background:C.blue,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>تعديل</button><button onClick={()=>{if(window.confirm(`حذف المستخدم ${u.name}؟`)) deleteUser(u.id);}} style={{padding:"4px 10px",background:C.red,color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>حذف</button></>
+                        )}
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              {showAddUser && (
+                <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+                  <div style={{background:C.white,borderRadius:16,padding:24,width:360}}>
+                    <h3 style={{margin:"0 0 16px",color:C.navy}}>إضافة مستخدم جديد</h3>
+                    <input placeholder="اسم المستخدم" value={newUser.un} onChange={e=>setNewUser({...newUser,un:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
+                    <input placeholder="كلمة المرور" type="password" value={newUser.pw} onChange={e=>setNewUser({...newUser,pw:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
+                    <input placeholder="الاسم الكامل" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:12,border:`1px solid ${C.border}`,borderRadius:8}}/>
+                    <select value={newUser.role} onChange={e=>setNewUser({...newUser,role:e.target.value})} style={{width:"100%",padding:"10px",marginBottom:20,border:`1px solid ${C.border}`,borderRadius:8}}>
+                      {Object.keys(ROLES).map(r=><option key={r} value={r}>{ROLES[r].label}</option>)}
+                    </select>
+                    <div style={{display:"flex",gap:10}}>
+                      <button onClick={addUser} style={{flex:1,padding:"10px",background:C.navy,color:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>إضافة</button>
+                      <button onClick={()=>setShowAddUser(false)} style={{flex:1,padding:"10px",background:C.bg,color:C.mid,border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer"}}>إلغاء</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* QR Fullscreen Modal */}
+      {qrFullscreen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1100}} onClick={()=>setQrFullscreen(null)}>
+          <div style={{textAlign:"center"}}>
+            <QR value={qrFullscreen} size={280}/>
+            <p style={{color:"#fff",marginTop:16,fontFamily:"monospace",fontSize:16}}>{qrFullscreen}</p>
+            <button onClick={()=>setQrFullscreen(null)} style={{marginTop:20,padding:"8px 20px",background:"#fff",border:"none",borderRadius:8,cursor:"pointer"}}>إغلاق</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
