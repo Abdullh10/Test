@@ -1,756 +1,1487 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>نظام تتبع مظاريف الاختبارات</title>
-  <!-- Google Fonts + Tajawal -->
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Tajawal', Arial, sans-serif;
-    }
-    body {
-      background: #F0F3F9;
-      direction: rtl;
-    }
-    /* colors */
-    :root {
-      --navy: #0D1F3C;
-      --navyL: #1A3260;
-      --navyLL: #243F6E;
-      --gold: #C8911F;
-      --goldL: #F0B429;
-      --bg: #F0F3F9;
-      --white: #FFFFFF;
-      --border: #D4DAE8;
-      --text: #0D1F3C;
-      --mid: #5A6580;
-      --muted: #9AA3B5;
-      --green: #15803D;
-      --greenBg: #DCFCE7;
-      --red: #DC2626;
-      --redBg: #FEE2E2;
-      --amber: #D97706;
-      --amberBg: #FEF3C7;
-      --blue: #2563EB;
-      --blueBg: #DBEAFE;
-      --purple: #7C3AED;
-      --purpleBg: #EDE9FE;
-    }
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--green);
-      color: white;
-      padding: 10px 26px;
-      border-radius: 12px;
-      font-weight: 700;
-      font-size: 14px;
-      z-index: 999;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-      transition: 0.2s;
-    }
-    .toast.err { background: var(--red); }
-    .card {
-      background: var(--white);
-      border-radius: 12px;
-      padding: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      margin-bottom: 18px;
-    }
-    .btn {
-      padding: 9px 18px;
-      background: var(--navy);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 700;
-      transition: 0.2s;
-    }
-    .btn:active { opacity: 0.8; }
-    .btn-secondary { background: var(--mid); }
-    .inp, select, textarea {
-      width: 100%;
-      padding: 9px 11px;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      font-size: 13px;
-      outline: none;
-      background: white;
-      color: var(--text);
-      font-family: 'Tajawal', Arial, sans-serif;
-    }
-    .tag {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      display: inline-block;
-    }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .nav-tab {
-      padding: 11px 14px;
-      border: none;
-      border-bottom: 3px solid transparent;
-      background: none;
-      cursor: pointer;
-      font-weight: 400;
-      font-size: 13px;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      white-space: nowrap;
-    }
-    .nav-tab.active {
-      color: var(--navy);
-      border-bottom-color: var(--gold);
-      font-weight: 800;
-    }
-    .stage-progress { display: flex; gap: 2px; margin: 8px 0; }
-    .stage-dot { flex: 1; height: 8px; border-radius: 4px; background: var(--border); }
-    .stage-dot.active { background: #3B82F6; }
-    .hidden { display: none; }
-    .qr-svg { border: 2px solid var(--navy); border-radius: 6px; background: white; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>نظام تتبع مظاريف الاختبارات</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:    #0D1F3C;
+    --navyM:   #162D52;
+    --navyL:   #1E3E6E;
+    --gold:    #C8911F;
+    --goldL:   #F0B429;
+    --bg:      #EEF1F8;
+    --white:   #FFFFFF;
+    --border:  #D2D8E8;
+    --text:    #0D1F3C;
+    --mid:     #56607A;
+    --muted:   #96A0B5;
+    --green:   #15803D;
+    --greenBg: #DCFCE7;
+    --red:     #DC2626;
+    --redBg:   #FEE2E2;
+    --amber:   #D97706;
+    --amberBg: #FEF3C7;
+    --blue:    #2563EB;
+    --blueBg:  #DBEAFE;
+    --purple:  #7C3AED;
+    --purBg:   #EDE9FE;
+    --wa:      #25D366;
+    --waBg:    #DCFCE7;
+  }
+
+  body {
+    font-family: 'Tajawal', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    direction: rtl;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    min-height: 100vh;
+    background: linear-gradient(145deg, var(--navy) 0%, var(--navyL) 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .loginBox {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 44px 36px;
+    width: 360px;
+    max-width: 100%;
+    box-shadow: 0 28px 70px rgba(0,0,0,.35);
+  }
+  .loginLogo {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .loginLogo .icon { font-size: 48px; display: block; margin-bottom: 8px; }
+  .loginLogo h1 { font-size: 20px; font-weight: 900; color: var(--navy); }
+  .loginLogo p  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .demoRow {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; background: none; border: none;
+    cursor: pointer; width: 100%; text-align: right;
+  }
+  .roleTag {
+    padding: 2px 9px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .demoMono { font-size: 11px; color: var(--mid); font-family: monospace; }
+
+  /* ── SHELL ── */
+  #appShell { display: none; min-height: 100vh; flex-direction: column; }
+
+  /* HEADER */
+  #appHeader {
+    background: var(--navy);
+    padding: 0 20px;
+    height: 54px;
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,.3);
+  }
+  #appHeader .hLogo { font-size: 22px; }
+  #appHeader .hTitle { color: #fff; font-weight: 900; font-size: 15px; flex: 1; }
+  #appHeader .hRole {
+    padding: 3px 11px; border-radius: 12px;
+    font-size: 11px; font-weight: 700;
+  }
+  #appHeader .hUser { color: #8AABCF; font-size: 12px; }
+  #appHeader .hLogout {
+    background: none; border: none; color: #EF4444;
+    cursor: pointer; font-size: 12px; font-family: 'Tajawal', sans-serif;
+    font-weight: 700; padding: 4px 8px;
+  }
+
+  /* NAV */
+  #appNav {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex; padding: 0 14px; gap: 2px;
+    overflow-x: auto; flex-shrink: 0;
+  }
+  #appNav::-webkit-scrollbar { height: 0; }
+  .navBtn {
+    padding: 12px 15px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: none; cursor: pointer;
+    color: var(--muted);
+    font-weight: 400; font-size: 13px;
+    display: flex; align-items: center; gap: 5px;
+    white-space: nowrap;
+    font-family: 'Tajawal', sans-serif;
+    transition: all .15s;
+  }
+  .navBtn.active {
+    color: var(--navy);
+    font-weight: 800;
+    border-bottom-color: var(--gold);
+  }
+
+  /* MAIN */
+  #appMain { flex: 1; padding: 20px; overflow-y: auto; }
+  .pageWrap { max-width: 720px; margin: 0 auto; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07);
+    margin-bottom: 14px;
+  }
+  .cardTitle {
+    font-size: 15px; font-weight: 800;
+    color: var(--navy); margin-bottom: 14px;
+  }
+
+  /* ── FORM ELEMENTS ── */
+  .inp {
+    width: 100%; padding: 9px 11px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: 13px;
+    outline: none; background: #fff;
+    color: var(--text);
+    font-family: 'Tajawal', sans-serif;
+    transition: border-color .15s;
+  }
+  .inp:focus { border-color: var(--navyL); }
+  .inp[dir="ltr"] { direction: ltr; font-family: monospace; }
+  textarea.inp { resize: vertical; line-height: 1.6; }
+  label.lbl { font-size: 12px; color: var(--mid); display: block; margin-bottom: 5px; }
+
+  .btn {
+    padding: 9px 20px;
+    border: none; border-radius: 8px;
+    cursor: pointer; font-size: 13px;
+    font-weight: 700;
+    font-family: 'Tajawal', sans-serif;
+    color: #fff; transition: opacity .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: .88; }
+  .btn:active { opacity: .75; }
+  .btn-navy   { background: var(--navy); }
+  .btn-green  { background: var(--green); }
+  .btn-red    { background: var(--red); }
+  .btn-mid    { background: var(--mid); }
+  .btn-wa     { background: var(--wa); }
+  .btn-full   { width: 100%; font-size: 14px; padding: 12px; }
+  .btn-sm     { padding: 5px 12px; font-size: 11px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%);
+    padding: 11px 28px; border-radius: 12px;
+    color: #fff; font-weight: 700; font-size: 14px;
+    z-index: 9999; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    pointer-events: none; opacity: 0;
+    transition: opacity .25s;
+    font-family: 'Tajawal', sans-serif;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── TAGS ── */
+  .tag {
+    padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    display: inline-block;
+  }
+
+  /* ── GRID HELPERS ── */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+
+  /* ── INFO GRID ── */
+  .infoGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .infoCell {
+    background: var(--bg); border-radius: 8px; padding: 9px 12px;
+  }
+  .infoCell .k { font-size: 10px; color: var(--muted); }
+  .infoCell .v { font-size: 13px; font-weight: 700; color: var(--text); margin-top: 2px; }
+
+  /* ── STAGE HEADER ── */
+  .stageHeader {
+    border-radius: 10px; padding: 16px 18px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .stageHeader .bc {
+    color: rgba(255,255,255,.7); font-size: 11px;
+  }
+  .stageHeader .bcode {
+    color: #fff; font-family: monospace;
+    font-size: 18px; font-weight: 900;
+    letter-spacing: 2px; margin: 2px 0 8px;
+  }
+  .stagePill {
+    background: rgba(255,255,255,.2);
+    display: inline-block; border-radius: 20px;
+    padding: 4px 13px;
+    color: #fff; font-weight: 700; font-size: 13px;
+  }
+
+  /* ── PROGRESS STRIP ── */
+  .progressWrap { margin-bottom: 14px; }
+  .progressLabel {
+    display: flex; justify-content: space-between;
+    margin-bottom: 5px; font-size: 11px; color: var(--muted);
+  }
+  .progressStrip { display: flex; gap: 2px; }
+  .progressSeg {
+    flex: 1; height: 8px; border-radius: 4px;
+    background: var(--border); transition: background .3s;
+  }
+
+  /* ── STAGE LIST ── */
+  .stageItem {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 9px;
+    border: 1.5px solid var(--border);
+    background: #fff; cursor: pointer;
+    margin-bottom: 6px; transition: all .15s;
+    font-family: 'Tajawal', sans-serif;
+    width: 100%; text-align: right;
+  }
+  .stageItem:hover:not(:disabled) { transform: translateX(-2px); }
+  .stageItem:disabled { cursor: default; opacity: .65; }
+  .stageNum {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .stageItemLabel {
+    flex: 1; font-size: 13px; color: var(--mid);
+  }
+  .stageDoneMark { font-size: 12px; color: var(--green); }
+  .stageNextTag {
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 10px; font-weight: 700;
+  }
+
+  /* ── CONFIRM BOX ── */
+  .confirmBox {
+    border-radius: 10px; padding: 16px;
+    border: 2px solid var(--border);
+  }
+  .confirmHighlight {
+    border-radius: 8px; padding: 12px 14px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .confirmNum {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 900; flex-shrink: 0;
+  }
+
+  /* ── LOG ── */
+  .logEntry {
+    display: flex; gap: 10px; margin-bottom: 9px;
+    align-items: flex-start;
+  }
+  .logDot {
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-top: 5px; flex-shrink: 0;
+  }
+  .logLabel { font-size: 12px; font-weight: 700; color: var(--text); }
+  .logMeta  { font-size: 11px; color: var(--muted); margin-right: 5px; }
+  .logNote  { font-size: 11px; color: var(--mid); font-style: italic; margin-top: 1px; }
+
+  /* ── BUNDLE CARD ── */
+  .bundleCard {
+    background: var(--white); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; transition: box-shadow .15s;
+  }
+  .bundleCard:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+  .bundleIcon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .bundleInfo { flex: 1; min-width: 0; }
+  .bundleName { font-weight: 800; color: var(--navy); font-size: 14px; }
+  .bundleMeta { font-size: 11px; color: var(--muted); margin: 2px 0 6px; }
+  .bundleProgress { display: flex; align-items: center; gap: 6px; }
+  .progressBar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progressFill { height: 100%; border-radius: 3px; transition: width .3s; }
+  .bundleStageBadge {
+    border: 1px solid; padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; text-align: center;
+    max-width: 140px; flex-shrink: 0; white-space: nowrap;
+  }
+  .bundleActions { display: flex; gap: 6px; align-items: center; }
+
+  /* ── TEACHER ROW ── */
+  .teacherRow {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 9px;
+    border: 1.5px solid var(--border); background: #fff;
+    cursor: pointer; margin-bottom: 5px;
+    transition: all .15s; font-family: 'Tajawal', sans-serif;
+    width: 100%; text-align: right;
+  }
+  .teacherRow.selected {
+    border-color: var(--navy);
+    background: rgba(13,31,60,.08);
+  }
+  .teacherAvatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  /* ── NOTIF TYPE BTNS ── */
+  .ntypeBtn {
+    padding: 8px 12px; border-radius: 8px;
+    border: 2px solid var(--border); background: #fff;
+    cursor: pointer; font-size: 12px; font-weight: 400;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: 'Tajawal', sans-serif;
+    transition: all .15s;
+  }
+  .ntypeBtn.active { font-weight: 800; }
+
+  /* ── NOTIF LOG CARD ── */
+  .nlogCard {
+    background: var(--white); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    border-right: 4px solid var(--border);
+  }
+
+  /* ── QR SVG (inline) ── */
+  .qrWrap { display: flex; justify-content: center; margin-bottom: 10px; }
+  .qrWrap svg { border: 2px solid var(--navy); border-radius: 6px; display: block; }
+
+  /* ── SETTINGS TABS ── */
+  .settingsTabs {
+    display: flex; gap: 2px; background: var(--white);
+    border-radius: 10px; padding: 4px; margin-bottom: 14px;
+    border: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .sTab {
+    flex: 1; min-width: 44px; padding: 7px 4px;
+    border: none; border-radius: 7px;
+    background: transparent; color: var(--mid);
+    cursor: pointer; font-size: 13px; font-weight: 400;
+    font-family: 'Tajawal', sans-serif; transition: all .15s;
+  }
+  .sTab.active { background: var(--navy); color: #fff; font-weight: 700; }
+
+  /* ── LIST ITEM ── */
+  .listItem {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border-radius: 8px;
+    padding: 9px 12px; margin-bottom: 6px;
+  }
+  .listItem .liText { flex: 1; font-size: 13px; color: var(--navy); }
+  .delBtn {
+    background: none; border: none; cursor: pointer;
+    color: var(--red); font-size: 18px; line-height: 1;
+    padding: 0 4px;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; color: var(--muted); padding: 32px 0; font-size: 14px; }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* ── MODALS / OVERLAYS ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 500; display: flex; align-items: center;
+    justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: var(--white); border-radius: 16px;
+    padding: 24px; width: 100%; max-width: 400px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.3);
+  }
+  .modalTitle { font-size: 16px; font-weight: 800; color: var(--navy); margin-bottom: 14px; }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:480px) {
+    .g2,.g3 { grid-template-columns: 1fr; }
+    .infoGrid { grid-template-columns: 1fr; }
+    .loginBox { padding: 32px 22px; }
+    .card { padding: 14px; }
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: fixed; top: 0; left: 0; right: 0; text-align: center; padding: 40px; }
+  }
+</style>
 </head>
 <body>
-<div id="app"></div>
+
+<!-- ══════════════════ LOGIN ══════════════════ -->
+<div id="loginScreen">
+  <div class="loginBox">
+    <div class="loginLogo">
+      <span class="icon">📦</span>
+      <h1 id="loginSchoolName">مدرسة النموذجية الثانوية</h1>
+      <p>نظام تتبع مظاريف الاختبارات</p>
+    </div>
+    <div id="loginErr" style="display:none;background:var(--redBg);color:var(--red);border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:12px;"></div>
+    <div style="margin-bottom:10px">
+      <input class="inp" id="loginUser" placeholder="اسم المستخدم" autocomplete="username"/>
+    </div>
+    <div style="margin-bottom:16px">
+      <input class="inp" id="loginPass" placeholder="كلمة المرور" type="password" dir="ltr" autocomplete="current-password"/>
+    </div>
+    <button class="btn btn-navy btn-full" onclick="doLogin()">دخول</button>
+    <hr class="divider"/>
+    <p style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">الحسابات التجريبية</p>
+    <div id="demoBtns"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ APP SHELL ══════════════════ -->
+<div id="appShell">
+  <header id="appHeader">
+    <span class="hLogo">📦</span>
+    <span class="hTitle" id="hSchool"></span>
+    <span class="hRole" id="hRole"></span>
+    <span class="hUser" id="hUser"></span>
+    <button class="hLogout" onclick="doLogout()">خروج 🚪</button>
+  </header>
+  <nav id="appNav"></nav>
+  <div id="appMain"><div class="pageWrap" id="pageContent"></div></div>
+</div>
+
+<!-- ══════════════════ TOAST ══════════════════ -->
+<div id="toast"></div>
+
+<!-- ══════════════════ PRINT AREA ══════════════════ -->
+<div id="printArea" style="display:none"></div>
 
 <script>
-  // ----------------------------------- CONSTANTS ---------------------------------
-  const C = {
-    navy:"#0D1F3C", navyL:"#1A3260", navyLL:"#243F6E",
-    gold:"#C8911F", goldL:"#F0B429",
-    bg:"#F0F3F9", white:"#FFFFFF", border:"#D4DAE8",
-    text:"#0D1F3C", mid:"#5A6580", muted:"#9AA3B5",
-    green:"#15803D", greenBg:"#DCFCE7",
-    red:"#DC2626",   redBg:"#FEE2E2",
-    amber:"#D97706", amberBg:"#FEF3C7",
-    blue:"#2563EB",  blueBg:"#DBEAFE",
-    purple:"#7C3AED",purpleBg:"#EDE9FE",
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F97316","#22C55E","#A855F7","#6366F1","#14B8A6","#64748B"];
+const sc = i => PALETTE[i % PALETTE.length];
+
+let state = {
+  schoolName: "مدرسة النموذجية الثانوية",
+  adminPhone: "+966551121498",   // <--- رقم الواتساب الافتراضي للمدير
+  subjects: ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية"],
+  grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
+  stages: [
+    "تم توزيع الأوراق على الطلاب",
+    "تم استلام الأوراق من اللجنة",
+    "تم تسليم المظروف للكنترول",
+    "تم تسليم المظروف للمعلم",
+    "الأوراق تحت التصحيح",
+    "تم الانتهاء من التصحيح",
+    "الأوراق تحت المراجعة",
+    "تم الانتهاء من المراجعة",
+    "تم الأرشفة والحفظ",
+  ],
+  teachers: [
+    { id:"T1", name:"أحمد الغامدي",  phone:"+966501001001", subject:"الكيمياء",      role:"corrector" },
+    { id:"T2", name:"سمر الزهراني",  phone:"+966502002002", subject:"الفيزياء",      role:"reviewer"  },
+    { id:"T3", name:"خالد العتيبي",  phone:"+966503003003", subject:"الأحياء",       role:"auditor"   },
+    { id:"T4", name:"نورة القحطاني", phone:"+966504004004", subject:"الرياضيات",     role:"corrector" },
+    { id:"T5", name:"وليد الشهري",   phone:"+966505005005", subject:"اللغة العربية", role:"reviewer"  },
+  ],
+  users: [
+    { id:"U1", name:"مدير النظام",        username:"admin",   password:"admin123", role:"admin"      },
+    { id:"U2", name:"الكنترول",           username:"ctrl",    password:"ctrl123",  role:"controller" },
+    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",  password:"1234",     role:"notifier"   },
+  ],
+  bundles: [],
+  notifLog: [],
+};
+
+let currentUser = null;
+let currentPage = "";
+
+const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات" };
+const ROLE_COLORS = { admin:["#C8911F","#FEF3C7"], controller:["#2563EB","#DBEAFE"], notifier:["#7C3AED","#EDE9FE"] };
+const TEACHER_ROLE_LABEL = { corrector:"مصحح", reviewer:"مراجع", auditor:"مدقق" };
+const NOTIFY_TYPES = [
+  { key:"correction", label:"طلب تصحيح",   icon:"✏️", color:"#EF4444" },
+  { key:"review",     label:"طلب مراجعة",  icon:"🔍", color:"#F97316" },
+  { key:"audit",      label:"طلب تدقيق",   icon:"🔏", color:"#8B5CF6" },
+  { key:"urgent",     label:"مراجعة عاجلة",icon:"🚨", color:"#DC2626" },
+  { key:"info",       label:"إشعار عام",   icon:"ℹ️", color:"#2563EB" },
+];
+const PAGES = {
+  admin:      [ {k:"admin_new", icon:"➕", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙️",label:"الإعدادات"} ],
+  controller: [ {k:"ctrl_scan",icon:"📷",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"} ],
+  notifier:   [ {k:"notif_send",icon:"📲",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
+};
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function uid()    { return Math.random().toString(36).slice(2,8).toUpperCase(); }
+function nowISO() { return new Date().toISOString(); }
+function fmt(iso) { try { return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"}); } catch(e){ return iso; } }
+
+let _toastTimer;
+function toast(msg, type="ok") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.background = type==="err" ? "var(--red)" : type==="wa" ? "var(--wa)" : "var(--green)";
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove("show"), 3200);
+}
+
+function makeQR(value, size=130) {
+  const h = value.split("").reduce((a,c)=>(a*31+c.charCodeAt(0))|0,0);
+  const N=9, cell=Math.floor(size/N);
+  const sz = cell*N;
+  let rects = `<rect width="${sz}" height="${sz}" fill="#fff"/>`;
+  for(let k=0;k<N*N;k++){
+    const r=Math.floor(k/N), c=k%N;
+    const corner=(r<3&&c<3)||(r<3&&c>5)||(r>5&&c<3);
+    if(corner||!!(Math.abs(h)>>(k%29)&1))
+      rects+=`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="#111"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">${rects}</svg>`;
+}
+
+function phoneToWA(phone) {
+  return phone.replace(/[^\d]/g,"");
+}
+function waLink(phone, msg) {
+  const num = phoneToWA(phone);
+  const enc = encodeURIComponent(msg);
+  return `https://wa.me/${num}?text=${enc}`;
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+function renderLoginDemos() {
+  const c = document.getElementById("demoBtns");
+  c.innerHTML = "";
+  state.users.forEach(u => {
+    const [col,bg] = ROLE_COLORS[u.role]||["#888","#eee"];
+    const btn = document.createElement("button");
+    btn.className = "demoRow";
+    btn.onclick = () => { document.getElementById("loginUser").value=u.username; document.getElementById("loginPass").value=u.password; };
+    btn.innerHTML = `<span class="roleTag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span><span class="demoMono">${u.username} / ${u.password}</span>`;
+    c.appendChild(btn);
+  });
+  document.getElementById("loginSchoolName").textContent = state.schoolName;
+}
+
+function doLogin() {
+  const u = document.getElementById("loginUser").value.trim();
+  const p = document.getElementById("loginPass").value;
+  const found = state.users.find(x=>x.username===u&&x.password===p);
+  const errEl = document.getElementById("loginErr");
+  if(found) {
+    currentUser = found; errEl.style.display="none";
+    document.getElementById("loginScreen").style.display="none";
+    const shell = document.getElementById("appShell");
+    shell.style.display="flex";
+    document.getElementById("hSchool").textContent = state.schoolName;
+    const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
+    document.getElementById("hRole").textContent = ROLE_LABEL[found.role]||found.role;
+    document.getElementById("hRole").style.cssText = `background:${bg};color:${col}`;
+    document.getElementById("hUser").textContent = found.name;
+    renderNav();
+    const defaultPage = PAGES[found.role]?.[0]?.k || "ctrl_scan";
+    navigateTo(defaultPage);
+  } else {
+    errEl.textContent="بيانات الدخول غير صحيحة";
+    errEl.style.display="block";
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if(e.key==="Enter" && !currentUser) doLogin();
+});
+
+function doLogout() {
+  currentUser=null; currentPage="";
+  document.getElementById("loginScreen").style.display="flex";
+  document.getElementById("appShell").style.display="none";
+  document.getElementById("loginUser").value="";
+  document.getElementById("loginPass").value="";
+  document.getElementById("loginErr").style.display="none";
+}
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+function renderNav() {
+  const nav = document.getElementById("appNav");
+  nav.innerHTML = "";
+  (PAGES[currentUser.role]||[]).forEach(p=>{
+    const btn = document.createElement("button");
+    btn.className = "navBtn" + (currentPage===p.k?" active":"");
+    btn.innerHTML = `${p.icon} ${p.label}`;
+    btn.onclick = () => navigateTo(p.k);
+    nav.appendChild(btn);
+  });
+}
+
+function navigateTo(page) {
+  currentPage = page;
+  renderNav();
+  const el = document.getElementById("pageContent");
+  // reset scroll
+  document.getElementById("appMain").scrollTop=0;
+  // render page
+  switch(page) {
+    case "admin_new":   renderAdminNew(el);    break;
+    case "admin_list":  renderAdminList(el);   break;
+    case "settings":    renderSettings(el);    break;
+    case "ctrl_scan":   renderCtrlScan(el);    break;
+    case "ctrl_list":   renderCtrlList(el);    break;
+    case "notif_send":  renderNotifSend(el);   break;
+    case "notif_log":   renderNotifLog(el);    break;
+    default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ADMIN — NEW BUNDLE
+// ═══════════════════════════════════════════════
+let _newBundleCreated = null;
+
+function renderAdminNew(el) {
+  if(_newBundleCreated) { renderBundleSuccess(el, _newBundleCreated); return; }
+  el.innerHTML = `
+  <div class="card">
+    <p class="cardTitle">➕ إنشاء مظروف جديد</p>
+    <div class="g2" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">المادة *</label>
+        <select class="inp" id="bf_subject">
+          <option value="">-- اختر المادة --</option>
+          ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">الصف الدراسي</label>
+        <select class="inp" id="bf_grade">
+          <option value="">-- اختياري --</option>
+          ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label class="lbl">عدد الأوراق في المظروف *</label>
+      <input class="inp" id="bf_count" type="number" min="1" placeholder="مثال: 32"/>
+    </div>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">تكليفات المظروف</p>
+    <div class="g3" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">المصحح</label>
+        <select class="inp" id="bf_corrector">
+          <option value="">-- اختر --</option>
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">المراجع</label>
+        <select class="inp" id="bf_reviewer">
+          <option value="">-- اختر --</option>
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">المدقق</label>
+        <select class="inp" id="bf_auditor">
+          <option value="">-- اختر --</option>
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="lbl">ملاحظة</label>
+      <input class="inp" id="bf_note" placeholder="ملاحظة اختيارية..."/>
+    </div>
+    <button class="btn btn-navy btn-full" onclick="submitNewBundle()">إنشاء الباركود ←</button>
+  </div>`;
+}
+
+function submitNewBundle() {
+  const subject   = document.getElementById("bf_subject").value;
+  const grade     = document.getElementById("bf_grade").value;
+  const count     = document.getElementById("bf_count").value;
+  const corrector = document.getElementById("bf_corrector").value;
+  const reviewer  = document.getElementById("bf_reviewer").value;
+  const auditor   = document.getElementById("bf_auditor").value;
+  const note      = document.getElementById("bf_note").value;
+  if(!subject) { toast("اختر المادة","err"); return; }
+  if(!count||isNaN(count)||+count<1) { toast("أدخل عدد الأوراق","err"); return; }
+  const b = {
+    id:uid(), barcode:`M${uid()}`,
+    subject, grade, count:+count,
+    corrector, reviewer, auditor, note,
+    stage:-1, log:[], created:nowISO(),
   };
-  const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F97316","#22C55E","#A855F7","#6366F1","#14B8A6","#64748B"];
-  const sc = i => PALETTE[i % PALETTE.length];
-  const TEACHER_ROLE_LABEL = { corrector:"مصحح", reviewer:"مراجع", auditor:"مدقق" };
-  const NOTIFY_TYPES = [
-    { key:"correction", label:"طلب تصحيح",        icon:"✏️", color:"#EF4444" },
-    { key:"review",     label:"طلب مراجعة",        icon:"🔍", color:"#F97316" },
-    { key:"audit",      label:"طلب تدقيق",         icon:"🔏", color:"#8B5CF6" },
-    { key:"urgent",     label:"مراجعة عاجلة",       icon:"🚨", color:"#DC2626" },
-    { key:"info",       label:"إشعار عام",          icon:"ℹ️", color:"#2563EB" },
-  ];
-  const ROLE_COLOR = { admin:[C.gold,C.amberBg], controller:[C.blue,C.blueBg], notifier:[C.purple,C.purpleBg] };
-  const ROLE_LABEL = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات" };
+  state.bundles.push(b);
+  _newBundleCreated = b;
+  renderBundleSuccess(document.getElementById("pageContent"), b);
+  toast("تم إنشاء المظروف وباركوده ✅");
+}
 
-  function uid() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
-  function nowISO() { return new Date().toISOString(); }
-  function fmt(iso) { return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"}); }
+function renderBundleSuccess(el, b) {
+  const corrT = state.teachers.find(t=>t.id===b.corrector);
+  const revT  = state.teachers.find(t=>t.id===b.reviewer);
+  const audT  = state.teachers.find(t=>t.id===b.auditor);
+  el.innerHTML = `
+  <div class="card" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:8px">✅</div>
+    <h3 style="color:var(--green);font-size:18px;margin-bottom:4px">تم إنشاء المظروف</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
+    <div id="printArea" class="qrWrap">${makeQR(b.barcode,150)}</div>
+    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${b.barcode}</p>
+    <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;text-align:right">
+      ${corrT?`✏️ المصحح: <strong>${corrT.name}</strong>&nbsp;&nbsp;`:""}
+      ${revT?`🔍 المراجع: <strong>${revT.name}</strong>&nbsp;&nbsp;`:""}
+      ${audT?`🔏 المدقق: <strong>${audT.name}</strong>`:""}
+    </div>
+    <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px">
+      📌 اطبع هذا الباركود وألصقه على المظروف
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-navy" style="flex:1" onclick="printBundle('${b.barcode}','${b.subject}','${b.count}')">🖨️ طباعة</button>
+      <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo('admin_new')">➕ مظروف آخر</button>
+    </div>
+  </div>`;
+}
 
-  // ------------------------------ INITIAL DATA ------------------------------------
-  const INIT = {
-    schoolName: "مدرسة النموذجية الثانوية",
-    adminPhone: "+966551121498",
-    subjects: ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية"],
-    grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
-    stages: [
-      "تم توزيع الأوراق على الطلاب",
-      "تم استلام الأوراق من اللجنة",
-      "تم تسليم المظروف للكنترول",
-      "تم تسليم المظروف للمعلم",
-      "الأوراق تحت التصحيح",
-      "تم الانتهاء من التصحيح",
-      "الأوراق تحت المراجعة",
-      "تم الانتهاء من المراجعة",
-      "تم الأرشفة والحفظ",
-    ],
-    teachers: [
-      { id:"T1", name:"أحمد الغامدي",   email:"ahmed@school.sa",  phone:"+966501234567", subject:"الكيمياء",      role:"corrector" },
-      { id:"T2", name:"سمر الزهراني",   email:"samar@school.sa",  phone:"+966551234568", subject:"الفيزياء",      role:"reviewer"  },
-      { id:"T3", name:"خالد العتيبي",   email:"khalid@school.sa", phone:"+966541234569", subject:"الأحياء",       role:"auditor"   },
-      { id:"T4", name:"نورة القحطاني",  email:"noura@school.sa",  phone:"+966561234570", subject:"الرياضيات",     role:"corrector" },
-      { id:"T5", name:"وليد الشهري",    email:"walid@school.sa",  phone:"+966571234571", subject:"اللغة العربية", role:"reviewer" },
-    ],
-    users: [
-      { id:"U1", name:"مدير النظام",  username:"admin",      password:"admin123", role:"admin"      },
-      { id:"U2", name:"الكنترول",     username:"ctrl",       password:"ctrl123",  role:"controller" },
-      { id:"U3", name:"مسؤول التنبيهات", username:"notify", password:"1234",     role:"notifier"   },
-    ],
-  };
-
-  // load from localStorage or default
-  let setup = JSON.parse(localStorage.getItem("setup")) || INIT;
-  let bundles = JSON.parse(localStorage.getItem("bundles")) || [];
-  let notifs = JSON.parse(localStorage.getItem("notifs")) || [];
-  let currentUser = null;
-  let currentPage = "home";
-  let toastTimer = null;
-  // UI states
-  let scanVal = "", hitBundle = null, confirmStageIdx = null, stageNote = "";
-  let nfTeachers = [], nfType = "correction", nfMessage = "", nfBundleId = "";
-  let bf = { subject:"", grade:"", count:"", corrector:"", reviewer:"", auditor:"", note:"" };
-  let newBundleCreated = null;
-  let settingsTab = "general";
-  let editSchool = setup.schoolName, editAdminPhone = setup.adminPhone;
-  let editStages = [...setup.stages];
-  let newSubject = "", newGrade = "", newStage = "";
-  let newTeacher = { name:"", email:"", subject:"", role:"corrector", phone:"" };
-  let newUser = { name:"", username:"", password:"", role:"controller" };
-  let loginUsername = "", loginPassword = "", loginError = "";
-
-  // helper save
-  function saveAll() {
-    localStorage.setItem("setup", JSON.stringify(setup));
-    localStorage.setItem("bundles", JSON.stringify(bundles));
-    localStorage.setItem("notifs", JSON.stringify(notifs));
-  }
-
-  function notify(msg, type="ok") {
-    const toastDiv = document.getElementById("toast");
-    if(toastDiv) {
-      toastDiv.innerText = msg;
-      toastDiv.className = "toast " + (type==="err"?"err":"");
-      toastDiv.style.display = "block";
-      if(toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(()=>{ toastDiv.style.display = "none"; }, 3200);
-    } else alert(msg);
-  }
-
-  // QR generator (simple)
-  function generateQRsvg(value, size=120) {
-    let h = 0;
-    for(let i=0; i<value.length; i++) h = (h*31 + value.charCodeAt(i))|0;
-    const N=9, cell=size/N;
-    let rects = [];
-    for(let k=0; k<N*N; k++) {
-      let r = Math.floor(k/N), c = k%N;
-      let corner = (r<3 && c<3) || (r<3 && c>5) || (r>5 && c<3);
-      let on = corner || ((Math.abs(h) >> (k%29)) & 1);
-      if(on) rects.push(`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="#111"/>`);
-    }
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="border:2px solid ${C.navy}; border-radius:6px; background:#fff">${rects.join("")}</svg>`;
-  }
-
-  // render main
-  function render() {
-    const app = document.getElementById("app");
-    if(!currentUser) {
-      app.innerHTML = loginScreen();
-      attachLoginEvents();
-      return;
-    }
-    const role = currentUser.role;
-    const navPages = {
-      admin: [
-        {k:"admin_setup", icon:"➕", label:"إنشاء مظروف"},
-        {k:"admin_list", icon:"📋", label:"المظاريف"},
-        {k:"settings", icon:"⚙️", label:"الإعدادات"},
-      ],
-      controller: [
-        {k:"ctrl_scan", icon:"📷", label:"مسح الباركود"},
-        {k:"ctrl_list", icon:"📋", label:"المظاريف"},
-      ],
-      notifier: [
-        {k:"notifier_send", icon:"📧", label:"إرسال تنبيه"},
-        {k:"notifier_log", icon:"📜", label:"سجل التنبيهات"},
-      ],
-    };
-    const pagesForRole = navPages[role] || [];
-    const header = `
-      <header style="background:${C.navy}; padding:0 18px; height:52px; display:flex; align-items:center; gap:10px;">
-        <span style="font-size:20px;">📦</span>
-        <span style="color:#fff; font-weight:800; flex:1;">${setup.schoolName}</span>
-        <span style="background:${ROLE_COLOR[role][1]}; color:${ROLE_COLOR[role][0]}; padding:3px 10px; border-radius:12px; font-size:11px;">${ROLE_LABEL[role]}</span>
-        <span style="color:#8AABCF; font-size:12px;">${currentUser.name}</span>
-        <button id="logoutBtn" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:12px;">خروج</button>
-      </header>
-      <nav style="background:white; border-bottom:1px solid var(--border); display:flex; padding:0 14px; gap:2px; overflow-x:auto;">
-        ${pagesForRole.map(p => `<button class="nav-tab ${currentPage===p.k?'active':''}" data-page="${p.k}">${p.icon} ${p.label}</button>`).join('')}
-      </nav>
-      <div id="toast" style="display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:999;" class="toast"></div>
-      <main style="max-width:700px; margin:0 auto; padding:18px; width:100%;">
-        ${renderPage()}
-      </main>
-    `;
-    app.innerHTML = header;
-    attachNavEvents();
-    attachLogout();
-    attachPageSpecificEvents();
-    if(toastTimer) clearTimeout(toastTimer);
-    const toastDiv = document.getElementById("toast");
-    if(toastDiv && toastDiv.style.display !== 'none') setTimeout(()=>{if(toastDiv) toastDiv.style.display='none';}, 3200);
-  }
-
-  function renderPage() {
-    if(currentPage === "ctrl_scan") return renderCtrlScan();
-    if(currentPage === "ctrl_list") return renderCtrlList();
-    if(currentPage === "admin_setup") return renderAdminSetup();
-    if(currentPage === "admin_list") return renderAdminList();
-    if(currentPage === "settings") return renderSettings();
-    if(currentPage === "notifier_send") return renderNotifierSend();
-    if(currentPage === "notifier_log") return renderNotifierLog();
-    return "<div class='card'>صفحة غير معروفة</div>";
-  }
-
-  // ---------- helper functions for each page ----------
-  function renderCtrlScan() {
-    return `
-      <div class="card">
-        <p style="margin:0 0 12px; font-weight:800;">📷 مسح باركود المظروف</p>
-        <div class="flex-row">
-          <input type="text" id="scanInput" placeholder="أدخل رقم الباركود..." class="inp" style="flex:1; font-family:monospace;" value="${escapeHtml(scanVal)}">
-          <button id="scanBtn" class="btn">مسح</button>
-        </div>
-        ${bundles.length ? `<div style="margin-top:10px;"><p style="font-size:11px; color:var(--muted)">اختر للاختبار السريع:</p><div class="flex-row" id="quickBundles"></div></div>` : ''}
-        <div id="scanError" style="color:var(--red); margin-top:8px;"></div>
-      </div>
-      <div id="bundleResult"></div>
-    `;
-  }
-
-  function renderCtrlList() {
-    if(!bundles.length) return `<div class="card"><p style="text-align:center; color:var(--muted); padding:28px 0;">لا توجد مظاريف حتى الآن</p></div>`;
-    return `<div style="display:flex; flex-direction:column; gap:10px;">${bundles.map(b => {
-      const stageName = b.stage<0 ? "جديد" : (setup.stages[b.stage] || "—");
-      const color = b.stage<0 ? C.mid : sc(b.stage);
-      const pct = setup.stages.length ? Math.round(((b.stage+1)/setup.stages.length)*100) : 0;
-      return `<div class="card" style="cursor:pointer" data-barcode="${b.barcode}">
-        <div class="flex-row">
-          <div style="width:42px;height:42px;background:${color}20;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">📦</div>
-          <div style="flex:1"><div class="flex-row"><strong>${b.subject}</strong> ${b.grade?`— ${b.grade}`:''}<span style="font-size:11px;">· ${b.count} ورقة</span></div>
-          <p style="font-family:monospace;font-size:11px;margin:2px 0;">${b.barcode}</p>
-          <div class="flex-row"><div style="flex:1;background:var(--border);border-radius:3px;height:5px;"><div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div></div><span>${Math.max(0,b.stage+1)}/${setup.stages.length}</span></div></div>
-          <span style="background:${color}20;color:${color};border:1px solid ${color}50;padding:4px 10px;border-radius:20px;font-size:11px;">${stageName}</span>
-        </div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-
-  function renderAdminSetup() {
-    if(newBundleCreated) {
-      return `<div class="card" style="text-align:center;">
-        <div style="font-size:44px;">✅</div>
-        <h3 style="color:var(--green);">تم إنشاء المظروف</h3>
-        <p>${newBundleCreated.subject} ${newBundleCreated.grade ? `— ${newBundleCreated.grade}` : ''} · ${newBundleCreated.count} ورقة</p>
-        <div style="margin:10px auto;">${generateQRsvg(newBundleCreated.barcode, 150)}</div>
-        <p style="font-family:monospace;font-size:20px;font-weight:900;">${newBundleCreated.barcode}</p>
-        <div style="background:var(--amberBg);border-radius:8px;padding:9px;font-size:12px;margin:10px 0;">المصحح: ${setup.teachers.find(t=>t.id===newBundleCreated.corrector)?.name||"—"} · المراجع: ${setup.teachers.find(t=>t.id===newBundleCreated.reviewer)?.name||"—"} · المدقق: ${setup.teachers.find(t=>t.id===newBundleCreated.auditor)?.name||"—"}</div>
-        <div class="flex-row"><button id="printBtn" class="btn">🖨️ طباعة</button><button id="newBundleReset" class="btn btn-secondary">مظروف آخر</button></div>
-      </div>`;
-    }
-    return `<div class="card">
-      <p style="margin-bottom:16px;font-weight:800;">➕ إنشاء مظروف جديد</p>
-      <div class="grid-2">
-        <div><label style="font-size:12px;">المادة *</label><select id="subjectSel" class="inp"><option value="">-- اختر --</option>${setup.subjects.map(s=>`<option ${bf.subject===s?'selected':''}>${s}</option>`).join('')}</select></div>
-        <div><label style="font-size:12px;">الصف</label><select id="gradeSel" class="inp"><option value="">-- اختياري --</option>${setup.grades.map(g=>`<option ${bf.grade===g?'selected':''}>${g}</option>`).join('')}</select></div>
-      </div>
-      <div style="margin:10px 0;"><label>عدد الأوراق *</label><input type="number" id="countInp" class="inp" value="${bf.count}"></div>
-      <p style="margin:12px 0 8px;">تكليفات المظروف</p>
-      <div class="grid-2" style="grid-template-columns:1fr 1fr 1fr;">
-        <div><label>المصحح</label><select id="correctorSel" class="inp"><option value="">-- اختر --</option>${setup.teachers.map(t=>`<option ${bf.corrector===t.id?'selected':''} value="${t.id}">${t.name}</option>`).join('')}</select></div>
-        <div><label>المراجع</label><select id="reviewerSel" class="inp"><option value="">-- اختر --</option>${setup.teachers.map(t=>`<option ${bf.reviewer===t.id?'selected':''} value="${t.id}">${t.name}</option>`).join('')}</select></div>
-        <div><label>المدقق</label><select id="auditorSel" class="inp"><option value="">-- اختر --</option>${setup.teachers.map(t=>`<option ${bf.auditor===t.id?'selected':''} value="${t.id}">${t.name}</option>`).join('')}</select></div>
-      </div>
-      <div style="margin:10px 0;"><label>ملاحظة</label><input id="noteInp" class="inp" value="${escapeHtml(bf.note)}"></div>
-      <button id="createBundleBtn" class="btn" style="width:100%;">إنشاء الباركود ←</button>
+function printBundle(barcode, subject, count) {
+  const pa = document.getElementById("printArea");
+  pa.style.display="block";
+  pa.innerHTML = `
+    <div style="font-family:'Tajawal',Arial,sans-serif;direction:rtl;text-align:center">
+      <h2 style="margin-bottom:8px">${state.schoolName}</h2>
+      <p style="font-size:14px;margin-bottom:16px">${subject} · ${count} ورقة</p>
+      ${makeQR(barcode,180)}
+      <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${barcode}</p>
     </div>`;
-  }
+  window.print();
+  setTimeout(()=>{ pa.style.display="none"; pa.innerHTML=""; }, 1000);
+}
 
-  function renderAdminList() {
-    if(!bundles.length) return `<div class="card"><p style="text-align:center; padding:28px;">لا توجد مظاريف — أنشئ مظروفاً أولاً</p></div>`;
-    return `<div style="display:flex; flex-direction:column; gap:10px;">${bundles.map(b => {
-      const stageName = b.stage<0 ? "جديد" : (setup.stages[b.stage] || "—");
-      const color = b.stage<0 ? C.mid : sc(b.stage);
-      return `<div class="card" style="position:relative;">
-        <div class="flex-row">
-          <div>${generateQRsvg(b.barcode, 54)}</div>
-          <div style="flex:1"><div class="flex-row"><strong>${b.subject}</strong> ${b.grade?`— ${b.grade}`:''}<span class="tag" style="background:var(--bg);">${b.count} ورقة</span></div>
-          <p style="font-family:monospace;margin:3px 0;">${b.barcode}</p>
-          <div class="flex-row" style="font-size:11px;">${b.corrector?`✏️ ${setup.teachers.find(t=>t.id===b.corrector)?.name||''}`:''} ${b.reviewer?`🔍 ${setup.teachers.find(t=>t.id===b.reviewer)?.name||''}`:''} ${b.auditor?`🔏 ${setup.teachers.find(t=>t.id===b.auditor)?.name||''}`:''}</div></div>
-          <span style="background:${color}20;color:${color};padding:4px 9px;border-radius:16px;font-size:11px;">${stageName}</span>
-          <button data-bundle-id="${b.id}" class="deleteBundleBtn" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:20px;">🗑️</button>
+// ═══════════════════════════════════════════════
+// ADMIN — LIST (with delete)
+// ═══════════════════════════════════════════════
+function renderAdminList(el) {
+  if(state.bundles.length===0) {
+    el.innerHTML=`<div class="card"><p class="empty">لا توجد مظاريف — أنشئ مظروفاً أولاً من قسم "مظروف جديد"</p></div>`;
+    return;
+  }
+  el.innerHTML=`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <p style="font-size:14px;font-weight:700;color:var(--navy)">${state.bundles.length} مظروف مسجّل</p>
+    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
+  </div>
+  <div id="adminBundleList"></div>`;
+  renderAdminBundleList();
+}
+
+function renderAdminBundleList() {
+  const container = document.getElementById("adminBundleList");
+  if(!container)return;
+  container.innerHTML = "";
+  state.bundles.forEach((b,idx) => {
+    const stageName = b.stage<0?"🆕 جديد":state.stages[b.stage]||"—";
+    const color     = b.stage<0?"var(--muted)":sc(b.stage);
+    const corrT     = state.teachers.find(t=>t.id===b.corrector);
+    const pct       = state.stages.length ? Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)) : 0;
+    const div = document.createElement("div");
+    div.className="bundleCard";
+    div.style.cursor="default";
+    div.innerHTML=`
+      <div class="bundleIcon" style="background:${color}20">${makeQR(b.barcode,42).replace('<svg','<svg style="border-radius:4px"')}</div>
+      <div class="bundleInfo">
+        <div class="row" style="flex-wrap:wrap;gap:5px">
+          <span class="bundleName">${b.subject}</span>
+          ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
+          <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
         </div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-
-  function renderSettings() {
-    const tabs = [["general","🏫"],["subjects","📚"],["grades","🎓"],["stages","🔄"],["teachers","👨‍🏫"],["users","👥"]];
-    const tabContent = (()=>{
-      if(settingsTab === "general") return `<div class="card"><p><strong>🏫 اسم المدرسة</strong></p><input id="editSchool" class="inp" value="${escapeHtml(editSchool)}"><p style="margin-top:12px;"><strong>📱 رقم المدير (واتساب)</strong></p><input id="editAdminPhone" class="inp" value="${escapeHtml(editAdminPhone)}"><button id="saveSettingsBtn" class="btn" style="margin-top:15px;">حفظ</button></div>`;
-      if(settingsTab === "subjects") return `<div class="card"><p><strong>📚 المواد الدراسية</strong></p><div id="subjectsList"></div><div class="flex-row"><input id="newSubject" class="inp" placeholder="اسم المادة"><button id="addSubjectBtn" class="btn">إضافة</button></div></div>`;
-      if(settingsTab === "grades") return `<div class="card"><p><strong>🎓 الصفوف الدراسية</strong></p><div id="gradesList"></div><div class="flex-row"><input id="newGrade" class="inp" placeholder="اسم الصف"><button id="addGradeBtn" class="btn">إضافة</button></div></div>`;
-      if(settingsTab === "stages") return `<div class="card"><p><strong>🔄 مراحل سير المظروف</strong></p><div id="stagesList"></div><div class="flex-row"><input id="newStage" class="inp" placeholder="مرحلة جديدة"><button id="addStageBtn" class="btn">إضافة</button></div><button id="saveStagesBtn" class="btn" style="margin-top:12px;background:var(--green);">💾 حفظ المراحل</button></div>`;
-      if(settingsTab === "teachers") return `<div class="card"><p><strong>👨‍🏫 المعلمون</strong></p><div id="teachersList"></div><div class="grid-2"><input id="teacherName" placeholder="الاسم"><input id="teacherEmail" placeholder="البريد"><input id="teacherPhone" placeholder="الجوال +966..."><select id="teacherSubject"><option value="">المادة</option>${setup.subjects.map(s=>`<option>${s}</option>`).join('')}</select><select id="teacherRole"><option value="corrector">مصحح</option><option value="reviewer">مراجع</option><option value="auditor">مدقق</option></select></div><button id="addTeacherBtn" class="btn">إضافة معلم</button></div>`;
-      if(settingsTab === "users") return `<div class="card"><p><strong>👥 حسابات النظام</strong></p><div id="usersList"></div><div class="grid-2"><input id="userName" placeholder="الاسم"><input id="userUsername" placeholder="اسم المستخدم"><input id="userPassword" placeholder="كلمة المرور"><select id="userRole"><option value="admin">مدير النظام</option><option value="controller">الكنترول</option><option value="notifier">مسؤول التنبيهات</option></select></div><button id="addUserBtn" class="btn">إضافة حساب</button></div>`;
-      return "";
-    })();
-    return `<div class="flex-row" style="background:white;border-radius:10px;padding:4px;margin-bottom:14px;">${tabs.map(([k,icon])=>`<button class="settings-tab-btn" data-tab="${k}" style="flex:1;padding:7px;border:none;border-radius:7px;background:${settingsTab===k?C.navy:"transparent"};color:${settingsTab===k?"#fff":C.mid};cursor:pointer;">${icon}</button>`).join('')}</div>${tabContent}`;
-  }
-
-  function renderNotifierSend() {
-    return `<div class="card">
-      <p style="font-weight:800;">📧 إرسال تنبيه للمعلمين (واتساب)</p>
-      <label>نوع التنبيه</label>
-      <div class="flex-row" style="margin-bottom:10px;">${NOTIFY_TYPES.map(t=>`<button data-type="${t.key}" class="notif-type-btn" style="padding:7px 12px;border-radius:8px;border:2px solid ${nfType===t.key?t.color:C.border};background:${nfType===t.key?`${t.color}15`:"#fff"};color:${nfType===t.key?t.color:C.mid};">${t.icon} ${t.label}</button>`).join('')}</div>
-      <label>المعلمون المستهدفون</label>
-      <div id="teachersSelectList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;"></div>
-      <label>ربط بمظروف (اختياري)</label>
-      <select id="bundleSelect" class="inp"><option value="">-- بدون ربط --</option>${bundles.map(b=>`<option ${nfBundleId===b.id?'selected':''} value="${b.id}">${b.barcode} — ${b.subject} ${b.grade||''}</option>`).join('')}</select>
-      <label>نص الرسالة *</label>
-      <textarea id="notifMessage" rows="3" class="inp" placeholder="اكتب نص التنبيه..." style="margin-bottom:12px;">${escapeHtml(nfMessage)}</textarea>
-      <button id="sendNotifBtn" class="btn" style="background:var(--purple);width:100%;">📧 إرسال عبر واتساب</button>
-    </div>`;
-  }
-
-  function renderNotifierLog() {
-    if(!notifs.length) return `<div class="card"><p style="text-align:center;padding:28px;">لم يتم إرسال أي تنبيهات بعد</p></div>`;
-    return `<div style="display:flex;flex-direction:column;gap:10px;">${notifs.map(n=>{
-      const nt = NOTIFY_TYPES.find(t=>t.key===n.type);
-      return `<div class="card" style="border-right:4px solid ${nt?.color||C.mid}">
-        <div class="flex-row"><span style="font-size:24px;">${nt?.icon}</span><div><div class="flex-row"><strong>${nt?.label}</strong><span>${fmt(n.ts)}</span><span>— ${n.sentBy}</span></div><p>${n.message}</p><div class="flex-row">${n.teachers.map(t=>`<span class="tag" style="background:var(--purpleBg);color:var(--purple);">${t.name} — ${t.phone||t.email}</span>`).join('')}</div>${n.bundle?`<p style="font-size:11px;">مظروف: ${n.bundle.barcode} — ${n.bundle.subject}</p>`:''}</div></div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-
-  // event binding
-  function attachNavEvents() {
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-      btn.addEventListener('click', (e) => { currentPage = btn.dataset.page; render(); });
-    });
-  }
-  function attachLogout() {
-    const logout = document.getElementById("logoutBtn");
-    if(logout) logout.addEventListener('click', ()=>{ currentUser = null; render(); });
-  }
-  function attachPageSpecificEvents() {
-    if(currentPage === "ctrl_scan") {
-      const scanInput = document.getElementById("scanInput");
-      const scanBtn = document.getElementById("scanBtn");
-      const scanErr = document.getElementById("scanError");
-      const quickDiv = document.getElementById("quickBundles");
-      if(quickDiv) {
-        quickDiv.innerHTML = bundles.map(b=>`<button class="quickBundle" data-barcode="${b.barcode}" style="padding:3px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:monospace;">${b.barcode}</button>`).join('');
-        document.querySelectorAll('.quickBundle').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            scanInput.value = btn.dataset.barcode;
-            scanVal = btn.dataset.barcode;
-            doScan();
-          });
-        });
-      }
-      const doScan = () => {
-        const val = scanInput.value.trim();
-        if(!val) return;
-        const found = bundles.find(b=>b.barcode===val);
-        if(!found) { scanErr.innerText = `لا يوجد مظروف بالرقم: ${val}`; document.getElementById("bundleResult").innerHTML = ""; hitBundle=null; return; }
-        scanErr.innerText = "";
-        hitBundle = found;
-        renderBundleResult(found);
-      };
-      scanBtn.addEventListener('click', doScan);
-      scanInput.addEventListener('keypress', e=>{ if(e.key==='Enter') doScan(); });
-      if(hitBundle) renderBundleResult(hitBundle);
-    }
-    else if(currentPage === "ctrl_list") {
-      document.querySelectorAll('[data-barcode]').forEach(el => {
-        el.addEventListener('click', (e) => {
-          const barcode = el.dataset.barcode;
-          const found = bundles.find(b=>b.barcode===barcode);
-          if(found) { hitBundle = found; scanVal = barcode; currentPage = "ctrl_scan"; render(); }
-        });
-      });
-    }
-    else if(currentPage === "admin_setup") {
-      if(newBundleCreated) {
-        document.getElementById("printBtn")?.addEventListener('click', ()=>window.print());
-        document.getElementById("newBundleReset")?.addEventListener('click', ()=>{ newBundleCreated = null; render(); });
-      } else {
-        attachAdminCreateEvents();
-      }
-    }
-    else if(currentPage === "admin_list") {
-      document.querySelectorAll('.deleteBundleBtn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = btn.dataset.bundleId;
-          if(confirm("هل أنت متأكد من حذف هذا المظروف؟")) {
-            bundles = bundles.filter(b=>b.id!==id);
-            if(hitBundle && hitBundle.id===id) hitBundle = null;
-            saveAll();
-            render();
-            notify("تم حذف المظروف");
-          }
-        });
-      });
-    }
-    else if(currentPage === "settings") {
-      attachSettingsEvents();
-    }
-    else if(currentPage === "notifier_send") {
-      attachNotifierSendEvents();
-    }
-  }
-
-  function renderBundleResult(b) {
-    const container = document.getElementById("bundleResult");
-    const stageIdx = b.stage;
-    const stageName = stageIdx<0 ? "جديد — لم تبدأ المراحل بعد" : setup.stages[stageIdx];
-    const color = stageIdx<0 ? C.navyLL : sc(stageIdx);
-    let stagesHtml = `<div class="stage-progress">${setup.stages.map((_,i)=>`<div class="stage-dot ${i<=stageIdx ? 'active' : ''}" style="${i<=stageIdx?`background:${sc(i)}`:''}"></div>`).join('')}</div>`;
-    let stageButtons = `<div style="margin-top:15px;"><p>اختر المرحلة الجديدة:</p><div style="display:flex;flex-direction:column;gap:6px;">${setup.stages.map((s,i)=>{
-      const done = i <= stageIdx;
-      const next = i === stageIdx+1;
-      if(done) return `<button disabled style="opacity:0.6;padding:10px;border-radius:9px;background:var(--bg);text-align:right;">✓ ${s}</button>`;
-      return `<button data-stage="${i}" class="stagePickBtn" style="padding:10px;border:1.5px solid ${next?sc(i):`${sc(i)}60`};background:${next?`${sc(i)}15`:"#fff"};text-align:right;">${i+1} - ${s} ${next?" (التالية)":""}</button>`;
-    }).join('')}</div></div>`;
-    if(confirmStageIdx !== null) {
-      stageButtons = `<div style="border:2px solid ${sc(confirmStageIdx)};padding:12px;border-radius:10px;"><p><strong>تأكيد تحديث المرحلة:</strong> ${setup.stages[confirmStageIdx]}</p><input type="text" id="stageNoteInput" class="inp" placeholder="ملاحظة (اختياري)" value="${escapeHtml(stageNote)}"><div class="flex-row" style="margin-top:8px;"><button id="confirmAdvance" class="btn" style="background:${sc(confirmStageIdx)}">✅ تأكيد</button><button id="cancelConfirm" class="btn btn-secondary">إلغاء</button></div></div>`;
-    }
-    container.innerHTML = `
-      <div class="card">
-        <div style="background:${color};border-radius:10px;padding:16px;margin-bottom:16px;"><div class="flex-row"><span style="font-size:32px;">📦</span><div><p style="color:rgba(255,255,255,0.7);">باركود المظروف</p><p style="font-family:monospace;font-size:18px;font-weight:900;color:white;">${b.barcode}</p><div style="background:rgba(255,255,255,0.2);display:inline-block;border-radius:20px;padding:4px 12px;"><span style="color:white;">${stageName}</span></div></div></div></div>
-        <div class="grid-2" style="margin-bottom:16px;">${[["المادة",b.subject],["الصف",b.grade||"—"],["عدد الأوراق",`${b.count} ورقة`],["تاريخ الإنشاء",fmt(b.created)],["المصحح",setup.teachers.find(t=>t.id===b.corrector)?.name||"—"],["المراجع",setup.teachers.find(t=>t.id===b.reviewer)?.name||"—"],["المدقق",setup.teachers.find(t=>t.id===b.auditor)?.name||"—"]].map(([k,v])=>`<div style="background:var(--bg);border-radius:8px;padding:9px;"><p style="font-size:10px;">${k}</p><p style="font-weight:700;">${v}</p></div>`).join('')}</div>
-        ${stagesHtml}
-        ${stageButtons}
-        ${b.log.length ? `<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;"><p><strong>سجل الحركة</strong></p>${[...b.log].reverse().map(e=>`<div class="flex-row" style="margin-bottom:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${sc(e.stageIdx)}"></div><div><span>${e.stageLabel}</span><span style="font-size:11px;color:var(--muted);margin-right:6px;">${fmt(e.ts)} — ${e.user}</span>${e.note?`<p style="font-size:11px;">"${e.note}"</p>`:""}</div></div>`).join('')}</div>` : ''}
+        <p class="bundleMeta">${b.barcode}${corrT?" · ✏️ "+corrT.name:""}</p>
+        <div class="bundleProgress">
+          <div class="progressBar"><div class="progressFill" style="width:${pct}%;background:${color}"></div></div>
+          <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
+        </div>
       </div>
-    `;
-    document.querySelectorAll('.stagePickBtn').forEach(btn => {
-      btn.addEventListener('click', (e) => { confirmStageIdx = parseInt(btn.dataset.stage); stageNote = ""; renderBundleResult(hitBundle); });
-    });
-    const confirmBtn = document.getElementById("confirmAdvance");
-    if(confirmBtn) confirmBtn.addEventListener('click', () => {
-      const noteInput = document.getElementById("stageNoteInput");
-      const note = noteInput ? noteInput.value : "";
-      const newLog = { stageIdx: confirmStageIdx, stageLabel: setup.stages[confirmStageIdx], ts: nowISO(), user: currentUser.name, note: note };
-      bundles = bundles.map(bun => {
-        if(bun.id !== hitBundle.id) return bun;
-        const upd = {...bun, stage: confirmStageIdx, log: [...bun.log, newLog]};
-        hitBundle = upd;
-        return upd;
-      });
-      saveAll();
-      confirmStageIdx = null;
-      stageNote = "";
-      renderBundleResult(hitBundle);
-      notify(`✅ ${setup.stages[confirmStageIdx]}`);
-    });
-    const cancelBtn = document.getElementById("cancelConfirm");
-    if(cancelBtn) cancelBtn.addEventListener('click', () => { confirmStageIdx = null; renderBundleResult(hitBundle); });
-  }
+      <div class="bundleActions">
+        <span class="bundleStageBadge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>
+        <button class="btn btn-sm" style="background:var(--navy);color:#fff" onclick="adminEditBundle('${b.id}')">✏️</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="adminDeleteBundle('${b.id}')">🗑️</button>
+      </div>`;
+    container.appendChild(div);
+  });
+}
 
-  function attachAdminCreateEvents() {
-    const subjectSel = document.getElementById("subjectSel");
-    const gradeSel = document.getElementById("gradeSel");
-    const countInp = document.getElementById("countInp");
-    const correctorSel = document.getElementById("correctorSel");
-    const reviewerSel = document.getElementById("reviewerSel");
-    const auditorSel = document.getElementById("auditorSel");
-    const noteInp = document.getElementById("noteInp");
-    const createBtn = document.getElementById("createBundleBtn");
-    if(createBtn) createBtn.addEventListener('click', () => {
-      if(!subjectSel.value) { notify("اختر المادة","err"); return; }
-      let count = parseInt(countInp.value);
-      if(isNaN(count) || count<1) { notify("أدخل عدد الأوراق","err"); return; }
-      const newB = {
-        id: uid(), barcode: `M${uid()}`, subject: subjectSel.value, grade: gradeSel.value || "", count: count,
-        corrector: correctorSel.value || "", reviewer: reviewerSel.value || "", auditor: auditorSel.value || "",
-        note: noteInp.value || "", stage: -1, log: [], created: nowISO()
-      };
-      bundles.push(newB);
-      saveAll();
-      newBundleCreated = newB;
-      render();
-      notify("تم إنشاء المظروف وباركوده");
-    });
-  }
+function adminDeleteBundle(id) {
+  if(!confirm("حذف هذا المظروف نهائياً؟")) return;
+  state.bundles = state.bundles.filter(b=>b.id!==id);
+  toast("تم الحذف","err");
+  renderAdminList(document.getElementById("pageContent"));
+}
 
-  function attachSettingsEvents() {
-    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { settingsTab = btn.dataset.tab; render(); });
-    });
-    if(settingsTab === "general") {
-      document.getElementById("saveSettingsBtn")?.addEventListener('click', ()=>{
-        setup.schoolName = document.getElementById("editSchool").value;
-        setup.adminPhone = document.getElementById("editAdminPhone").value;
-        saveAll();
-        notify("تم حفظ الإعدادات");
-        render();
-      });
-    } else if(settingsTab === "subjects") {
-      const container = document.getElementById("subjectsList");
-      const refresh = () => {
-        container.innerHTML = setup.subjects.map((s,i)=>`<div class="flex-row" style="justify-content:space-between;background:var(--bg);margin-bottom:5px;padding:8px;"><span>${s}</span><button data-index="${i}" class="delSubjectBtn" style="background:none;border:none;color:var(--red);font-size:18px;">×</button></div>`).join('');
-        document.querySelectorAll('.delSubjectBtn').forEach(btn => {
-          btn.addEventListener('click', (e) => { let idx = parseInt(btn.dataset.index); setup.subjects.splice(idx,1); saveAll(); refresh(); render(); });
-        });
-      };
-      refresh();
-      document.getElementById("addSubjectBtn")?.addEventListener('click', ()=>{
-        let val = document.getElementById("newSubject").value.trim();
-        if(val) { setup.subjects.push(val); saveAll(); refresh(); document.getElementById("newSubject").value=""; render(); }
-      });
-    } else if(settingsTab === "grades") {
-      const container = document.getElementById("gradesList");
-      const refresh = () => {
-        container.innerHTML = setup.grades.map((g,i)=>`<div class="flex-row" style="justify-content:space-between;background:var(--bg);margin-bottom:5px;padding:8px;"><span>${g}</span><button data-index="${i}" class="delGradeBtn" style="background:none;border:none;color:var(--red);">×</button></div>`).join('');
-        document.querySelectorAll('.delGradeBtn').forEach(btn => btn.addEventListener('click',()=>{ setup.grades.splice(parseInt(btn.dataset.index),1); saveAll(); refresh(); render(); }));
-      };
-      refresh();
-      document.getElementById("addGradeBtn")?.addEventListener('click',()=>{ let val=document.getElementById("newGrade").value.trim(); if(val){ setup.grades.push(val); saveAll(); refresh(); document.getElementById("newGrade").value=""; render(); } });
-    } else if(settingsTab === "stages") {
-      const container = document.getElementById("stagesList");
-      const refresh = () => {
-        container.innerHTML = editStages.map((s,i)=>`<div class="flex-row"><span style="background:${sc(i)};width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;">${i+1}</span><input class="inp" data-idx="${i}" value="${escapeHtml(s)}" style="flex:1;"><button data-idx="${i}" class="delStageBtn" style="background:none;border:none;color:red;">×</button></div>`).join('');
-        document.querySelectorAll('.delStageBtn').forEach(btn => btn.addEventListener('click',()=>{ editStages.splice(parseInt(btn.dataset.idx),1); refresh(); }));
-        document.querySelectorAll('.inp[data-idx]').forEach(inp => inp.addEventListener('change',(e)=>{ let idx = parseInt(inp.dataset.idx); editStages[idx] = inp.value; }));
-      };
-      refresh();
-      document.getElementById("addStageBtn")?.addEventListener('click',()=>{ let val=document.getElementById("newStage").value.trim(); if(val){ editStages.push(val); document.getElementById("newStage").value=""; refresh(); } });
-      document.getElementById("saveStagesBtn")?.addEventListener('click',()=>{ setup.stages = [...editStages]; saveAll(); notify("تم حفظ المراحل"); render(); });
-    } else if(settingsTab === "teachers") {
-      const container = document.getElementById("teachersList");
-      const refresh = () => {
-        container.innerHTML = setup.teachers.map(t=>`<div class="flex-row" style="justify-content:space-between;background:var(--bg);margin-bottom:5px;padding:8px;"><div><strong>${t.name}</strong> (${t.subject}) - ${t.phone} <span class="tag">${TEACHER_ROLE_LABEL[t.role]}</span></div><button data-id="${t.id}" class="delTeacherBtn" style="background:none;border:none;color:red;">×</button></div>`).join('');
-        document.querySelectorAll('.delTeacherBtn').forEach(btn => btn.addEventListener('click',()=>{ setup.teachers = setup.teachers.filter(tt=>tt.id !== btn.dataset.id); saveAll(); refresh(); render(); }));
-      };
-      refresh();
-      document.getElementById("addTeacherBtn")?.addEventListener('click',()=>{
-        const name = document.getElementById("teacherName").value.trim();
-        const email = document.getElementById("teacherEmail").value.trim();
-        const phone = document.getElementById("teacherPhone").value.trim();
-        const subject = document.getElementById("teacherSubject").value;
-        const role = document.getElementById("teacherRole").value;
-        if(!name || !email || !phone) { notify("أدخل الاسم والبريد والجوال","err"); return; }
-        setup.teachers.push({ id:uid(), name, email, phone, subject, role });
-        saveAll();
-        refresh();
-        document.getElementById("teacherName").value = "";
-        document.getElementById("teacherEmail").value = "";
-        document.getElementById("teacherPhone").value = "";
-        render();
-        notify("تم إضافة المعلم");
-      });
-    } else if(settingsTab === "users") {
-      const container = document.getElementById("usersList");
-      const refresh = () => {
-        container.innerHTML = setup.users.map(u=>`<div class="flex-row" style="justify-content:space-between;background:var(--bg);margin-bottom:5px;padding:8px;"><div><strong>${u.name}</strong> (${u.username}) <span class="tag">${ROLE_LABEL[u.role]}</span></div>${u.id !== currentUser.id ? `<button data-id="${u.id}" class="delUserBtn" style="background:none;border:none;color:red;">×</button>` : ''}</div>`).join('');
-        document.querySelectorAll('.delUserBtn').forEach(btn => btn.addEventListener('click',()=>{ setup.users = setup.users.filter(uu=>uu.id !== btn.dataset.id); saveAll(); refresh(); render(); }));
-      };
-      refresh();
-      document.getElementById("addUserBtn")?.addEventListener('click',()=>{
-        const name = document.getElementById("userName").value.trim();
-        const username = document.getElementById("userUsername").value.trim();
-        const password = document.getElementById("userPassword").value.trim();
-        const role = document.getElementById("userRole").value;
-        if(!name || !username || !password) { notify("أكمل البيانات","err"); return; }
-        if(setup.users.find(u=>u.username===username)) { notify("اسم المستخدم موجود","err"); return; }
-        setup.users.push({ id:uid(), name, username, password, role });
-        saveAll();
-        refresh();
-        document.getElementById("userName").value = "";
-        document.getElementById("userUsername").value = "";
-        document.getElementById("userPassword").value = "";
-        render();
-        notify("تم إضافة الحساب");
-      });
-    }
-  }
+function adminEditBundle(id) {
+  const b = state.bundles.find(x=>x.id===id);
+  if(!b)return;
+  const overlay = document.createElement("div");
+  overlay.className="overlay";
+  overlay.id="editOverlay";
+  overlay.innerHTML=`
+  <div class="modal">
+    <p class="modalTitle">✏️ تعديل المظروف — ${b.barcode}</p>
+    <label class="lbl">المادة</label>
+    <select class="inp" id="eb_subject" style="margin-bottom:10px">
+      ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${s}</option>`).join("")}
+    </select>
+    <label class="lbl">الصف</label>
+    <select class="inp" id="eb_grade" style="margin-bottom:10px">
+      <option value="">-- اختياري --</option>
+      ${state.grades.map(g=>`<option${g===b.grade?" selected":""}>${g}</option>`).join("")}
+    </select>
+    <label class="lbl">عدد الأوراق</label>
+    <input class="inp" id="eb_count" type="number" value="${b.count}" style="margin-bottom:10px"/>
+    <label class="lbl">المصحح</label>
+    <select class="inp" id="eb_corrector" style="margin-bottom:10px">
+      <option value="">-- اختر --</option>
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector?" selected":""}>${t.name}</option>`).join("")}
+    </select>
+    <label class="lbl">المراجع</label>
+    <select class="inp" id="eb_reviewer" style="margin-bottom:10px">
+      <option value="">-- اختر --</option>
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer?" selected":""}>${t.name}</option>`).join("")}
+    </select>
+    <label class="lbl">المدقق</label>
+    <select class="inp" id="eb_auditor" style="margin-bottom:16px">
+      <option value="">-- اختر --</option>
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${t.name}</option>`).join("")}
+    </select>
+    <div class="row">
+      <button class="btn btn-navy" style="flex:1" onclick="saveEditBundle('${b.id}')">💾 حفظ</button>
+      <button class="btn btn-mid" style="flex:1" onclick="document.getElementById('editOverlay').remove()">إلغاء</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
 
-  function attachNotifierSendEvents() {
-    const teachersDiv = document.getElementById("teachersSelectList");
-    const refreshTeachers = () => {
-      teachersDiv.innerHTML = setup.teachers.map(t => `<button data-id="${t.id}" class="teacherSelectBtn" style="display:flex;align-items:center;gap:10px;padding:10px;border:1.5px solid ${nfTeachers.includes(t.id)?C.navy:C.border};background:${nfTeachers.includes(t.id)?`${C.navy}10`:"#fff"};border-radius:9px;width:100%;margin-bottom:5px;cursor:pointer;"><div style="width:28px;height:28px;border-radius:50%;background:${nfTeachers.includes(t.id)?C.navy:C.border};display:flex;align-items:center;justify-content:center;color:white;">${nfTeachers.includes(t.id)?"✓":t.name.charAt(0)}</div><div><strong>${t.name}</strong> (${t.subject})<br><span style="font-size:11px;">${t.phone}</span></div></button>`).join('');
-      document.querySelectorAll('.teacherSelectBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.dataset.id;
-          if(nfTeachers.includes(id)) nfTeachers = nfTeachers.filter(x=>x!==id);
-          else nfTeachers.push(id);
-          refreshTeachers();
-        });
-      });
-    };
-    refreshTeachers();
-    document.querySelectorAll('.notif-type-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { nfType = btn.dataset.type; render(); });
-    });
-    const bundleSel = document.getElementById("bundleSelect");
-    if(bundleSel) bundleSel.addEventListener('change', (e) => { nfBundleId = e.target.value; });
-    const msgText = document.getElementById("notifMessage");
-    if(msgText) msgText.addEventListener('input', (e) => { nfMessage = e.target.value; });
-    document.getElementById("sendNotifBtn")?.addEventListener('click', () => {
-      if(nfTeachers.length===0){ notify("اختر معلماً على الأقل","err"); return; }
-      if(!nfMessage.trim()){ notify("أدخل نص الرسالة","err"); return; }
-      const bundle = bundles.find(b=>b.id===nfBundleId) || null;
-      const typeObj = NOTIFY_TYPES.find(t=>t.key===nfType);
-      let waMsg = `*${typeObj.label}* - ${setup.schoolName}\n\n${nfMessage}\n`;
-      if(bundle) waMsg += `\n📦 المظروف: ${bundle.barcode} | ${bundle.subject}${bundle.grade?` - ${bundle.grade}`:""} | عدد الأوراق: ${bundle.count}`;
-      waMsg += `\n\nمرسل من: ${currentUser.name}`;
-      const encoded = encodeURIComponent(waMsg);
-      nfTeachers.forEach(tid => {
-        const teacher = setup.teachers.find(t=>t.id===tid);
-        if(teacher && teacher.phone) {
-          const cleanPhone = teacher.phone.replace(/[^0-9+]/g, '');
-          window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
-        } else notify(`المعلم ${teacher?.name} ليس لديه رقم جوال`, "err");
-      });
-      const logEntry = { id:uid(), ts:nowISO(), type:nfType, typeLabel:typeObj?.label, teachers: nfTeachers.map(tid=>setup.teachers.find(t=>t.id===tid)).filter(Boolean), message:nfMessage, bundle, sentBy:currentUser.name };
-      notifs.unshift(logEntry);
-      saveAll();
-      nfTeachers = []; nfMessage = ""; nfBundleId = ""; nfType = "correction";
-      notify(`📧 تم فتح واتساب لـ ${logEntry.teachers.length} معلم (أرسل الرسالة يدوياً)`);
-      render();
-    });
-  }
+function saveEditBundle(id) {
+  const b = state.bundles.find(x=>x.id===id);
+  if(!b)return;
+  b.subject   = document.getElementById("eb_subject").value||b.subject;
+  b.grade     = document.getElementById("eb_grade").value;
+  b.count     = +document.getElementById("eb_count").value||b.count;
+  b.corrector = document.getElementById("eb_corrector").value;
+  b.reviewer  = document.getElementById("eb_reviewer").value;
+  b.auditor   = document.getElementById("eb_auditor").value;
+  document.getElementById("editOverlay").remove();
+  toast("تم حفظ التعديلات ✅");
+  renderAdminList(document.getElementById("pageContent"));
+}
 
-  function loginScreen() {
-    return `<div style="min-height:100vh;background:linear-gradient(140deg,${C.navy},${C.navyLL});display:flex;align-items:center;justify-content:center;padding:16px;">
-      <div style="background:white;border-radius:20px;padding:40px 30px;width:360px;max-width:100%;">
-        <div style="text-align:center;margin-bottom:28px;"><div style="font-size:44px;">📦</div><h2>${setup.schoolName}</h2><p style="font-size:12px;">نظام تتبع مظاريف الاختبارات</p></div>
-        ${loginError?`<div style="background:var(--redBg);color:var(--red);padding:9px;border-radius:8px;margin-bottom:12px;">${loginError}</div>`:''}
-        <input id="loginUser" class="inp" placeholder="اسم المستخدم" style="margin-bottom:10px;">
-        <input id="loginPass" type="password" class="inp" placeholder="كلمة المرور" style="margin-bottom:16px;" dir="ltr">
-        <button id="loginBtn" class="btn" style="width:100%;">دخول</button>
-        <div style="margin-top:18px;background:var(--bg);border-radius:10px;padding:12px;"><p style="font-size:11px;">الحسابات التجريبية</p>${setup.users.map(u=>`<button data-u="${u.username}" data-p="${u.password}" class="quickLogin" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:4px 0;"><span style="background:${ROLE_COLOR[u.role][1]};color:${ROLE_COLOR[u.role][0]};padding:2px 8px;border-radius:10px;">${ROLE_LABEL[u.role]}</span><span style="font-family:monospace;">${u.username} / ${u.password}</span></button>`).join('')}</div>
+// ═══════════════════════════════════════════════
+// CONTROLLER — SCAN
+// ═══════════════════════════════════════════════
+let _scanHit    = null;
+let _confirmStg = null;
+
+function renderCtrlScan(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📷 مسح باركود المظروف</p>
+    <div class="row" style="margin-bottom:12px">
+      <input class="inp" id="scanInput" placeholder="أدخل رقم الباركود..." dir="ltr" style="flex:1;font-family:monospace;font-size:15px;letter-spacing:1px" autofocus/>
+      <button class="btn btn-navy" onclick="doScan()">مسح ◀</button>
+    </div>
+    ${state.bundles.length?`
+    <p style="font-size:11px;color:var(--muted);margin-bottom:6px">اختر للاختبار السريع:</p>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">
+      ${state.bundles.map(b=>`<button onclick="quickScan('${b.id}')" style="padding:3px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--mid);font-family:monospace">${b.barcode}</button>`).join("")}
+    </div>`:""}
+    <div id="scanErr"></div>
+  </div>
+  <div id="scanResult"></div>`;
+
+  document.getElementById("scanInput").addEventListener("keydown", e=>{ if(e.key==="Enter") doScan(); });
+  if(_scanHit) renderScanResult();
+}
+
+function quickScan(id) {
+  const b = state.bundles.find(x=>x.id===id);
+  if(!b)return;
+  _scanHit=b; _confirmStg=null;
+  const inp=document.getElementById("scanInput");
+  if(inp) inp.value=b.barcode;
+  renderScanResult();
+}
+
+function doScan() {
+  const v = (document.getElementById("scanInput")||{value:""}).value.trim();
+  if(!v)return;
+  const b = state.bundles.find(x=>x.barcode===v);
+  const errEl = document.getElementById("scanErr");
+  if(!b) {
+    _scanHit=null;
+    if(errEl) errEl.innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${v}</p>`;
+    document.getElementById("scanResult").innerHTML="";
+    return;
+  }
+  if(errEl) errEl.innerHTML="";
+  _scanHit=b; _confirmStg=null;
+  renderScanResult();
+}
+
+function renderScanResult() {
+  const container=document.getElementById("scanResult");
+  if(!container||!_scanHit)return;
+  const b=_scanHit;
+  const color = b.stage<0?"var(--navyL)":sc(b.stage);
+  const corrT = state.teachers.find(t=>t.id===b.corrector);
+  const revT  = state.teachers.find(t=>t.id===b.reviewer);
+  const audT  = state.teachers.find(t=>t.id===b.auditor);
+  const pct   = state.stages.length ? Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)) : 0;
+  const logHTML = [...b.log].reverse().map(e=>`
+    <div class="logEntry">
+      <div class="logDot" style="background:${sc(e.stageIdx)}"></div>
+      <div>
+        <span class="logLabel">${e.stageLabel}</span>
+        <span class="logMeta">${fmt(e.ts)} — ${e.user}</span>
+        ${e.note?`<p class="logNote">"${e.note}"</p>`:""}
+      </div>
+    </div>`).join("");
+
+  container.innerHTML=`
+  <div class="card">
+    <!-- Stage header -->
+    <div class="stageHeader" style="background:${color}">
+      <div style="font-size:34px">📦</div>
+      <div style="flex:1">
+        <p class="bc">باركود المظروف</p>
+        <p class="bcode">${b.barcode}</p>
+        <span class="stagePill">${b.stage<0?"🆕 جديد — لم تبدأ المراحل بعد":state.stages[b.stage]||"—"}</span>
+      </div>
+    </div>
+    <!-- Info -->
+    <div class="infoGrid">
+      <div class="infoCell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
+      <div class="infoCell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
+      <div class="infoCell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
+      <div class="infoCell"><p class="k">تاريخ الإنشاء</p><p class="v">${fmt(b.created)}</p></div>
+      <div class="infoCell"><p class="k">✏️ المصحح</p><p class="v">${corrT?corrT.name:"—"}</p></div>
+      <div class="infoCell"><p class="k">🔍 المراجع</p><p class="v">${revT?revT.name:"—"}</p></div>
+      <div class="infoCell"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>
+      ${b.note?`<div class="infoCell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
+    </div>
+    <!-- Progress -->
+    <div class="progressWrap">
+      <div class="progressLabel"><span>مسار الأوراق</span><span style="font-weight:700;color:var(--navy)">${Math.max(0,b.stage+1)} / ${state.stages.length}</span></div>
+      <div class="progressStrip">
+        ${state.stages.map((_,i)=>`<div class="progressSeg" title="${state.stages[i]}" style="background:${i<=b.stage?sc(i):"var(--border)"}"></div>`).join("")}
+      </div>
+    </div>
+    <!-- Stage selector / confirm -->
+    <div id="stageSelectorArea"></div>
+    <!-- Log -->
+    ${b.log.length?`<hr class="divider"><p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">سجل الحركة</p>${logHTML}`:""}
+  </div>`;
+  renderStageSelector();
+}
+
+function renderStageSelector() {
+  const area=document.getElementById("stageSelectorArea");
+  if(!area||!_scanHit)return;
+  const b=_scanHit;
+  if(_confirmStg!==null) {
+    const idx=_confirmStg;
+    const c=sc(idx);
+    area.innerHTML=`
+    <div class="confirmBox" style="border-color:${c}">
+      <p style="font-weight:800;font-size:14px;color:var(--navy);margin-bottom:4px">تأكيد تحديث المرحلة</p>
+      <p style="font-size:12px;color:var(--mid);margin-bottom:12px">سيتم تحديث المظروف <strong>${b.barcode}</strong> إلى:</p>
+      <div class="confirmHighlight" style="background:${c}15;border:1px solid ${c}40">
+        <div class="confirmNum" style="background:${c}">${idx+1}</div>
+        <span style="font-weight:800;color:${c};font-size:14px">${state.stages[idx]}</span>
+      </div>
+      <input class="inp" id="stageNote" placeholder="ملاحظة (اختياري)" style="margin-bottom:10px"/>
+      <div class="row">
+        <button class="btn" style="flex:1;background:${c}" onclick="doAdvance()">✅ تأكيد التحديث</button>
+        <button class="btn btn-mid" style="flex:1" onclick="_confirmStg=null;renderStageSelector()">إلغاء</button>
       </div>
     </div>`;
+    return;
   }
+  let html=`<p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">اختر المرحلة الجديدة للمظروف:</p>`;
+  state.stages.forEach((s,i)=>{
+    const done=i<=b.stage;
+    const next=i===b.stage+1;
+    const c=sc(i);
+    html+=`<button class="stageItem"
+      style="${done?`border-color:var(--border);background:var(--bg);`:next?`border-color:${c};background:${c}15`:""}"
+      ${done?"disabled":""}
+      onclick="if(!this.disabled){_confirmStg=${i};renderStageSelector()}">
+      <div class="stageNum" style="background:${done?"var(--green)":next?c:"var(--border)"}">${done?"✓":i+1}</div>
+      <span class="stageItemLabel" style="${done?"color:var(--muted)":next?`color:${c};font-weight:700`:"color:var(--mid)"}">${s}</span>
+      ${next?`<span class="stageNextTag" style="background:${c}20;color:${c}">التالية</span>`:""}
+      ${done?`<span class="stageDoneMark">✓</span>`:""}
+    </button>`;
+  });
+  area.innerHTML=html;
+}
 
-  function attachLoginEvents() {
-    const loginBtn = document.getElementById("loginBtn");
-    const userInp = document.getElementById("loginUser");
-    const passInp = document.getElementById("loginPass");
-    const quickBtns = document.querySelectorAll('.quickLogin');
-    const doLogin = () => {
-      const u = setup.users.find(u=>u.username===userInp.value && u.password===passInp.value);
-      if(u) { currentUser = u; currentPage = u.role==="admin"?"admin_setup":u.role==="controller"?"ctrl_scan":"notifier_send"; loginError=""; render(); }
-      else { loginError = "بيانات الدخول غير صحيحة"; render(); }
-    };
-    loginBtn.addEventListener('click', doLogin);
-    userInp.addEventListener('keypress', e=>{if(e.key==='Enter')doLogin();});
-    passInp.addEventListener('keypress', e=>{if(e.key==='Enter')doLogin();});
-    quickBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        userInp.value = btn.dataset.u;
-        passInp.value = btn.dataset.p;
-        doLogin();
-      });
-    });
+function doAdvance() {
+  if(_confirmStg===null||!_scanHit)return;
+  const idx=_confirmStg;
+  const note=document.getElementById("stageNote")?.value||"";
+  const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
+  const b=state.bundles.find(x=>x.id===_scanHit.id);
+  if(!b)return;
+  b.stage=idx; b.log.push(entry);
+  _scanHit=b; _confirmStg=null;
+  toast(`✅ ${state.stages[idx]}`);
+  renderScanResult();
+}
+
+// ═══════════════════════════════════════════════
+// CONTROLLER — LIST
+// ═══════════════════════════════════════════════
+function renderCtrlList(el) {
+  if(state.bundles.length===0){ el.innerHTML=`<div class="card"><p class="empty">لا توجد مظاريف حتى الآن</p></div>`; return; }
+  el.innerHTML=`<div id="ctrlBundleList"></div>`;
+  const container=document.getElementById("ctrlBundleList");
+  state.bundles.forEach(b=>{
+    const stageName=b.stage<0?"🆕 جديد":state.stages[b.stage]||"—";
+    const color=b.stage<0?"var(--muted)":sc(b.stage);
+    const pct=state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
+    const div=document.createElement("div");
+    div.className="bundleCard";
+    div.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
+    div.innerHTML=`
+      <div class="bundleIcon" style="background:${color}20;font-size:22px">📦</div>
+      <div class="bundleInfo">
+        <div class="row" style="flex-wrap:wrap;gap:5px">
+          <span class="bundleName">${b.subject}</span>
+          ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
+          <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
+        </div>
+        <p class="bundleMeta">${b.barcode}</p>
+        <div class="bundleProgress">
+          <div class="progressBar"><div class="progressFill" style="width:${pct}%;background:${color}"></div></div>
+          <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
+        </div>
+      </div>
+      <span class="bundleStageBadge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>`;
+    container.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// NOTIFIER — SEND (WhatsApp)
+// ═══════════════════════════════════════════════
+let _selTeachers=[], _selType="correction", _selBundle="";
+
+function renderNotifSend(el) {
+  const ntHTML=NOTIFY_TYPES.map(t=>`
+    <button class="ntypeBtn${_selType===t.key?" active":""}" onclick="selNType('${t.key}')"
+      style="${_selType===t.key?`border-color:${t.color};background:${t.color}15;color:${t.color};font-weight:800`:""}">
+      ${t.icon} ${t.label}
+    </button>`).join("");
+
+  const teachersHTML=state.teachers.map(t=>`
+    <button class="teacherRow${_selTeachers.includes(t.id)?" selected":""}" onclick="toggleTeacher('${t.id}')">
+      <div class="teacherAvatar" style="background:${_selTeachers.includes(t.id)?"var(--navy)":"var(--border)"}">${_selTeachers.includes(t.id)?"✓":t.name.charAt(0)}</div>
+      <div style="flex:1;text-align:right">
+        <span style="font-weight:${_selTeachers.includes(t.id)?800:400};color:${_selTeachers.includes(t.id)?"var(--navy)":"var(--mid)"};font-size:13px">${t.name}</span>
+        <span style="font-size:11px;color:var(--muted);margin-right:6px">${t.subject}</span>
+      </div>
+      <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
+      <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
+    </button>`).join("") || `<p class="empty">لا يوجد معلمون — أضفهم من الإعدادات</p>`;
+
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📲 إرسال تنبيه واتساب للمعلمين</p>
+    <label class="lbl">نوع التنبيه</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${ntHTML}</div>
+    <label class="lbl">المعلمون المستهدفون (اختر واحداً أو أكثر)</label>
+    <div id="teacherList" style="margin-bottom:14px">${teachersHTML}</div>
+    <label class="lbl">ربط بمظروف (اختياري)</label>
+    <select class="inp" id="notif_bundle" style="margin-bottom:14px" onchange="_selBundle=this.value">
+      <option value="">-- بدون ربط --</option>
+      ${state.bundles.map(b=>`<option value="${b.id}"${_selBundle===b.id?" selected":""}>${b.barcode} — ${b.subject}${b.grade?" "+b.grade:""}</option>`).join("")}
+    </select>
+    <label class="lbl">نص الرسالة *</label>
+    <textarea class="inp" id="notif_msg" rows="3" placeholder="اكتب نص التنبيه هنا...">${""}</textarea>
+    <!-- Preview -->
+    <div id="notifPreview" style="margin-top:12px"></div>
+    <div class="row" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-wa" style="flex:1" onclick="sendNotif()">📲 إرسال عبر واتساب</button>
+      <button class="btn" style="flex:1;background:var(--mid)" onclick="clearNotif()">مسح الحقول</button>
+    </div>
+    <!-- Admin direct WA -->
+    <hr class="divider"/>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">📱 رقم واتساب المدير (للمراسلة المباشرة)</p>
+    <div class="row">
+      <span style="font-size:13px;font-family:monospace;color:var(--navy);direction:ltr;flex:1">${state.adminPhone}</span>
+      <a href="${waLink(state.adminPhone,"مرحباً، رسالة من نظام تتبع المظاريف")}" target="_blank" class="btn btn-wa btn-sm">📲 واتساب المدير</a>
+    </div>
+  </div>`;
+  document.getElementById("notif_msg").addEventListener("input",updatePreview);
+  updatePreview();
+}
+
+function selNType(key) {
+  _selType=key;
+  renderNotifSend(document.getElementById("pageContent"));
+}
+function toggleTeacher(id) {
+  _selTeachers = _selTeachers.includes(id) ? _selTeachers.filter(x=>x!==id) : [..._selTeachers,id];
+  const el=document.getElementById("pageContent");
+  renderNotifSend(el);
+  // restore message
+}
+function clearNotif() {
+  _selTeachers=[]; _selType="correction"; _selBundle="";
+  renderNotifSend(document.getElementById("pageContent"));
+}
+
+function updatePreview() {
+  const msgEl=document.getElementById("notif_msg");
+  const prevEl=document.getElementById("notifPreview");
+  if(!msgEl||!prevEl)return;
+  const msg=msgEl.value.trim();
+  if(!msg||_selTeachers.length===0){ prevEl.innerHTML=""; return; }
+  const nt=NOTIFY_TYPES.find(t=>t.key===_selType);
+  const names=_selTeachers.map(id=>state.teachers.find(t=>t.id===id)?.name||"").filter(Boolean).join("، ");
+  prevEl.innerHTML=`
+  <div style="background:var(--bg);border-radius:10px;padding:12px 14px;border:1px solid var(--border)">
+    <p style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:6px">معاينة الرسالة</p>
+    <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:1px solid ${nt?.color||"var(--border)"}40">
+      <p style="font-weight:800;color:${nt?.color};font-size:13px;margin-bottom:4px">${nt?.icon} ${nt?.label}</p>
+      <p style="font-size:13px;color:var(--text);margin-bottom:4px">${msg}</p>
+      <p style="font-size:11px;color:var(--muted)">إلى: ${names}</p>
+    </div>
+  </div>`;
+}
+
+function sendNotif() {
+  if(_selTeachers.length===0){ toast("اختر معلماً على الأقل","err"); return; }
+  const msg=document.getElementById("notif_msg")?.value.trim();
+  if(!msg){ toast("أدخل نص الرسالة","err"); return; }
+  const nt=NOTIFY_TYPES.find(t=>t.key===_selType);
+  const bundle=state.bundles.find(b=>b.id===_selBundle)||null;
+  const teachers=_selTeachers.map(id=>state.teachers.find(t=>t.id===id)).filter(Boolean);
+
+  // Full WA message
+  const fullMsg=`*${nt?.icon} ${nt?.label}*\n${state.schoolName}\n\n${msg}${bundle?`\n\nالمظروف: ${bundle.barcode} — ${bundle.subject}`:""}\n\n— ${currentUser.name}`;
+
+  // Save to log
+  state.notifLog.unshift({
+    id:uid(), ts:nowISO(), type:_selType,
+    typeLabel:nt?.label, typeColor:nt?.color, typeIcon:nt?.icon,
+    teachers, message:msg, bundle, sentBy:currentUser.name, waMsg:fullMsg,
+  });
+  toast(`📲 جاهز للإرسال لـ ${teachers.length} معلم عبر واتساب`,"wa");
+
+  // Open WA for first teacher, rest open in tabs
+  teachers.forEach((t,i)=>{
+    const link=waLink(t.phone, fullMsg);
+    if(i===0) window.open(link,"_blank");
+    else setTimeout(()=>window.open(link,"_blank"), i*600);
+  });
+  _selTeachers=[]; _selBundle="";
+  setTimeout(()=>renderNotifSend(document.getElementById("pageContent")),300);
+}
+
+// ═══════════════════════════════════════════════
+// NOTIFIER — LOG
+// ═══════════════════════════════════════════════
+function renderNotifLog(el) {
+  if(state.notifLog.length===0){
+    el.innerHTML=`<div class="card"><p class="empty">لم يتم إرسال أي تنبيهات بعد</p></div>`;
+    return;
   }
+  el.innerHTML=`<div>${state.notifLog.map(n=>`
+    <div class="nlogCard" style="border-right-color:${n.typeColor||"var(--border)"}">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:24px;flex-shrink:0">${n.typeIcon}</span>
+        <div style="flex:1">
+          <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:5px">
+            <span style="font-weight:800;color:${n.typeColor};font-size:13px">${n.typeLabel}</span>
+            <span style="font-size:11px;color:var(--muted)">${fmt(n.ts)}</span>
+            <span style="font-size:11px;color:var(--muted)">— ${n.sentBy}</span>
+          </div>
+          <p style="font-size:13px;color:var(--text);margin-bottom:7px">${n.message}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px">
+            ${n.teachers.map(t=>`
+            <a href="${waLink(t.phone,n.waMsg)}" target="_blank"
+              style="display:inline-flex;align-items:center;gap:4px;background:var(--waBg);color:var(--wa);padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;text-decoration:none">
+              📲 ${t.name} <span style="font-family:monospace;font-size:10px;direction:ltr">${t.phone}</span>
+            </a>`).join("")}
+          </div>
+          ${n.bundle?`<p style="font-size:11px;color:var(--muted)">مظروف: <strong>${n.bundle.barcode}</strong> — ${n.bundle.subject}</p>`:""}
+        </div>
+      </div>
+    </div>`).join("")}</div>`;
+}
 
-  function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+// ═══════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════
+let _sTab="general", _editStages=null;
 
-  render();
+function renderSettings(el) {
+  if(!_editStages) _editStages=[...state.stages];
+  el.innerHTML=`
+  <div class="settingsTabs">
+    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["users","👥 حسابات"],["phone","📱 واتساب"]].map(([k,l])=>`
+    <button class="sTab${_sTab===k?" active":""}" onclick="switchSTab('${k}')">${l}</button>`).join("")}
+  </div>
+  <div id="sTabContent"></div>`;
+  renderSTabContent();
+}
+
+function switchSTab(k){ _sTab=k; renderSettings(document.getElementById("pageContent")); }
+
+function renderSTabContent() {
+  const el=document.getElementById("sTabContent");
+  if(!el)return;
+  switch(_sTab) {
+    case "general":  renderSGeneral(el);   break;
+    case "subjects": renderSSubjects(el);  break;
+    case "grades":   renderSGrades(el);    break;
+    case "stages":   renderSStages(el);    break;
+    case "teachers": renderSTeachers(el);  break;
+    case "users":    renderSUsers(el);     break;
+    case "phone":    renderSPhone(el);     break;
+  }
+}
+
+function renderSGeneral(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">🏫 اسم المدرسة / المؤسسة</p>
+    <input class="inp" id="s_school" value="${state.schoolName}" style="margin-bottom:12px"/>
+    <button class="btn btn-navy" onclick="
+      state.schoolName=document.getElementById('s_school').value||state.schoolName;
+      document.getElementById('hSchool').textContent=state.schoolName;
+      document.getElementById('loginSchoolName').textContent=state.schoolName;
+      toast('تم الحفظ ✅')">💾 حفظ</button>
+  </div>`;
+}
+
+function renderSSubjects(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📚 المواد الدراسية</p>
+    <div id="subjectList">
+      ${state.subjects.map((s,i)=>`
+      <div class="listItem">
+        <span class="liText">${s}</span>
+        <button class="delBtn" onclick="state.subjects.splice(${i},1);renderSTabContent()">×</button>
+      </div>`).join("")}
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input class="inp" id="newSubj" placeholder="اسم المادة الجديدة" style="flex:1"/>
+      <button class="btn btn-navy" onclick="
+        const v=document.getElementById('newSubj').value.trim();
+        if(v){state.subjects.push(v);renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+    </div>
+  </div>`;
+}
+
+function renderSGrades(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">🎓 الصفوف الدراسية</p>
+    <div>
+      ${state.grades.map((g,i)=>`
+      <div class="listItem">
+        <span class="liText">${g}</span>
+        <button class="delBtn" onclick="state.grades.splice(${i},1);renderSTabContent()">×</button>
+      </div>`).join("")}
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input class="inp" id="newGrade" placeholder="اسم الصف الجديد" style="flex:1"/>
+      <button class="btn btn-navy" onclick="
+        const v=document.getElementById('newGrade').value.trim();
+        if(v){state.grades.push(v);renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+    </div>
+  </div>`;
+}
+
+function renderSStages(el) {
+  if(!_editStages) _editStages=[...state.stages];
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">🔄 مراحل سير المظروف</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">عدّل أسماء المراحل أو احذف أو أضف جديدة</p>
+    <div id="stageEditList">
+      ${_editStages.map((s,i)=>`
+      <div class="row" style="margin-bottom:6px">
+        <div class="stageNum" style="background:${sc(i)};width:26px;height:26px;flex-shrink:0">${i+1}</div>
+        <input class="inp" value="${s}" style="flex:1;margin:0" onchange="_editStages[${i}]=this.value"/>
+        <button class="delBtn" onclick="_editStages.splice(${i},1);renderSTabContent()">×</button>
+      </div>`).join("")}
+    </div>
+    <div class="row" style="margin:10px 0">
+      <input class="inp" id="newStage" placeholder="مرحلة جديدة" style="flex:1"/>
+      <button class="btn btn-navy" onclick="
+        const v=document.getElementById('newStage').value.trim();
+        if(v){_editStages.push(v);renderSTabContent()}">إضافة</button>
+    </div>
+    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
+  </div>`;
+}
+
+function renderSTeachers(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">👨‍🏫 المعلمون (مصححون / مراجعون / مدققون)</p>
+    <div>
+      ${state.teachers.map(t=>`
+      <div class="listItem" style="flex-wrap:wrap;gap:6px">
+        <div style="flex:1;min-width:120px">
+          <span style="font-weight:700;color:var(--navy);font-size:13px">${t.name}</span>
+          <span style="font-size:11px;color:var(--muted);margin-right:5px">${t.subject}</span>
+        </div>
+        <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
+        <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
+        <button class="delBtn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');renderSTabContent()">×</button>
+      </div>`).join("")}
+    </div>
+    <hr class="divider"/>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">إضافة معلم جديد</p>
+    <div class="g2" style="margin-bottom:8px">
+      <input class="inp" id="nt_name" placeholder="الاسم"/>
+      <input class="inp" id="nt_phone" placeholder="+966XXXXXXXXX" dir="ltr"/>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <select class="inp" id="nt_subject">
+        <option value="">-- المادة --</option>
+        ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+      </select>
+      <select class="inp" id="nt_role">
+        <option value="corrector">مصحح</option>
+        <option value="reviewer">مراجع</option>
+        <option value="auditor">مدقق</option>
+      </select>
+    </div>
+    <button class="btn btn-navy btn-full" onclick="addTeacher()">إضافة المعلم</button>
+  </div>`;
+}
+
+function addTeacher() {
+  const name  = document.getElementById("nt_name")?.value.trim();
+  const phone = document.getElementById("nt_phone")?.value.trim();
+  const subject=document.getElementById("nt_subject")?.value;
+  const role  = document.getElementById("nt_role")?.value;
+  if(!name||!phone){ toast("أدخل الاسم ورقم الواتساب","err"); return; }
+  state.teachers.push({ id:"T"+uid(), name, phone, subject, role });
+  toast("تم إضافة المعلم ✅");
+  renderSTabContent();
+}
+
+function renderSPhone(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📱 رقم واتساب المدير</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يستخدم في المراسلات المباشرة ومسؤول التنبيهات</p>
+    <label class="lbl">رقم الواتساب (بمفتاح الدولة +966)</label>
+    <input class="inp" id="s_adminPhone" value="${state.adminPhone}" dir="ltr" placeholder="+966XXXXXXXXX" style="margin-bottom:12px"/>
+    <div class="row">
+      <button class="btn btn-navy" onclick="
+        const v=document.getElementById('s_adminPhone').value.trim();
+        if(v){state.adminPhone=v;toast('تم حفظ الرقم ✅')}">💾 حفظ الرقم</button>
+      <a href="${waLink(state.adminPhone,"اختبار الرسالة — نظام تتبع المظاريف")}" target="_blank"
+        class="btn btn-wa">📲 اختبار الرقم</a>
+    </div>
+    <hr class="divider"/>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">الرقم الحالي المفعّل:</p>
+    <p style="font-family:monospace;font-size:18px;font-weight:800;color:var(--navy);direction:ltr">${state.adminPhone}</p>
+  </div>`;
+}
+
+function renderSUsers(el) {
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">👥 حسابات النظام</p>
+    <div>
+      ${state.users.map(u=>{
+        const[col,bg]=ROLE_COLORS[u.role]||["#888","#eee"];
+        return `<div class="listItem" style="flex-wrap:wrap;gap:6px">
+          <div style="flex:1">
+            <span style="font-weight:700;color:var(--navy);font-size:13px">${u.name}</span>
+            <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${u.username}</span>
+          </div>
+          <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
+          ${u.id!==currentUser?.id?`<button class="delBtn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');renderSTabContent()">×</button>`:""}
+        </div>`;
+      }).join("")}
+    </div>
+    <hr class="divider"/>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">إضافة حساب جديد</p>
+    <div class="g2" style="margin-bottom:8px">
+      <input class="inp" id="nu_name" placeholder="الاسم"/>
+      <input class="inp" id="nu_user" placeholder="اسم المستخدم" dir="ltr"/>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <input class="inp" id="nu_pass" placeholder="كلمة المرور" dir="ltr"/>
+      <select class="inp" id="nu_role">
+        <option value="admin">مدير النظام</option>
+        <option value="controller">الكنترول</option>
+        <option value="notifier">مسؤول التنبيهات</option>
+      </select>
+    </div>
+    <button class="btn btn-navy btn-full" onclick="addUser()">إضافة الحساب</button>
+  </div>`;
+}
+
+function addUser() {
+  const name=document.getElementById("nu_name")?.value.trim();
+  const username=document.getElementById("nu_user")?.value.trim();
+  const password=document.getElementById("nu_pass")?.value;
+  const role=document.getElementById("nu_role")?.value;
+  if(!name||!username||!password){ toast("أكمل البيانات","err"); return; }
+  if(state.users.find(u=>u.username===username)){ toast("اسم المستخدم موجود مسبقاً","err"); return; }
+  state.users.push({ id:"U"+uid(), name, username, password, role });
+  toast("تم إضافة الحساب ✅");
+  renderSTabContent();
+  renderLoginDemos();
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+renderLoginDemos();
 </script>
 </body>
 </html>
