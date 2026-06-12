@@ -446,7 +446,7 @@
   <div class="loginBox">
     <div class="loginLogo">
       <span class="icon">📦</span>
-      <h1 id="loginSchoolName">مدرسة العلا الثانوية</h1>
+      <h1 id="loginSchoolName">مدرسة النموذجية الثانوية</h1>
       <p>نظام تتبع مظاريف الاختبارات</p>
     </div>
     <div id="loginErr" style="display:none;background:var(--redBg);color:var(--red);border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:12px;"></div>
@@ -490,7 +490,7 @@ const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F
 const sc = i => PALETTE[i % PALETTE.length];
 
 let state = {
-  schoolName: "مدرسة العلا الثانوية",
+  schoolName: "مدرسة النموذجية الثانوية",
   adminPhone: "+966551121498",   // <--- رقم الواتساب الافتراضي للمدير
   subjects: ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية"],
   grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
@@ -579,6 +579,39 @@ function waLink(phone, msg) {
   const num = phoneToWA(phone);
   const enc = encodeURIComponent(msg);
   return `https://wa.me/${num}?text=${enc}`;
+}
+
+// ═══════════════════════════════════════════════
+// PERSISTENCE — localStorage
+// ═══════════════════════════════════════════════
+const STORAGE_KEY = "examTrackerState_v1";
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) { console.warn("saveState failed:", e); }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    // Merge saved into state (keep defaults for any missing keys)
+    Object.keys(saved).forEach(k => { state[k] = saved[k]; });
+  } catch(e) { console.warn("loadState failed:", e); }
+}
+
+// Wrap every state-mutating action with auto-save
+// We intercept via a Proxy so every assignment triggers save
+function makePersistent(obj) {
+  return new Proxy(obj, {
+    set(target, prop, value) {
+      target[prop] = value;
+      saveState();
+      return true;
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -785,6 +818,7 @@ function submitNewBundle() {
     stage:-1, log:[], created:nowISO(),
   };
   state.bundles.push(b);
+  saveState();
   _newBundleCreated = b;
   renderBundleSuccess(document.getElementById("pageContent"), b);
   toast("تم إنشاء المظروف وباركوده ✅");
@@ -841,7 +875,7 @@ function renderAdminList(el) {
   el.innerHTML=`
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <p style="font-size:14px;font-weight:700;color:var(--navy)">${state.bundles.length} مظروف مسجّل</p>
-    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
+    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];saveState();renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
   </div>
   <div id="adminBundleList"></div>`;
   renderAdminBundleList();
@@ -885,6 +919,7 @@ function renderAdminBundleList() {
 function adminDeleteBundle(id) {
   if(!confirm("حذف هذا المظروف نهائياً؟")) return;
   state.bundles = state.bundles.filter(b=>b.id!==id);
+  saveState();
   toast("تم الحذف","err");
   renderAdminList(document.getElementById("pageContent"));
 }
@@ -968,6 +1003,7 @@ function saveEditBundle(id) {
   b.examHall  = document.getElementById("eb_hall")?.value||b.examHall||"";
   b.examStart = document.getElementById("eb_start")?.value||b.examStart||"";
   b.examEnd   = document.getElementById("eb_end")?.value||b.examEnd||"";
+  saveState();
   document.getElementById("editOverlay").remove();
   toast("تم حفظ التعديلات ✅");
   renderAdminList(document.getElementById("pageContent"));
@@ -1133,6 +1169,7 @@ function doAdvance() {
   const b=state.bundles.find(x=>x.id===_scanHit.id);
   if(!b)return;
   b.stage=idx; b.log.push(entry);
+  saveState();
   _scanHit=b; _confirmStg=null;
   toast(`✅ ${state.stages[idx]}`);
   renderScanResult();
@@ -1272,11 +1309,13 @@ function sendNotif() {
   const fullMsg=`*${nt?.icon} ${nt?.label}*\n${state.schoolName}\n\n${msg}${bundle?`\n\nالمظروف: ${bundle.barcode} — ${bundle.subject}`:""}\n\n— ${currentUser.name}`;
 
   // Save to log
+  // notifLog saved after push
   state.notifLog.unshift({
     id:uid(), ts:nowISO(), type:_selType,
     typeLabel:nt?.label, typeColor:nt?.color, typeIcon:nt?.icon,
     teachers, message:msg, bundle, sentBy:currentUser.name, waMsg:fullMsg,
   });
+  saveState();
   toast(`📲 جاهز للإرسال لـ ${teachers.length} معلم عبر واتساب`,"wa");
 
   // Open WA for first teacher, rest open in tabs
@@ -1358,11 +1397,19 @@ function renderSGeneral(el) {
   <div class="card">
     <p class="cardTitle">🏫 اسم المدرسة / المؤسسة</p>
     <input class="inp" id="s_school" value="${state.schoolName}" style="margin-bottom:12px"/>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
     <button class="btn btn-navy" onclick="
       state.schoolName=document.getElementById('s_school').value||state.schoolName;
       document.getElementById('hSchool').textContent=state.schoolName;
       document.getElementById('loginSchoolName').textContent=state.schoolName;
-      toast('تم الحفظ ✅')">💾 حفظ</button>
+      saveState();toast('تم الحفظ ✅')">💾 حفظ</button>
+    <button class="btn" style="background:var(--red)" onclick="
+      if(confirm('هل تريد حذف جميع البيانات المحفوظة واستعادة الإعدادات الافتراضية؟
+تحذير: سيتم حذف جميع المظاريف والتعديلات!')){
+        localStorage.removeItem('examTrackerState_v1');
+        location.reload();
+      }">🗑️ إعادة تعيين كامل</button>
+  </div>
   </div>`;
 }
 
@@ -1374,14 +1421,14 @@ function renderSSubjects(el) {
       ${state.subjects.map((s,i)=>`
       <div class="listItem">
         <span class="liText">${s}</span>
-        <button class="delBtn" onclick="state.subjects.splice(${i},1);renderSTabContent()">×</button>
+        <button class="delBtn" onclick="state.subjects.splice(${i},1);saveState();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
       <input class="inp" id="newSubj" placeholder="اسم المادة الجديدة" style="flex:1"/>
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('newSubj').value.trim();
-        if(v){state.subjects.push(v);renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+        if(v){state.subjects.push(v);saveState();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
     </div>
   </div>`;
 }
@@ -1394,14 +1441,14 @@ function renderSGrades(el) {
       ${state.grades.map((g,i)=>`
       <div class="listItem">
         <span class="liText">${g}</span>
-        <button class="delBtn" onclick="state.grades.splice(${i},1);renderSTabContent()">×</button>
+        <button class="delBtn" onclick="state.grades.splice(${i},1);saveState();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
       <input class="inp" id="newGrade" placeholder="اسم الصف الجديد" style="flex:1"/>
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('newGrade').value.trim();
-        if(v){state.grades.push(v);renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+        if(v){state.grades.push(v);saveState();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
     </div>
   </div>`;
 }
@@ -1426,7 +1473,7 @@ function renderSStages(el) {
         const v=document.getElementById('newStage').value.trim();
         if(v){_editStages.push(v);renderSTabContent()}">إضافة</button>
     </div>
-    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
+    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];saveState();toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
   </div>`;
 }
 
@@ -1443,7 +1490,7 @@ function renderSTeachers(el) {
         </div>
         <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
         <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
-        <button class="delBtn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');renderSTabContent()">×</button>
+        <button class="delBtn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');saveState();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <hr class="divider"/>
@@ -1474,6 +1521,7 @@ function addTeacher() {
   const role  = document.getElementById("nt_role")?.value;
   if(!name||!phone){ toast("أدخل الاسم ورقم الواتساب","err"); return; }
   state.teachers.push({ id:"T"+uid(), name, phone, subject, role });
+  saveState();
   toast("تم إضافة المعلم ✅");
   renderSTabContent();
 }
@@ -1488,7 +1536,7 @@ function renderSPhone(el) {
     <div class="row">
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('s_adminPhone').value.trim();
-        if(v){state.adminPhone=v;toast('تم حفظ الرقم ✅')}">💾 حفظ الرقم</button>
+        if(v){state.adminPhone=v;saveState();toast('تم حفظ الرقم ✅')}">💾 حفظ الرقم</button>
       <a href="${waLink(state.adminPhone,"اختبار الرسالة — نظام تتبع المظاريف")}" target="_blank"
         class="btn btn-wa">📲 اختبار الرقم</a>
     </div>
@@ -1511,7 +1559,7 @@ function renderSUsers(el) {
             <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${u.username}</span>
           </div>
           <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
-          ${u.id!==currentUser?.id?`<button class="delBtn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');renderSTabContent()">×</button>`:""}
+          ${u.id!==currentUser?.id?`<button class="delBtn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
         </div>`;
       }).join("")}
     </div>
@@ -1541,6 +1589,7 @@ function addUser() {
   if(!name||!username||!password){ toast("أكمل البيانات","err"); return; }
   if(state.users.find(u=>u.username===username)){ toast("اسم المستخدم موجود مسبقاً","err"); return; }
   state.users.push({ id:"U"+uid(), name, username, password, role });
+  saveState();
   toast("تم إضافة الحساب ✅");
   renderSTabContent();
   renderLoginDemos();
@@ -1850,6 +1899,7 @@ function pdfSchedule() {
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
+loadState();          // ← restore from localStorage on page load
 renderLoginDemos();
 </script>
 </body>
