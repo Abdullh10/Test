@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <title>نظام تتبع مظاريف الاختبارات</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
@@ -1510,7 +1511,39 @@ function renderSTeachers(el) {
         <option value="auditor">مدقق</option>
       </select>
     </div>
-    <button class="btn btn-navy btn-full" onclick="addTeacher()">إضافة المعلم</button>
+    <button class="btn btn-navy btn-full" onclick="addTeacher()">➕ إضافة معلم</button>
+  </div>
+
+  <div class="card" style="margin-top:0">
+    <p class="cardTitle">📥 رفع ملف Excel دفعة واحدة</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">ارفع ملف Excel يحتوي على بيانات المعلمين لإضافتهم جميعاً دفعة واحدة</p>
+
+    <!-- Download template -->
+    <div style="background:var(--amberBg);border-radius:10px;padding:13px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:24px">📋</span>
+      <div style="flex:1">
+        <p style="font-weight:700;color:var(--amber);font-size:13px">الخطوة 1 — تنزيل النموذج</p>
+        <p style="font-size:11px;color:var(--amber)">نزّل ملف Excel النموذج، عبّئ بيانات المعلمين، ثم ارفعه</p>
+      </div>
+      <button class="btn" style="background:var(--amber)" onclick="downloadTeacherTemplate()">⬇️ تنزيل النموذج</button>
+    </div>
+
+    <!-- Upload area -->
+    <div id="uploadArea"
+      style="border:2.5px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)"
+      onclick="document.getElementById('xlsxUpload').click()"
+      ondragover="event.preventDefault();this.style.borderColor='var(--navy)';this.style.background='var(--blueBg)'"
+      ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg)'"
+      ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='var(--bg)';handleXlsxDrop(event)">
+      <div style="font-size:36px;margin-bottom:8px">📂</div>
+      <p style="font-weight:700;color:var(--navy);font-size:14px">الخطوة 2 — رفع الملف</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:4px">اضغط هنا أو اسحب ملف Excel إلى هذه المنطقة</p>
+      <p style="font-size:11px;color:var(--border);margin-top:8px">يدعم .xlsx و .xls</p>
+    </div>
+    <input type="file" id="xlsxUpload" accept=".xlsx,.xls" style="display:none" onchange="handleXlsxFile(this)"/>
+
+    <!-- Preview table -->
+    <div id="uploadPreview" style="margin-top:14px"></div>
   </div>`;
 }
 
@@ -1894,6 +1927,206 @@ function generatePDF(subjectFilter) {
 
 function pdfSchedule() {
   printSchedule();
+}
+
+
+// ═══════════════════════════════════════════════
+// EXCEL UPLOAD — Teachers bulk import
+// ═══════════════════════════════════════════════
+
+// Build template as base64 using SheetJS (no server needed)
+function downloadTeacherTemplate() {
+  if(typeof XLSX === "undefined") {
+    toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err");
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: data ──
+  const headers = ["الاسم الكامل *","الدور *","رقم الجوال (واتساب) *","المادة التخصصية","ملاحظة"];
+  const samples = [
+    ["أحمد محمد الغامدي",    "مصحح",  "+966501001001", "الكيمياء",      ""],
+    ["سمر علي الزهراني",     "مراجع", "+966502002002", "الفيزياء",      ""],
+    ["خالد إبراهيم العتيبي", "مدقق",  "+966503003003", "الأحياء",       ""],
+    ["نورة سعد القحطاني",    "مصحح",  "+966504004004", "الرياضيات",     ""],
+    ["وليد فهد الشهري",      "مراجع", "+966505005005", "اللغة العربية", ""],
+    ["","","","",""],
+    ["","","","",""],
+    ["","","","",""],
+  ];
+  const wsData = [headers, ...samples];
+  const ws1 = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws1["!cols"] = [{wch:28},{wch:12},{wch:24},{wch:22},{wch:24}];
+
+  // ── Sheet 2: guide ──
+  const guideData = [
+    ["الدور","المهام","المرحلة في النظام"],
+    ["مصحح","تصحيح أوراق الإجابة وإعطاء الدرجات","المرحلة 5 و 6"],
+    ["مراجع","مراجعة التصحيح والتحقق من الدقة","المرحلة 7 و 8"],
+    ["مدقق","التدقيق النهائي قبل الأرشفة","المرحلة 9 و 10"],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(guideData);
+  ws2["!cols"] = [{wch:12},{wch:42},{wch:28}];
+
+  XLSX.utils.book_append_sheet(wb, ws1, "بيانات المعلمين");
+  XLSX.utils.book_append_sheet(wb, ws2, "دليل الأدوار");
+  XLSX.writeFile(wb, "نموذج_بيانات_المعلمين.xlsx");
+  toast("تم تنزيل ملف النموذج ✅");
+}
+
+function handleXlsxDrop(e) {
+  const file = e.dataTransfer.files[0];
+  if(file) processXlsxFile(file);
+}
+
+function handleXlsxFile(input) {
+  const file = input.files[0];
+  if(file) processXlsxFile(file);
+  input.value = "";
+}
+
+function processXlsxFile(file) {
+  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة","err"); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data  = new Uint8Array(e.target.result);
+      const wb    = XLSX.read(data, {type:"array"});
+      const ws    = wb.Sheets[wb.SheetNames[0]];
+      const rows  = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+
+      // Find header row (contains الاسم or similar)
+      let headerRow = -1;
+      for(let i=0;i<Math.min(rows.length,8);i++){
+        const r = rows[i].join("");
+        if(r.includes("الاسم") || r.includes("Name") || r.includes("name")) { headerRow=i; break; }
+      }
+      if(headerRow < 0) { toast("لم يتم العثور على رأس الجدول — تأكد من استخدام النموذج الصحيح","err"); return; }
+
+      // Map columns by header name
+      const hRow   = rows[headerRow].map(h=>String(h).trim());
+      const colMap = {};
+      hRow.forEach((h,i)=>{
+        if(h.includes("الاسم")||h.includes("Name")||h.includes("name"))     colMap.name=i;
+        if(h.includes("الدور")||h.includes("Role")||h.includes("role"))     colMap.role=i;
+        if(h.includes("الجوال")||h.includes("Phone")||h.includes("phone"))  colMap.phone=i;
+        if(h.includes("المادة")||h.includes("Subject")||h.includes("subject")) colMap.subject=i;
+        if(h.includes("ملاحظة")||h.includes("Note")||h.includes("note"))    colMap.note=i;
+      });
+
+      if(colMap.name===undefined || colMap.role===undefined || colMap.phone===undefined) {
+        toast("الأعمدة المطلوبة غير موجودة: الاسم، الدور، رقم الجوال","err"); return;
+      }
+
+      // Parse data rows
+      const ROLE_MAP = {
+        "مصحح":"corrector","corrector":"corrector","مراجع":"reviewer","reviewer":"reviewer",
+        "مدقق":"auditor","auditor":"auditor"
+      };
+      const parsed=[], errors=[];
+      for(let i=headerRow+1;i<rows.length;i++){
+        const row=rows[i];
+        const name  = String(row[colMap.name]||"").trim();
+        const roleRaw=String(row[colMap.role]||"").trim();
+        const phone = String(row[colMap.phone]||"").trim();
+        const subject=colMap.subject!==undefined?String(row[colMap.subject]||"").trim():"";
+        const note  =colMap.note!==undefined?String(row[colMap.note]||"").trim():"";
+        if(!name&&!phone) continue; // empty row
+        const role = ROLE_MAP[roleRaw];
+        if(!name)  { errors.push(`صف ${i+1}: الاسم مفقود`); continue; }
+        if(!role)  { errors.push(`صف ${i+1} (${name}): الدور "${roleRaw}" غير معروف — استخدم: مصحح / مراجع / مدقق`); continue; }
+        if(!phone) { errors.push(`صف ${i+1} (${name}): رقم الجوال مفقود`); continue; }
+        // Normalize phone
+        let p=phone.replace(/\s/g,"");
+        if(p.startsWith("05"))    p="+966"+p.slice(1);
+        if(p.startsWith("5")&&p.length===9) p="+966"+p;
+        parsed.push({id:"T"+uid(), name, role, phone:p, subject, note});
+      }
+
+      renderUploadPreview(parsed, errors);
+    } catch(err) {
+      toast("خطأ في قراءة الملف — تأكد أنه ملف Excel صحيح","err");
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderUploadPreview(parsed, errors) {
+  const el = document.getElementById("uploadPreview");
+  if(!el) return;
+  const ROLE_LABEL_MAP = {corrector:"مصحح",reviewer:"مراجع",auditor:"مدقق"};
+  const ROLE_COLOR_MAP = {corrector:"#EFF6FF",reviewer:"#F3E8FF",auditor:"#DCFCE7"};
+
+  let html = "";
+
+  if(errors.length) {
+    html += `<div style="background:var(--redBg);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <p style="font-weight:700;color:var(--red);font-size:13px;margin-bottom:6px">⚠️ تحذيرات في ${errors.length} صف:</p>
+      ${errors.map(e=>`<p style="font-size:12px;color:var(--red);margin-bottom:2px">• ${e}</p>`).join("")}
+    </div>`;
+  }
+
+  if(parsed.length===0) {
+    html += `<p style="text-align:center;color:var(--muted);padding:20px 0">لا توجد بيانات صحيحة للاستيراد</p>`;
+    el.innerHTML=html; return;
+  }
+
+  html += `
+  <div style="background:var(--greenBg);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:24px">✅</span>
+    <div>
+      <p style="font-weight:700;color:var(--green);font-size:13px">جاهز للاستيراد — ${parsed.length} معلم</p>
+      <p style="font-size:11px;color:var(--green)">راجع البيانات أدناه ثم اضغط "استيراد الكل"</p>
+    </div>
+  </div>
+  <div style="overflow-x:auto;margin-bottom:12px">
+  <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px">
+    <thead>
+      <tr style="background:var(--navy)">
+        <th style="padding:8px 10px;text-align:right;color:#fff;font-weight:700">#</th>
+        <th style="padding:8px 10px;text-align:right;color:#fff;font-weight:700">الاسم</th>
+        <th style="padding:8px 10px;text-align:right;color:#fff;font-weight:700">الدور</th>
+        <th style="padding:8px 10px;text-align:right;color:#fff;font-weight:700">الجوال</th>
+        <th style="padding:8px 10px;text-align:right;color:#fff;font-weight:700">المادة</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${parsed.map((t,i)=>`
+      <tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
+        <td style="padding:7px 10px;color:var(--muted)">${i+1}</td>
+        <td style="padding:7px 10px;font-weight:700;color:var(--navy)">${t.name}</td>
+        <td style="padding:7px 10px"><span style="background:${ROLE_COLOR_MAP[t.role]||"#eee"};color:var(--navy);padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700">${ROLE_LABEL_MAP[t.role]||t.role}</span></td>
+        <td style="padding:7px 10px;font-family:monospace;font-size:11px;direction:ltr;text-align:right;color:var(--wa)">${t.phone}</td>
+        <td style="padding:7px 10px;color:var(--mid)">${t.subject||"—"}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-green" style="flex:1;font-size:14px" onclick="confirmBulkImport(window._parsedTeachers)">✅ استيراد الكل (${parsed.length} معلم)</button>
+    <button class="btn btn-mid" style="flex:1" onclick="document.getElementById('uploadPreview').innerHTML=''">إلغاء</button>
+  </div>`;
+
+  window._parsedTeachers = parsed;
+  el.innerHTML = html;
+}
+
+function confirmBulkImport(teachers) {
+  if(!teachers||teachers.length===0) return;
+  const existing = new Set(state.teachers.map(t=>t.phone));
+  let added=0, skipped=0;
+  teachers.forEach(t=>{
+    if(existing.has(t.phone)) { skipped++; return; }
+    state.teachers.push(t);
+    added++;
+  });
+  saveState();
+  window._parsedTeachers=null;
+  toast(`✅ تم استيراد ${added} معلم${skipped>0?" · تم تجاهل "+skipped+" مكرر":""}`);
+  renderSTabContent();
 }
 
 // ═══════════════════════════════════════════════
