@@ -519,6 +519,7 @@ let state = {
   ],
   bundles: [],
   notifLog: [],
+  examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
 };
 
 let currentUser = null;
@@ -536,7 +537,7 @@ const NOTIFY_TYPES = [
 ];
 const PAGES = {
   admin:      [ {k:"admin_new", icon:"➕", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙️",label:"الإعدادات"} ],
-  controller: [ {k:"ctrl_scan",icon:"📷",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"} ],
+  controller: [ {k:"ctrl_scan",icon:"📷",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
   notifier:   [ {k:"notif_send",icon:"📲",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
 };
 
@@ -663,7 +664,9 @@ function navigateTo(page) {
     case "ctrl_scan":   renderCtrlScan(el);    break;
     case "ctrl_list":   renderCtrlList(el);    break;
     case "notif_send":  renderNotifSend(el);   break;
-    case "notif_log":   renderNotifLog(el);    break;
+    case "notif_log":    renderNotifLog(el);      break;
+    case "ctrl_schedule":renderCtrlSchedule(el);  break;
+    case "ctrl_report":  renderCtrlReport(el);    break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
   }
 }
@@ -726,6 +729,35 @@ function renderAdminNew(el) {
       <label class="lbl">ملاحظة</label>
       <input class="inp" id="bf_note" placeholder="ملاحظة اختيارية..."/>
     </div>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">📅 بيانات الاختبار</p>
+    <div class="g3" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">يوم الاختبار</label>
+        <select class="inp" id="bf_day">
+          <option value="">-- اليوم --</option>
+          <option>الأحد</option><option>الاثنين</option><option>الثلاثاء</option>
+          <option>الأربعاء</option><option>الخميس</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl">تاريخ الاختبار</label>
+        <input class="inp" id="bf_examdate" type="date"/>
+      </div>
+      <div>
+        <label class="lbl">القاعة / اللجنة</label>
+        <input class="inp" id="bf_hall" placeholder="مثال: قاعة A"/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div>
+        <label class="lbl">وقت البدء</label>
+        <input class="inp" id="bf_start" type="time"/>
+      </div>
+      <div>
+        <label class="lbl">وقت الانتهاء</label>
+        <input class="inp" id="bf_end" type="time"/>
+      </div>
+    </div>
     <button class="btn btn-navy btn-full" onclick="submitNewBundle()">إنشاء الباركود ←</button>
   </div>`;
 }
@@ -738,12 +770,18 @@ function submitNewBundle() {
   const reviewer  = document.getElementById("bf_reviewer").value;
   const auditor   = document.getElementById("bf_auditor").value;
   const note      = document.getElementById("bf_note").value;
+  const examDay   = document.getElementById("bf_day")?.value||"";
+  const examDate  = document.getElementById("bf_examdate")?.value||"";
+  const examHall  = document.getElementById("bf_hall")?.value||"";
+  const examStart = document.getElementById("bf_start")?.value||"";
+  const examEnd   = document.getElementById("bf_end")?.value||"";
   if(!subject) { toast("اختر المادة","err"); return; }
   if(!count||isNaN(count)||+count<1) { toast("أدخل عدد الأوراق","err"); return; }
   const b = {
     id:uid(), barcode:`M${uid()}`,
     subject, grade, count:+count,
     corrector, reviewer, auditor, note,
+    examDay, examDate, examHall, examStart, examEnd,
     stage:-1, log:[], created:nowISO(),
   };
   state.bundles.push(b);
@@ -886,6 +924,28 @@ function adminEditBundle(id) {
       <option value="">-- اختر --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${t.name}</option>`).join("")}
     </select>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:8px 0 6px">📅 بيانات الاختبار</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">اليوم</label>
+        <select class="inp" id="eb_day" style="font-size:12px">
+          <option value="">-- اليوم --</option>
+          <option ${b.examDay=='الأحد'?'selected':''}">الأحد</option>
+          <option ${b.examDay=='الاثنين'?'selected':''}">الاثنين</option>
+          <option ${b.examDay=='الثلاثاء'?'selected':''}">الثلاثاء</option>
+          <option ${b.examDay=='الأربعاء'?'selected':''}">الأربعاء</option>
+          <option ${b.examDay=='الخميس'?'selected':''}">الخميس</option>
+        </select></div>
+      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ</label>
+        <input class="inp" id="eb_examdate" type="date" value="${b.examDate||''}" style="font-size:12px"/></div>
+      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">القاعة</label>
+        <input class="inp" id="eb_hall" value="${b.examHall||''}" style="font-size:12px"/></div>
+      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت البدء</label>
+        <input class="inp" id="eb_start" type="time" value="${b.examStart||''}" style="font-size:12px"/></div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت الانتهاء</label>
+      <input class="inp" id="eb_end" type="time" value="${b.examEnd||''}" style="font-size:12px"/>
+    </div>
     <div class="row">
       <button class="btn btn-navy" style="flex:1" onclick="saveEditBundle('${b.id}')">💾 حفظ</button>
       <button class="btn btn-mid" style="flex:1" onclick="document.getElementById('editOverlay').remove()">إلغاء</button>
@@ -903,6 +963,11 @@ function saveEditBundle(id) {
   b.corrector = document.getElementById("eb_corrector").value;
   b.reviewer  = document.getElementById("eb_reviewer").value;
   b.auditor   = document.getElementById("eb_auditor").value;
+  b.examDay   = document.getElementById("eb_day")?.value||b.examDay||"";
+  b.examDate  = document.getElementById("eb_examdate")?.value||b.examDate||"";
+  b.examHall  = document.getElementById("eb_hall")?.value||b.examHall||"";
+  b.examStart = document.getElementById("eb_start")?.value||b.examStart||"";
+  b.examEnd   = document.getElementById("eb_end")?.value||b.examEnd||"";
   document.getElementById("editOverlay").remove();
   toast("تم حفظ التعديلات ✅");
   renderAdminList(document.getElementById("pageContent"));
@@ -1000,6 +1065,9 @@ function renderScanResult() {
       <div class="infoCell"><p class="k">🔍 المراجع</p><p class="v">${revT?revT.name:"—"}</p></div>
       <div class="infoCell"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>
       ${b.note?`<div class="infoCell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
+      ${b.examDate?`<div class="infoCell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
+      ${b.examStart?`<div class="infoCell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
+      ${b.examHall?`<div class="infoCell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
     </div>
     <!-- Progress -->
     <div class="progressWrap">
@@ -1476,6 +1544,307 @@ function addUser() {
   toast("تم إضافة الحساب ✅");
   renderSTabContent();
   renderLoginDemos();
+}
+
+
+// ═══════════════════════════════════════════════
+// CONTROLLER — EXAM SCHEDULE
+// ═══════════════════════════════════════════════
+function renderCtrlSchedule(el) {
+  // Build schedule from bundles + standalone entries
+  const bundlesWithDate = state.bundles.filter(b=>b.examDate);
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📅 جدول الاختبارات</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يعرض جميع المظاريف التي تم تحديد تاريخ اختبار لها</p>
+    ${bundlesWithDate.length===0?`<p class="empty">لا توجد مظاريف بتاريخ اختبار محدد — أضف التاريخ عند إنشاء المظروف أو من تعديله</p>`:`
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">
+      <thead>
+        <tr style="background:var(--navy);color:#fff">
+          <th style="padding:10px 12px;text-align:right;font-weight:700">المادة</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">الصف</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">اليوم</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">التاريخ</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">الوقت</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">القاعة</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">الأوراق</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:700">الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${[...bundlesWithDate].sort((a,b)=>a.examDate.localeCompare(b.examDate)).map((b,i)=>{
+          const stageName=b.stage<0?"جديد":state.stages[b.stage]||"—";
+          const color=b.stage<0?"var(--muted)":sc(b.stage);
+          return `<tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
+            <td style="padding:9px 12px;font-weight:700;color:var(--navy)">${b.subject}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${b.grade||"—"}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${b.examDay||"—"}</td>
+            <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${b.examDate}</td>
+            <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${b.examStart||"—"}${b.examEnd?" — "+b.examEnd:""}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${b.examHall||"—"}</td>
+            <td style="padding:9px 12px;text-align:center;font-weight:700;color:var(--navy)">${b.count}</td>
+            <td style="padding:9px 12px"><span style="background:${color}20;color:${color};border:1px solid ${color}50;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap">${stageName}</span></td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-navy" onclick="printSchedule()">🖨️ طباعة الجدول</button>
+      <button class="btn" style="background:var(--red)" onclick="pdfSchedule()">📄 تصدير PDF</button>
+    </div>`}
+  </div>`;
+}
+
+function printSchedule() {
+  const bundlesWithDate = [...state.bundles.filter(b=>b.examDate)].sort((a,b)=>a.examDate.localeCompare(b.examDate));
+  if(bundlesWithDate.length===0){toast("لا توجد بيانات للطباعة","err");return;}
+  const rows = bundlesWithDate.map((b,i)=>`
+    <tr style="border-bottom:1px solid #ddd;background:${i%2===0?"#fff":"#f8f9fa"}">
+      <td style="padding:8px 10px;font-weight:700">${b.subject}</td>
+      <td style="padding:8px 10px">${b.grade||"—"}</td>
+      <td style="padding:8px 10px">${b.examDay||"—"}</td>
+      <td style="padding:8px 10px;direction:ltr;text-align:right">${b.examDate}</td>
+      <td style="padding:8px 10px;direction:ltr;text-align:right">${b.examStart||"—"}${b.examEnd?" — "+b.examEnd:""}</td>
+      <td style="padding:8px 10px">${b.examHall||"—"}</td>
+      <td style="padding:8px 10px;text-align:center">${b.count}</td>
+    </tr>`).join("");
+  const win=window.open("","_blank","width=900,height=700");
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
+  <title>جدول الاختبارات</title>
+  <style>
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:30px;color:#0D1F3C}
+    h1{font-size:20px;margin-bottom:4px}
+    p.sub{font-size:13px;color:#666;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#0D1F3C;color:#fff;padding:10px 10px;text-align:right;font-weight:700}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h1>${state.schoolName}</h1>
+  <p class="sub">جدول الاختبارات — تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</p>
+  <table>
+    <thead><tr>
+      <th>المادة</th><th>الصف</th><th>اليوم</th><th>التاريخ</th><th>الوقت</th><th>القاعة</th><th>عدد الأوراق</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <br/>
+  <button onclick="window.print()" style="padding:9px 20px;background:#0D1F3C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">🖨️ طباعة</button>
+  </body></html>`);
+  win.document.close();
+}
+
+// ═══════════════════════════════════════════════
+// CONTROLLER — PDF REPORTS
+// ═══════════════════════════════════════════════
+function renderCtrlReport(el) {
+  const subjects = [...new Set(state.bundles.map(b=>b.subject))].sort();
+  el.innerHTML=`
+  <div class="card">
+    <p class="cardTitle">📄 تقارير PDF للكنترول</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">اختر المادة لإنشاء تقرير تفصيلي كامل قابل للطباعة</p>
+    ${state.bundles.length===0?`<p class="empty">لا توجد مظاريف لإنشاء تقارير</p>`:`
+    <!-- All subjects report -->
+    <div style="background:var(--bg);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:28px">📋</span>
+      <div style="flex:1">
+        <p style="font-weight:800;color:var(--navy);font-size:14px">تقرير شامل — جميع المواد</p>
+        <p style="font-size:12px;color:var(--muted)">${state.bundles.length} مظروف · جميع المراحل</p>
+      </div>
+      <button class="btn btn-navy" onclick="generatePDF('ALL')">📄 إنشاء PDF</button>
+    </div>
+    <!-- Per subject -->
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:10px">تقارير حسب المادة:</p>
+    ${subjects.map(subj=>{
+      const bs=state.bundles.filter(b=>b.subject===subj);
+      const doneCount=bs.filter(b=>b.stage===state.stages.length-1).length;
+      const lastStages=[...new Set(bs.map(b=>b.stage<0?"جديد":state.stages[b.stage]||"—"))];
+      return `
+      <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:150px">
+          <p style="font-weight:800;color:var(--navy);font-size:13px">${subj}</p>
+          <p style="font-size:11px;color:var(--muted)">${bs.length} مظروف · ${bs.reduce((a,b)=>a+b.count,0)} ورقة · مكتمل: ${doneCount}</p>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1">
+          ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${b.barcode}</span>`;}).join("")}
+        </div>
+        <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
+      </div>`;
+    }).join("")}`}
+  </div>`;
+}
+
+function generatePDF(subjectFilter) {
+  const bundles = subjectFilter==="ALL" ? state.bundles : state.bundles.filter(b=>b.subject===subjectFilter);
+  if(bundles.length===0){toast("لا توجد بيانات","err");return;}
+  const title = subjectFilter==="ALL" ? "تقرير شامل — جميع المواد" : `تقرير مادة ${subjectFilter}`;
+  const printDate = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+
+  // Summary counts per stage
+  const stageSummary = state.stages.map((s,i)=>{
+    const cnt=bundles.filter(b=>b.stage===i).length;
+    return cnt>0?`<tr><td style="padding:6px 10px">${i+1}. ${s}</td><td style="padding:6px 10px;text-align:center;font-weight:700">${cnt}</td></tr>`:"";
+  }).join("");
+
+  // Detailed rows
+  const detailRows = bundles.map((b,i)=>{
+    const corrT=state.teachers.find(t=>t.id===b.corrector);
+    const revT=state.teachers.find(t=>t.id===b.reviewer);
+    const audT=state.teachers.find(t=>t.id===b.auditor);
+    const stageName=b.stage<0?"جديد":state.stages[b.stage]||"—";
+    const lastLog=b.log[b.log.length-1];
+    const pct=state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
+    // mini progress bar (text-based)
+    const bar="█".repeat(Math.round(pct/10))+"░".repeat(10-Math.round(pct/10));
+    return `<tr style="border-bottom:1px solid #e5e7eb;background:${i%2===0?"#fff":"#f9fafb"}">
+      <td style="padding:8px 10px;font-family:monospace;font-size:11px">${b.barcode}</td>
+      <td style="padding:8px 10px;font-weight:700">${b.subject}</td>
+      <td style="padding:8px 10px">${b.grade||"—"}</td>
+      <td style="padding:8px 10px;text-align:center">${b.count}</td>
+      <td style="padding:8px 10px">${b.examDay||""}${b.examDate?" "+b.examDate:""}</td>
+      <td style="padding:8px 10px">${b.examHall||"—"}</td>
+      <td style="padding:8px 10px">${corrT?corrT.name:"—"}</td>
+      <td style="padding:8px 10px">${revT?revT.name:"—"}</td>
+      <td style="padding:8px 10px">${audT?audT.name:"—"}</td>
+      <td style="padding:8px 10px;font-size:11px;font-weight:700;color:${b.stage<0?"#64748b":"#0D1F3C"}">${stageName}</td>
+      <td style="padding:8px 10px;font-size:10px;font-family:monospace;direction:ltr;color:#64748b">${bar} ${pct}%</td>
+      <td style="padding:8px 10px;font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA"):"—"}</td>
+    </tr>`;
+  }).join("");
+
+  // Log rows for each bundle
+  const logSection = bundles.filter(b=>b.log.length>0).map(b=>`
+    <div style="margin-bottom:20px;page-break-inside:avoid">
+      <h4 style="font-size:13px;color:#0D1F3C;margin-bottom:6px;border-right:3px solid #C8911F;padding-right:8px">
+        ${b.barcode} — ${b.subject}${b.grade?" ("+b.grade+")":""} · ${b.count} ورقة
+        ${b.examDate?` · 📅 ${b.examDay||""} ${b.examDate}`:""}
+      </h4>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:#f1f5f9">
+          <th style="padding:5px 8px;text-align:right">#</th>
+          <th style="padding:5px 8px;text-align:right">المرحلة</th>
+          <th style="padding:5px 8px;text-align:right">التاريخ والوقت</th>
+          <th style="padding:5px 8px;text-align:right">المستخدم</th>
+          <th style="padding:5px 8px;text-align:right">ملاحظة</th>
+        </tr></thead>
+        <tbody>
+          ${b.log.map((e,i)=>`<tr style="border-bottom:1px solid #e5e7eb">
+            <td style="padding:5px 8px;color:#64748b">${i+1}</td>
+            <td style="padding:5px 8px;font-weight:700">${e.stageLabel}</td>
+            <td style="padding:5px 8px;direction:ltr;text-align:right;color:#64748b">${new Date(e.ts).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"})}</td>
+            <td style="padding:5px 8px">${e.user}</td>
+            <td style="padding:5px 8px;color:#64748b;font-style:italic">${e.note||"—"}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`).join("");
+
+  const win=window.open("","_blank","width=1050,height=800");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>${title}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;font-size:13px;line-height:1.5}
+  .page{padding:28px 32px}
+  .header{border-bottom:3px solid #0D1F3C;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start}
+  .header h1{font-size:22px;font-weight:900;color:#0D1F3C}
+  .header .sub{font-size:13px;color:#64748b;margin-top:4px}
+  .header .badge{background:#0D1F3C;color:#fff;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700}
+  .section-title{font-size:15px;font-weight:800;color:#0D1F3C;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px}
+  .kpi-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .kpi{flex:1;min-width:100px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;text-align:center}
+  .kpi .val{font-size:28px;font-weight:900;color:#0D1F3C}
+  .kpi .lbl{font-size:11px;color:#64748b;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#0D1F3C;color:#fff;padding:9px 10px;text-align:right;font-weight:700}
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8}
+  .no-print{margin-top:20px;display:flex;gap:10px;justify-content:center}
+  @media print{
+    .no-print{display:none}
+    body{font-size:11px}
+    .page{padding:16px 20px}
+    tr{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <h1>${state.schoolName}</h1>
+      <p class="sub">${title}</p>
+      <p class="sub">تاريخ التقرير: ${printDate}</p>
+    </div>
+    <div class="badge">${bundles.length} مظروف</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi"><div class="val">${bundles.length}</div><div class="lbl">إجمالي المظاريف</div></div>
+    <div class="kpi"><div class="val">${bundles.reduce((a,b)=>a+b.count,0)}</div><div class="lbl">إجمالي الأوراق</div></div>
+    <div class="kpi"><div class="val">${bundles.filter(b=>b.stage===state.stages.length-1).length}</div><div class="lbl">مكتملة</div></div>
+    <div class="kpi"><div class="val">${bundles.filter(b=>b.stage<0).length}</div><div class="lbl">جديدة</div></div>
+    <div class="kpi"><div class="val">${bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length}</div><div class="lbl">قيد التنفيذ</div></div>
+  </div>
+
+  <!-- STAGE SUMMARY -->
+  <p class="section-title">📊 ملخص المراحل</p>
+  <table style="margin-bottom:20px">
+    <thead><tr><th>المرحلة</th><th style="text-align:center">عدد المظاريف</th></tr></thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:6px 10px">جديد (لم تبدأ)</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:700">${bundles.filter(b=>b.stage<0).length}</td>
+      </tr>
+      ${stageSummary}
+    </tbody>
+  </table>
+
+  <!-- DETAIL TABLE -->
+  <p class="section-title">📦 تفاصيل المظاريف</p>
+  <div style="overflow-x:auto;margin-bottom:24px">
+  <table>
+    <thead>
+      <tr>
+        <th>الباركود</th><th>المادة</th><th>الصف</th><th style="text-align:center">الأوراق</th>
+        <th>تاريخ الاختبار</th><th>القاعة</th><th>المصحح</th><th>المراجع</th><th>المدقق</th>
+        <th>المرحلة الحالية</th><th>التقدم</th><th>آخر تحديث</th>
+      </tr>
+    </thead>
+    <tbody>${detailRows}</tbody>
+  </table>
+  </div>
+
+  <!-- MOVEMENT LOG -->
+  ${bundles.some(b=>b.log.length>0)?`
+  <p class="section-title">📜 سجل حركة المظاريف</p>
+  <div>${logSection}</div>`:""}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>${state.schoolName} — نظام تتبع مظاريف الاختبارات</span>
+    <span>طُبع بواسطة: ${currentUser.name} — ${printDate}</span>
+  </div>
+
+  <!-- PRINT BUTTON -->
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:10px 28px;background:#0D1F3C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">🖨️ طباعة / حفظ PDF</button>
+    <button onclick="window.close()" style="padding:10px 20px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">إغلاق</button>
+  </div>
+</div>
+</body></html>`);
+  win.document.close();
+  toast("تم فتح نافذة التقرير — اختر طباعة أو حفظ PDF ✅");
+}
+
+function pdfSchedule() {
+  printSchedule();
 }
 
 // ═══════════════════════════════════════════════
