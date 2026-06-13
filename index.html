@@ -496,6 +496,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     <span class="h-title" id="hSchool"></span>
     <span class="h-role" id="hRole"></span>
     <span class="h-user" id="hUser"></span>
+    <div id="syncDot" title="تمت المزامنة" style="width:8px;height:8px;border-radius:50%;background:#22C55E;opacity:.35;flex-shrink:0;transition:all .4s"></div>
     <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
   <nav id="appNav"></nav>
@@ -506,6 +507,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 <div id="printArea" style="display:none"></div>
 
 <script>
+
 
 
 // ═══════════════════════════════════════════════
@@ -590,6 +592,7 @@ let state = {
   ],
   bundles: [],
   notifLog: [],
+  reportLog: [],
   examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
 };
 
@@ -658,36 +661,203 @@ function waLink(phone, msg) {
 }
 
 // ═══════════════════════════════════════════════
-// PERSISTENCE — localStorage
+// SUPABASE CONFIG — ضع مفاتيحك هنا
 // ═══════════════════════════════════════════════
-const STORAGE_KEY = "examTrackerState_v1";
+const SUPABASE_URL = "https://sdufrvefwvnojwaxodvd.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkdWZydmVmd3Zub2p3YXhvZHZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNTkxMDgsImV4cCI6MjA5NjkzNTEwOH0.lYqhMc5mvms-TevVxiwFqDlcihvbstzXjUF3D5LnEc8";
+// Support both old JWT keys (eyJ...) and new publishable keys (sb_publishable_...)
+const IS_NEW_KEY   = SUPABASE_KEY.startsWith("sb_publishable_") || SUPABASE_KEY.startsWith("sb_secret_");
+const SB_HEADERS   = IS_NEW_KEY ? {
+  "Content-Type":    "application/json",
+  "Authorization":   "Bearer " + SUPABASE_KEY,
+  "apikey":          SUPABASE_KEY,
+  "Prefer":          "return=minimal",
+} : {
+  "Content-Type":    "application/json",
+  "apikey":          SUPABASE_KEY,
+  "Authorization":   "Bearer " + SUPABASE_KEY,
+  "Prefer":          "return=minimal",
+};
 
-function saveState() {
+// ── Generic fetch helpers ────────────────────────────────────
+async function sbGet(table, match) {
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  if(match) Object.entries(match).forEach(([k,v])=>params.set(k,"eq."+v));
+  const headers = {
+    "Content-Type":  "application/json",
+    "apikey":        SUPABASE_KEY,
+    "Authorization": "Bearer " + SUPABASE_KEY,
+  };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch(e) { console.warn("saveState failed:", e); }
-}
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    // Merge saved into state (keep defaults for any missing keys)
-    Object.keys(saved).forEach(k => { state[k] = saved[k]; });
-  } catch(e) { console.warn("loadState failed:", e); }
-}
-
-// Wrap every state-mutating action with auto-save
-// We intercept via a Proxy so every assignment triggers save
-function makePersistent(obj) {
-  return new Proxy(obj, {
-    set(target, prop, value) {
-      target[prop] = value;
-      saveState();
-      return true;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers, mode:"cors" });
+    if(!r.ok) {
+      const err = await r.text().catch(()=>"");
+      console.warn("sbGet error:", r.status, err);
+      return [];
     }
-  });
+    return r.json();
+  } catch(e) {
+    console.warn("sbGet fetch error:", e.message);
+    return [];
+  }
+}
+async function sbUpsert(table, obj) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method:  "POST",
+      mode:    "cors",
+      headers: {
+        "Content-Type":  "application/json",
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Prefer":        "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(obj),
+    });
+    if(!r.ok) {
+      const err = await r.text().catch(()=>"");
+      console.warn("sbUpsert error:", r.status, err);
+    }
+  } catch(e) {
+    console.warn("sbUpsert fetch error:", e.message);
+  }
+}
+async function sbDelete(table, match) {
+  try {
+    const params = "?" + Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
+      method:  "DELETE",
+      mode:    "cors",
+      headers: {
+        "Content-Type":  "application/json",
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+      },
+    });
+  } catch(e) {
+    console.warn("sbDelete error:", e.message);
+  }
+}
+
+// ── State sync ───────────────────────────────────────────────
+let _saving = false;
+let _saveQueue = false;
+
+async function saveState() {
+  if(_saving){ _saveQueue=true; return; }
+  _saving = true;
+  try {
+    // Save settings (everything except bundles & notifLog)
+    const settings = {
+      schoolName: state.schoolName,
+      adminPhone: state.adminPhone,
+      subjects:   state.subjects,
+      grades:     state.grades,
+      stages:     state.stages,
+      teachers:   state.teachers,
+      users:      state.users,
+      reportLog:  state.reportLog,
+    };
+    await sbUpsert("settings", { id:"main", data: settings, updated_at: new Date().toISOString() });
+    // Show subtle sync indicator
+    showSyncDot("ok");
+  } catch(e) {
+    console.warn("saveState error:", e);
+    showSyncDot("err");
+  } finally {
+    _saving = false;
+    if(_saveQueue){ _saveQueue=false; saveState(); }
+  }
+}
+
+async function saveBundleToCloud(bundle) {
+  try {
+    await sbUpsert("bundles", {
+      id: bundle.id,
+      data: bundle,
+      updated_at: new Date().toISOString()
+    });
+    showSyncDot("ok");
+  } catch(e){ console.warn("saveBundleToCloud error:", e); showSyncDot("err"); }
+}
+
+async function deleteBundleFromCloud(id) {
+  try { await sbDelete("bundles", {id}); } catch(e){}
+}
+
+async function saveNotifToCloud(notif) {
+  try {
+    await sbUpsert("notif_log", { id: notif.id, data: notif });
+  } catch(e){ console.warn("saveNotifToCloud error:", e); }
+}
+
+async function loadState() {
+  // Show loading overlay
+  showLoading(true);
+  try {
+    // Load settings
+    const settingsRows = await sbGet("settings", {id:"main"});
+    if(settingsRows && settingsRows[0] && settingsRows[0].data) {
+      const saved = settingsRows[0].data;
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","reportLog"].forEach(k=>{
+        if(saved[k] !== undefined) state[k] = saved[k];
+      });
+    }
+    // Load bundles
+    const bundleRows = await sbGet("bundles");
+    if(bundleRows && bundleRows.length) {
+      state.bundles = bundleRows
+        .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))
+        .map(r=>r.data);
+    }
+    // Load notif log
+    const notifRows = await sbGet("notif_log");
+    if(notifRows && notifRows.length) {
+      state.notifLog = notifRows
+        .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
+        .map(r=>r.data);
+    }
+  } catch(e) {
+    console.warn("loadState error:", e.message);
+    // Show non-blocking warning — still allow app to work offline
+    setTimeout(()=>{
+      const errDiv = document.createElement("div");
+      errDiv.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#FEF3C7;color:#92400E;padding:12px 20px;border-radius:10px;font-size:12px;font-weight:700;z-index:999;font-family:inherit;border:1px solid #FDE68A;direction:rtl;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.1);white-space:nowrap";
+      errDiv.textContent = "⚠️ وضع بدون إنترنت — البيانات محلية فقط";
+      document.body.appendChild(errDiv);
+      setTimeout(()=>errDiv.remove(), 5000);
+    }, 500);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Sync dot indicator ───────────────────────────────────────
+function showSyncDot(status) {
+  const dot = document.getElementById("syncDot");
+  if(!dot) return;
+  dot.style.background = status==="ok" ? "#22C55E" : "#EF4444";
+  dot.style.opacity = "1";
+  dot.title = status==="ok" ? "تمت المزامنة" : "خطأ في المزامنة";
+  clearTimeout(dot._t);
+  dot._t = setTimeout(()=>{ dot.style.opacity="0.35"; }, 2500);
+}
+
+// ── Loading overlay ──────────────────────────────────────────
+function showLoading(show) {
+  let overlay = document.getElementById("loadingOverlay");
+  if(!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "loadingOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(11,29,58,.7);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(6px)";
+    overlay.innerHTML = `
+      <div style="width:52px;height:52px;border:3px solid rgba(255,255,255,.2);border-top-color:#F0B429;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px"></div>
+      <p style="color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:15px;font-weight:600">جارٍ تحميل البيانات...</p>
+      <p style="color:rgba(255,255,255,.55);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:12px;margin-top:4px">يتصل بقاعدة البيانات</p>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = show ? "flex" : "none";
 }
 
 // ═══════════════════════════════════════════════
@@ -829,26 +999,47 @@ function renderAdminNew(el) {
       <input class="inp" id="bf_count" type="number" min="1" placeholder="مثال: 32"/>
     </div>
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">تكليفات المظروف</p>
-    <div class="g3" style="margin-bottom:10px">
+    <div class="g2" style="margin-bottom:10px">
       <div>
-        <label class="lbl">المصحح</label>
+        <label class="lbl">✏️ المصحح</label>
         <select class="inp" id="bf_corrector">
-          <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          <option value="">-- اختر المصحح --</option>
+          ${state.teachers.filter(t=>t.role==="corrector"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          <optgroup label="── جميع المعلمين ──">
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          </optgroup>
         </select>
       </div>
       <div>
-        <label class="lbl">المراجع</label>
+        <label class="lbl">🔍 المراجع</label>
         <select class="inp" id="bf_reviewer">
-          <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          <option value="">-- اختر المراجع --</option>
+          ${state.teachers.filter(t=>t.role==="reviewer"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          <optgroup label="── جميع المعلمين ──">
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          </optgroup>
+        </select>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">🔏 المدقق الأول</label>
+        <select class="inp" id="bf_auditor">
+          <option value="">-- اختر المدقق الأول --</option>
+          ${state.teachers.filter(t=>t.role==="auditor"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          <optgroup label="── جميع المعلمين ──">
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          </optgroup>
         </select>
       </div>
       <div>
-        <label class="lbl">المدقق</label>
-        <select class="inp" id="bf_auditor">
-          <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+        <label class="lbl">🔏 المدقق الثاني <span style="font-weight:400;color:var(--muted)">(اختياري)</span></label>
+        <select class="inp" id="bf_auditor2">
+          <option value="">-- اختر المدقق الثاني --</option>
+          ${state.teachers.filter(t=>t.role==="auditor"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          <optgroup label="── جميع المعلمين ──">
+          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
+          </optgroup>
         </select>
       </div>
     </div>
@@ -896,6 +1087,7 @@ function submitNewBundle() {
   const corrector = document.getElementById("bf_corrector").value;
   const reviewer  = document.getElementById("bf_reviewer").value;
   const auditor   = document.getElementById("bf_auditor").value;
+  const auditor2  = document.getElementById("bf_auditor2")?.value||"";
   const note      = document.getElementById("bf_note").value;
   const examDay   = document.getElementById("bf_day")?.value||"";
   const examDate  = document.getElementById("bf_examdate")?.value||"";
@@ -907,12 +1099,13 @@ function submitNewBundle() {
   const b = {
     id:uid(), barcode:`M${uid()}`,
     subject, grade, count:+count,
-    corrector, reviewer, auditor, note,
+    corrector, reviewer, auditor, auditor2, note,
     examDay, examDate, examHall, examStart, examEnd,
     stage:-1, log:[], created:nowISO(),
   };
   state.bundles.push(b);
   saveState();
+  saveBundleToCloud(b);
   _newBundleCreated = b;
   renderBundleSuccess(document.getElementById("pageContent"), b);
   toast("تم إنشاء المظروف وباركوده ✅");
@@ -939,7 +1132,8 @@ function renderBundleSuccess(el, b) {
     <div style="background:var(--blueBg);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--blue);margin-bottom:10px;text-align:right;border:1px solid rgba(37,99,235,.15)">
       ${corrT?"✏️ المصحح: <strong>"+corrT.name+"</strong>&nbsp;&nbsp;":""}
       ${revT?"🔍 المراجع: <strong>"+revT.name+"</strong>&nbsp;&nbsp;":""}
-      ${audT?"🔏 المدقق: <strong>"+audT.name+"</strong>":""}
+      ${audT?"🔏 المدقق الأول: <strong>"+audT.name+"</strong>&nbsp;&nbsp;":""}
+      ${(()=>{ const a2=state.teachers.find(t=>t.id===newBundle.auditor2); return a2?"🔏 المدقق الثاني: <strong>"+a2.name+"</strong>":""; })()}
     </div>`:""}
     <!-- Exam info -->
     ${examInfo?`<div style="background:var(--purBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--purple);margin-bottom:10px;text-align:right;border:1px solid rgba(124,58,237,.15)">📅 ${examInfo}</div>`:""}
@@ -1006,7 +1200,8 @@ function printBundleFull(bundleId) {
     ${b.examHall?`<tr><td>القاعة</td><td>${b.examHall}</td></tr>`:""}
     ${corrT?`<tr><td>المصحح</td><td>${corrT.name}</td></tr>`:""}
     ${revT?`<tr><td>المراجع</td><td>${revT.name}</td></tr>`:""}
-    ${audT?`<tr><td>المدقق</td><td>${audT.name}</td></tr>`:""}
+    ${audT?`<tr><td>المدقق الأول</td><td>${audT.name}</td></tr>`:""}
+    ${(()=>{ const a2=state.teachers.find(t=>t.id===b.auditor2); return a2?`<tr><td>المدقق الثاني</td><td>${a2.name}</td></tr>`:""; })()}
   </table>
   <div class="hint">📌 الصق هذا الباركود على المظروف قبل توزيع الأوراق</div>
   <div class="actions">
@@ -1027,7 +1222,7 @@ function renderAdminList(el) {
   el.innerHTML=`
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <p style="font-size:14px;font-weight:700;color:var(--navy)">${state.bundles.length} مظروف مسجّل</p>
-    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];saveState();renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
+    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];saveState();Promise.all(state.bundles.map(b=>deleteBundleFromCloud(b.id)));renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
   </div>
   <div id="adminBundleList"></div>`;
   renderAdminBundleList();
@@ -1073,6 +1268,7 @@ function adminDeleteBundle(id) {
   if(!confirm("حذف هذا المظروف نهائياً؟")) return;
   state.bundles = state.bundles.filter(b=>b.id!==id);
   saveState();
+  deleteBundleFromCloud(id);
   toast("تم الحذف","err");
   renderAdminList(document.getElementById("pageContent"));
 }
@@ -1151,12 +1347,14 @@ function saveEditBundle(id) {
   b.corrector = document.getElementById("eb_corrector").value;
   b.reviewer  = document.getElementById("eb_reviewer").value;
   b.auditor   = document.getElementById("eb_auditor").value;
+  b.auditor2  = document.getElementById("eb_auditor2")?.value||"";
   b.examDay   = document.getElementById("eb_day")?.value||b.examDay||"";
   b.examDate  = document.getElementById("eb_examdate")?.value||b.examDate||"";
   b.examHall  = document.getElementById("eb_hall")?.value||b.examHall||"";
   b.examStart = document.getElementById("eb_start")?.value||b.examStart||"";
   b.examEnd   = document.getElementById("eb_end")?.value||b.examEnd||"";
   saveState();
+  saveBundleToCloud(b);
   document.getElementById("editOverlay").remove();
   toast("تم حفظ التعديلات ✅");
   renderAdminList(document.getElementById("pageContent"));
@@ -1374,7 +1572,13 @@ function renderScanResult() {
       <div class="info-cell"><p class="k">تاريخ الإنشاء</p><p class="v">${fmt(b.created)}</p></div>
       <div class="info-cell"><p class="k">✏️ المصحح</p><p class="v">${corrT?corrT.name:"—"}</p></div>
       <div class="info-cell"><p class="k">🔍 المراجع</p><p class="v">${revT?revT.name:"—"}</p></div>
-      <div class="info-cell" style="grid-column:span 2"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>
+      ${(()=>{
+        const audT2 = state.teachers.find(t=>t.id===hit.auditor2);
+        return audT2
+          ? `<div class="info-cell"><p class="k">🔏 المدقق الأول</p><p class="v">${audT?audT.name:"—"}</p></div>
+             <div class="info-cell"><p class="k">🔏 المدقق الثاني</p><p class="v">${audT2.name}</p></div>`
+          : `<div class="info-cell" style="grid-column:span 2"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>`;
+      })()}
       ${b.note?`<div class="info-cell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
       ${b.examDate?`<div class="info-cell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
       ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
@@ -1445,6 +1649,7 @@ function doAdvance() {
   if(!b)return;
   b.stage=idx; b.log.push(entry);
   saveState();
+  saveBundleToCloud(b);
   _scanHit=b; _confirmStg=null;
   toast(`✅ ${state.stages[idx]}`);
   renderScanResult();
@@ -1591,6 +1796,7 @@ function sendNotif() {
     teachers, message:msg, bundle, sentBy:currentUser.name, waMsg:fullMsg,
   });
   saveState();
+  saveNotifToCloud(entry);
   toast(`📲 جاهز للإرسال لـ ${teachers.length} معلم عبر واتساب`,"wa");
 
   // Open WA for first teacher, rest open in tabs
@@ -1608,37 +1814,48 @@ function sendNotif() {
 // ═══════════════════════════════════════════════
 function renderNotifLog(el) {
   if(state.notifLog.length===0){
-    el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◌</span>لا توجد تنبيهات مرسلة بعد</div></div>`;
+    el.innerHTML='<div class="card"><div class="empty"><span class="empty-icon">◌</span>لا توجد تنبيهات مرسلة بعد</div></div>';
     return;
   }
-  el.innerHTML=`<div>${state.notifLog.map(n=>`
-    <div class="nlog-card" style="border-right-color:${n.typeColor||"var(--border)"}">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <span style="font-size:24px;flex-shrink:0">${n.typeIcon}</span>
-        <div style="flex:1">
-          <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:5px">
-            <span style="font-weight:800;color:${n.typeColor};font-size:13px">${n.typeLabel}</span>
-            <span style="font-size:11px;color:var(--muted)">${fmt(n.ts)}</span>
-            <span style="font-size:11px;color:var(--muted)">— ${n.sentBy}</span>
-          </div>
-          <p style="font-size:13px;color:var(--text);margin-bottom:7px">${n.message}</p>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px">
-            ${n.teachers.map(t=>`
-            <a href="${waLink(t.phone,n.waMsg)}" target="_blank"
-              style="display:inline-flex;align-items:center;gap:4px;background:var(--waBg);color:var(--wa);padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;text-decoration:none">
-              📲 ${t.name} <span style="font-family:monospace;font-size:10px;direction:ltr">${t.phone}</span>
-            </a>`).join("")}
-          </div>
-          ${n.bundle?`<p style="font-size:11px;color:var(--muted)">مظروف: <strong>${n.bundle.barcode}</strong> — ${n.bundle.subject}</p>`:""}
-        </div>
-      </div>
-    </div>`).join("")}</div>`;
+  const isAdmin = !!(currentUser && currentUser.role==="admin");
+  let html = "";
+  if(isAdmin){
+    html += '<div style="background:var(--amberBg);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--amber);border:1px solid #FDE68A">🔑 بصفتك مديراً يمكنك حذف أي تنبيه من السجل</div>';
+  }
+  html += '<div>';
+  state.notifLog.forEach(function(n){
+    const color  = n.typeColor || "var(--border)";
+    const icon   = n.typeIcon  || "◌";
+    const label  = n.typeLabel || "";
+    const delBtn = isAdmin
+      ? '<button onclick="deleteNotif('' + n.id + '')" style="padding:3px 10px;background:var(--redBg);color:var(--red);border:1px solid #FECACA;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;flex-shrink:0">🗑️ حذف</button>'
+      : "";
+    let teacherLinks = "";
+    (n.teachers||[]).forEach(function(t){
+      const wl = waLink(t.phone||"", n.waMsg||"");
+      teacherLinks += '<a href="' + wl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;background:var(--waBg);color:var(--wa);padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;text-decoration:none">📲 ' + t.name + ' <span style="font-family:monospace;font-size:10px;direction:ltr">' + (t.phone||"") + '</span></a>';
+    });
+    const bundleInfo = n.bundle
+      ? '<p style="font-size:11px;color:var(--muted)">مظروف: <strong>' + n.bundle.barcode + '</strong> — ' + n.bundle.subject + '</p>'
+      : "";
+    html += '<div class="nlog-card" style="border-right-color:' + color + '">';
+    html += '<div style="display:flex;align-items:flex-start;gap:10px">';
+    html += '<span style="font-size:22px;flex-shrink:0">' + icon + '</span>';
+    html += '<div style="flex:1">';
+    html += '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:5px;align-items:center">';
+    html += '<span style="font-weight:800;color:' + color + ';font-size:13px">' + label + '</span>';
+    html += '<span style="font-size:11px;color:var(--muted)">' + fmt(n.ts) + '</span>';
+    html += '<span style="font-size:11px;color:var(--muted)">— ' + (n.sentBy||"") + '</span>';
+    html += delBtn;
+    html += '</div>';
+    html += '<p style="font-size:13px;color:var(--text);margin-bottom:7px">' + (n.message||"") + '</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px">' + teacherLinks + '</div>';
+    html += bundleInfo;
+    html += '</div></div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
-
-// ═══════════════════════════════════════════════
-// SETTINGS
-// ═══════════════════════════════════════════════
-let _sTab="general", _editStages=null;
 
 function renderSettings(el) {
   if(!_editStages) _editStages=[...state.stages];
@@ -1678,12 +1895,13 @@ function renderSGeneral(el) {
       document.getElementById('hSchool').textContent=state.schoolName;
       document.getElementById('loginSchoolName').textContent=state.schoolName;
       saveState();toast('تم الحفظ ✅')">💾 حفظ</button>
-    <button class="btn" style="background:var(--red)" onclick="
-      if(confirm('هل تريد حذف جميع البيانات المحفوظة واستعادة الإعدادات الافتراضية؟
-تحذير: سيتم حذف جميع المظاريف والتعديلات!')){
-        localStorage.removeItem('examTrackerState_v1');
-        location.reload();
-      }">🗑️ إعادة تعيين كامل</button>
+    <div style="background:var(--greenBg);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid #86EFAC">
+      <span style="font-size:20px">☁️</span>
+      <div>
+        <p style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:2px">متصل بقاعدة البيانات</p>
+        <p style="font-size:11px;color:var(--green);font-family:monospace;direction:ltr">https://sdufrvefwvnojwaxodvd.supabase.co</p>
+      </div>
+    </div>
   </div>
   </div>`;
 }
@@ -2057,7 +2275,39 @@ function renderCtrlReport(el) {
         <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
       </div>`;
     }).join("")}`}
-  </div>`;
+
+  <!-- Report Log -->
+  </div>\`;
+
+  // Append report log separately (avoids nested template literal issues)
+  if(state.reportLog && state.reportLog.length>0){
+    const isAdmin2 = !!(currentUser && currentUser.role==="admin");
+    let rHtml = '<div class="card" style="margin-top:0"><p class="card-title"><span class="ct-icon" style="background:var(--amberBg);color:var(--amber)">📜</span>سجل التقارير المُنشأة</p>';
+    rHtml += '<table class="data-table"><thead><tr><th>#</th><th>المادة</th><th>المظاريف</th><th>الأوراق</th><th>أنشأه</th><th>التاريخ</th>';
+    if(isAdmin2) rHtml += '<th>حذف</th>';
+    rHtml += '</tr></thead><tbody>';
+    state.reportLog.forEach(function(r,i){
+      rHtml += '<tr><td style="color:var(--muted);font-size:11px">'+(i+1)+'</td>';
+      rHtml += '<td style="font-weight:700;color:var(--navy)">'+r.subject+'</td>';
+      rHtml += '<td style="text-align:center">'+r.bundleCount+'</td>';
+      rHtml += '<td style="text-align:center">'+r.paperCount+'</td>';
+      rHtml += '<td style="font-size:12px">'+r.generatedBy+'</td>';
+      rHtml += '<td style="color:var(--muted);font-size:11px">'+fmt(r.ts)+'</td>';
+      if(isAdmin2) rHtml += '<td><button class="btn btn-red btn-sm" onclick="deleteReport(''+r.id+'')">🗑️</button></td>';
+      rHtml += '</tr>';
+    });
+    rHtml += '</tbody></table></div>';
+    el.innerHTML += rHtml;
+  }
+}
+
+function deleteReport(id) {
+  if(!currentUser||currentUser.role!=="admin"){ toast("هذه الخاصية للمدير فقط","err"); return; }
+  if(!confirm("حذف هذا السجل؟")) return;
+  state.reportLog = state.reportLog.filter(r=>r.id!==id);
+  saveState();
+  toast("تم حذف السجل","err");
+  navigateTo("ctrl_report");
 }
 
 function generatePDF(subjectFilter) {
@@ -2225,6 +2475,17 @@ function generatePDF(subjectFilter) {
 </div>
 </body></html>`);
   win.document.close();
+  // Log this report
+  const reportEntry = {
+    id: uid(),
+    ts: nowISO(),
+    subject: subjectFilter==="ALL"?"جميع المواد":subjectFilter,
+    bundleCount: bundles.length,
+    paperCount: bundles.reduce((a,b)=>a+b.count,0),
+    generatedBy: currentUser?.name||"—",
+  };
+  state.reportLog.unshift(reportEntry);
+  saveState();
   toast("تم فتح نافذة التقرير — اختر طباعة أو حفظ PDF ✅");
 }
 
@@ -2553,31 +2814,46 @@ function filterTeachers() {
   }).join("");
 }
 
+
+// ─── Delete notification (admin only) ───────────────────────
+function deleteNotif(id) {
+  if(!currentUser||currentUser.role!=="admin"){
+    toast("حذف التنبيهات للمدير فقط","err"); return;
+  }
+  if(!confirm("حذف هذا التنبيه نهائياً؟")) return;
+  state.notifLog = state.notifLog.filter(n=>n.id!==id);
+  saveState();
+  // Delete from Supabase
+  sbDelete("notif_log",{id}).catch(()=>{});
+  toast("تم حذف التنبيه","err");
+  navigateTo("notif_log");
+}
+
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-loadState();           // restore data from localStorage
+(async function init() {
+  // 1. Check Supabase configured
+  // Keys are pre-configured — no setup screen needed
 
-// ── Auto-login: restore session after page refresh ──────────
-(function restoreSession() {
+  // 2. Load data from Supabase
+  await loadState();
+
+  // 3. Restore session
+  renderLoginDemos();
   try {
     const raw = sessionStorage.getItem("examSession");
-    if (!raw) { renderLoginDemos(); return; }
+    if(!raw) return;
     const sess = JSON.parse(raw);
-    if (!sess || !sess.username) { renderLoginDemos(); return; }
-
-    // Find user in current state (works even after data changes)
+    if(!sess || !sess.username) return;
     const found = state.users.find(u => u.username === sess.username);
-    if (!found) { sessionStorage.removeItem("examSession"); renderLoginDemos(); return; }
-
-    // Re-enter the app on the same page the user was on
-    renderLoginDemos();
+    if(!found) { sessionStorage.removeItem("examSession"); return; }
     enterApp(found, sess.page || null);
   } catch(e) {
     sessionStorage.removeItem("examSession");
-    renderLoginDemos();
   }
 })();
+
 
 
 </script>
