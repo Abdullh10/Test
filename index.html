@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>نظام تتبع مظاريف الاختبارات</title>
+<title>متابعة سير الاختبارات الإلكتروني</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -470,9 +470,9 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">
-      <div class="login-icon">📦</div>
-      <h1 id="loginSchoolName">مدرسة النموذجية الثانوية</h1>
-      <p>نظام تتبع مظاريف الاختبارات</p>
+      <div class="login-icon">📋</div>
+      <h1 id="loginSchoolName">متابعة سير الاختبارات الإلكتروني</h1>
+      <p style="font-size:13px;color:var(--mid);margin-top:6px">برمجة الأستاذ عبدالله حمدي</p>
     </div>
     <div id="loginErr" class="login-err" style="display:none"></div>
     <div class="login-field">
@@ -493,7 +493,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 <div id="appShell">
   <header id="appHeader">
     <div class="h-logo">📦</div>
-    <span class="h-title" id="hSchool"></span>
+    <span class="h-title" id="hSchool"></span><span style="color:rgba(255,255,255,.35);font-size:11px;font-weight:400;padding-right:4px">— برمجة الأستاذ عبدالله حمدي</span>
     <span class="h-role" id="hRole"></span>
     <span class="h-user" id="hUser"></span>
     <div id="syncDot" title="تمت المزامنة" style="width:8px;height:8px;border-radius:50%;background:#22C55E;opacity:.35;flex-shrink:0;transition:all .4s"></div>
@@ -517,7 +517,7 @@ const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F
 const sc = i => PALETTE[i % PALETTE.length];
 
 let state = {
-  schoolName: "مدرسة النموذجية الثانوية",
+  schoolName: "متابعة سير الاختبارات الإلكتروني",
   adminPhone: "+966551121498",   // <--- رقم الواتساب الافتراضي للمدير
   subjects: ["لغة إنجليزية", "رياضيات", "علم البيئة", "فيزياء", "الكفايات اللغوية", "أحياء", "كيمياء", "علوم الأرض والفضاء"],
   grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
@@ -793,8 +793,23 @@ async function saveNotifToCloud(notif) {
 }
 
 async function loadState() {
-  // Show loading overlay
+  // Show loading overlay with timeout safety
   showLoading(true);
+  const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
+  try {
+    await Promise.race([loadStateInner(), timeout]);
+  } catch(e) {
+    console.warn("loadState failed or timed out:", e.message);
+    showLoading(false);
+    const w = document.createElement("div");
+    w.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#FEF3C7;color:#92400E;padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;z-index:999;font-family:inherit;border:1px solid #FDE68A;direction:rtl;white-space:nowrap";
+    w.textContent = "⚠️ وضع بدون إنترنت — سيتم العمل محلياً";
+    document.body.appendChild(w);
+    setTimeout(()=>w.remove(), 4000);
+  }
+}
+
+async function loadStateInner() {
   try {
     // Load settings
     const settingsRows = await sbGet("settings", {id:"main"});
@@ -819,15 +834,8 @@ async function loadState() {
         .map(r=>r.data);
     }
   } catch(e) {
-    console.warn("loadState error:", e.message);
-    // Show non-blocking warning — still allow app to work offline
-    setTimeout(()=>{
-      const errDiv = document.createElement("div");
-      errDiv.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#FEF3C7;color:#92400E;padding:12px 20px;border-radius:10px;font-size:12px;font-weight:700;z-index:999;font-family:inherit;border:1px solid #FDE68A;direction:rtl;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.1);white-space:nowrap";
-      errDiv.textContent = "⚠️ وضع بدون إنترنت — البيانات محلية فقط";
-      document.body.appendChild(errDiv);
-      setTimeout(()=>errDiv.remove(), 5000);
-    }, 500);
+    console.warn("loadStateInner error:", e.message);
+    throw e;
   } finally {
     showLoading(false);
   }
@@ -882,7 +890,7 @@ function enterApp(found, restorePage) {
   currentUser = found;
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("appShell").style.display    = "flex";
-  document.getElementById("hSchool").textContent = state.schoolName;
+  document.getElementById("hSchool").textContent = "متابعة سير الاختبارات الإلكتروني";
   const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
   const rIcons = {admin:"🔑",controller:"📋",notifier:"📲"};
   document.getElementById("hRole").textContent = (rIcons[found.role]||"") + " " + (ROLE_LABEL[found.role]||found.role);
@@ -894,26 +902,42 @@ function enterApp(found, restorePage) {
 }
 
 function doLogin() {
-  const u = document.getElementById("loginUser").value.trim();
-  const p = document.getElementById("loginPass").value;
-  const found = state.users.find(x=>x.username===u&&x.password===p);
+  const u     = (document.getElementById("loginUser")?.value||"").trim();
+  const p     = (document.getElementById("loginPass")?.value||"");
   const errEl = document.getElementById("loginErr");
+
+  // Search in state.users first, fallback to hardcoded defaults
+  const DEFAULTS = [
+    {id:"U1",name:"مدير النظام",       username:"admin",  password:"admin123", role:"admin"},
+    {id:"U2",name:"الكنترول",          username:"ctrl",   password:"ctrl123",  role:"controller"},
+    {id:"U3",name:"مسؤول التنبيهات",   username:"notify", password:"1234",     role:"notifier"},
+  ];
+  const allUsers = (state.users && state.users.length) ? state.users : DEFAULTS;
+  const found = allUsers.find(x=>x.username===u && x.password===p);
+
   if(found) {
     errEl.style.display = "none";
-    // Save session so refresh keeps user logged in
-    sessionStorage.setItem("examSession", JSON.stringify({
-      username: found.username,
-      page: PAGES[found.role]?.[0]?.k || "ctrl_scan"
-    }));
+    try {
+      sessionStorage.setItem("examSession", JSON.stringify({
+        username: found.username,
+        page: (PAGES[found.role]||[])[0]?.k || "ctrl_scan"
+      }));
+    } catch(e){}
     enterApp(found);
   } else {
-    errEl.textContent = "بيانات الدخول غير صحيحة";
+    errEl.textContent = "بيانات الدخول غير صحيحة — تأكد من: admin/admin123";
     errEl.style.display = "block";
   }
 }
 
 document.addEventListener("keydown", e => {
   if(e.key==="Enter" && !currentUser) doLogin();
+});
+
+// Also wire login button directly on DOM ready
+document.addEventListener("DOMContentLoaded", function() {
+  const passInp = document.getElementById("loginPass");
+  if(passInp) passInp.addEventListener("keydown", function(e){ if(e.key==="Enter") doLogin(); });
 });
 
 function doLogout() {
@@ -2833,20 +2857,23 @@ function deleteNotif(id) {
 // INIT
 // ═══════════════════════════════════════════════
 (async function init() {
-  // 1. Check Supabase configured
-  // Keys are pre-configured — no setup screen needed
+  // 0. Render login immediately so user can log in without waiting
+  renderLoginDemos();
 
-  // 2. Load data from Supabase
+  // 1. Keys are pre-configured — no setup screen needed
+
+  // 2. Load data from Supabase (non-blocking)
   await loadState();
 
   // 3. Restore session
-  renderLoginDemos();
   try {
     const raw = sessionStorage.getItem("examSession");
     if(!raw) return;
     const sess = JSON.parse(raw);
     if(!sess || !sess.username) return;
-    const found = state.users.find(u => u.username === sess.username);
+    const DEFS = [{id:"U1",name:"مدير النظام",username:"admin",password:"admin123",role:"admin"},{id:"U2",name:"الكنترول",username:"ctrl",password:"ctrl123",role:"controller"},{id:"U3",name:"مسؤول التنبيهات",username:"notify",password:"1234",role:"notifier"}];
+    const allU = (state.users && state.users.length) ? state.users : DEFS;
+    const found = allU.find(u => u.username === sess.username);
     if(!found) { sessionStorage.removeItem("examSession"); return; }
     enterApp(found, sess.page || null);
   } catch(e) {
