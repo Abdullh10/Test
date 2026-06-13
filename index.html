@@ -475,18 +475,57 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
       <p style="font-size:13px;color:var(--mid);margin-top:6px">برمجة الأستاذ عبدالله حمدي</p>
     </div>
     <div id="loginErr" class="login-err" style="display:none"></div>
+
+    <!-- Account cards - tap to login directly -->
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+
+      <button onclick="quickLogin('admin','admin123')"
+        style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#0B1D3A,#1D3561);border:none;border-radius:12px;cursor:pointer;width:100%;text-align:right;transition:opacity .15s;font-family:inherit">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔑</div>
+        <div style="flex:1">
+          <p style="color:#fff;font-weight:700;font-size:13px;margin:0">مدير النظام</p>
+          <p style="color:rgba(255,255,255,.55);font-size:11px;margin:0;font-family:monospace;direction:ltr">admin / admin123</p>
+        </div>
+        <span style="color:rgba(255,255,255,.4);font-size:18px">←</span>
+      </button>
+
+      <button onclick="quickLogin('ctrl','ctrl123')"
+        style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#1E3A8A,#2563EB);border:none;border-radius:12px;cursor:pointer;width:100%;text-align:right;transition:opacity .15s;font-family:inherit">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📋</div>
+        <div style="flex:1">
+          <p style="color:#fff;font-weight:700;font-size:13px;margin:0">الكنترول</p>
+          <p style="color:rgba(255,255,255,.55);font-size:11px;margin:0;font-family:monospace;direction:ltr">ctrl / ctrl123</p>
+        </div>
+        <span style="color:rgba(255,255,255,.4);font-size:18px">←</span>
+      </button>
+
+      <button onclick="quickLogin('notify','1234')"
+        style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,#5B21B6,#7C3AED);border:none;border-radius:12px;cursor:pointer;width:100%;text-align:right;transition:opacity .15s;font-family:inherit">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📲</div>
+        <div style="flex:1">
+          <p style="color:#fff;font-weight:700;font-size:13px;margin:0">مسؤول التنبيهات</p>
+          <p style="color:rgba(255,255,255,.55);font-size:11px;margin:0;font-family:monospace;direction:ltr">notify / 1234</p>
+        </div>
+        <span style="color:rgba(255,255,255,.4);font-size:18px">←</span>
+      </button>
+
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--muted)">أو ادخل يدوياً</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
     <div class="login-field">
       <label>اسم المستخدم</label>
       <input class="inp" id="loginUser" placeholder="أدخل اسم المستخدم" autocomplete="username"/>
     </div>
     <div class="login-field">
-      <input class="inp" id="loginPass" placeholder="كلمة المرور" type="password" dir="ltr" autocomplete="current-password" style="margin-bottom:16px"/>
+      <input class="inp" id="loginPass" placeholder="كلمة المرور" type="password" dir="ltr" autocomplete="current-password" style="margin-bottom:14px"/>
     </div>
     <button class="btn btn-navy btn-full" onclick="doLogin()">دخول إلى النظام</button>
-    <div class="demo-section">
-      <p style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px;letter-spacing:.3px">الحسابات التجريبية — اضغط للدخول التلقائي</p>
-      <div id="demoBtns"></div>
-    </div>
+    <div id="demoBtns" style="display:none"></div>
   </div>
 </div>
 
@@ -946,15 +985,54 @@ function enterApp(found, restorePage) {
   currentUser = found;
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("appShell").style.display    = "flex";
-  document.getElementById("hSchool").textContent = "متابعة سير الاختبارات الإلكتروني";
-  const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
-  const rIcons = {admin:"🔑",controller:"📋",notifier:"📲"};
-  document.getElementById("hRole").textContent = (rIcons[found.role]||"") + " " + (ROLE_LABEL[found.role]||found.role);
-  document.getElementById("hRole").style.cssText = `background:${bg};color:${col};padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px`;
-  document.getElementById("hUser").textContent = found.name;
+
+  // Update header
+  const hSchool = document.getElementById("hSchool");
+  if(hSchool) hSchool.textContent = "متابعة سير الاختبارات الإلكتروني";
+
+  const ROLE_COLORS_MAP = {
+    admin:      ["#92610A","#FEF3C7"],
+    controller: ["#1E40AF","#DBEAFE"],
+    notifier:   ["#5B21B6","#EDE9FE"],
+  };
+  const ROLE_LABELS_MAP = {
+    admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات"
+  };
+  const ROLE_ICONS = {admin:"🔑", controller:"📋", notifier:"📲"};
+  const colors = ROLE_COLORS_MAP[found.role]||["#888","#eee"];
+  const hRole = document.getElementById("hRole");
+  if(hRole) {
+    hRole.textContent = (ROLE_ICONS[found.role]||"") + " " + (ROLE_LABELS_MAP[found.role]||found.role);
+    hRole.style.cssText = "background:"+colors[1]+";color:"+colors[0]+";padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px";
+  }
+  const hUser = document.getElementById("hUser");
+  if(hUser) hUser.textContent = found.name;
+
   renderNav();
-  const page = restorePage || (PAGES[found.role]&&PAGES[found.role][0]&&PAGES[found.role][0].k) || "ctrl_scan";
+  const page = restorePage || ((PAGES[found.role]||[])[0] ? (PAGES[found.role]||[])[0].k : "ctrl_scan");
   navigateTo(page);
+}
+
+
+function quickLogin(username, password) {
+  // Direct login - no waiting, no Supabase dependency
+  const DEFAULTS = [
+    {id:"U1", name:"مدير النظام",      username:"admin",  password:"admin123", role:"admin"},
+    {id:"U2", name:"الكنترول",         username:"ctrl",   password:"ctrl123",  role:"controller"},
+    {id:"U3", name:"مسؤول التنبيهات", username:"notify", password:"1234",     role:"notifier"},
+  ];
+  const allUsers = (state.users && state.users.length > 0) ? state.users : DEFAULTS;
+  const found = allUsers.find(function(u){ return u.username===username && u.password===password; });
+  if(!found) { toast("حساب غير موجود","err"); return; }
+
+  try {
+    sessionStorage.setItem("examSession", JSON.stringify({
+      username: found.username,
+      page: (PAGES[found.role]||[])[0] ? (PAGES[found.role]||[])[0].k : "ctrl_scan"
+    }));
+  } catch(e){}
+
+  enterApp(found);
 }
 
 function doLogin() {
