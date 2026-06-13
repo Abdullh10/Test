@@ -484,7 +484,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     </div>
     <button class="btn btn-navy btn-full" onclick="doLogin()">دخول إلى النظام</button>
     <div class="demo-section">
-      <p>حسابات تجريبية — اضغط للملء التلقائي</p>
+      <p style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px;letter-spacing:.3px">الحسابات التجريبية — اضغط للدخول التلقائي</p>
       <div id="demoBtns"></div>
     </div>
   </div>
@@ -496,7 +496,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     <span class="h-title" id="hSchool"></span><span style="color:rgba(255,255,255,.35);font-size:11px;font-weight:400;padding-right:4px">— برمجة الأستاذ عبدالله حمدي</span>
     <span class="h-role" id="hRole"></span>
     <span class="h-user" id="hUser"></span>
-    <div id="syncDot" title="تمت المزامنة" style="width:8px;height:8px;border-radius:50%;background:#22C55E;opacity:.35;flex-shrink:0;transition:all .4s"></div>
+    <div id="syncDot" onclick="forceSyncAll()" title="اضغط للمزامنة" style="width:8px;height:8px;border-radius:50%;background:#22C55E;opacity:.35;flex-shrink:0;transition:all .4s;cursor:pointer"></div>
     <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
   <nav id="appNav"></nav>
@@ -507,6 +507,8 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 <div id="printArea" style="display:none"></div>
 
 <script>
+
+
 
 
 
@@ -718,9 +720,13 @@ async function sbUpsert(table, obj) {
     if(!r.ok) {
       const err = await r.text().catch(()=>"");
       console.warn("sbUpsert error:", r.status, err);
+      showSyncDot("err");
+    } else {
+      console.log("sbUpsert OK:", table);
     }
   } catch(e) {
     console.warn("sbUpsert fetch error:", e.message);
+    showSyncDot("err");
   }
 }
 async function sbDelete(table, match) {
@@ -768,6 +774,39 @@ async function saveState() {
   } finally {
     _saving = false;
     if(_saveQueue){ _saveQueue=false; saveState(); }
+  }
+}
+
+// ── Force sync everything to Supabase ───────────────────────
+async function forceSyncAll() {
+  showLoading(true);
+  try {
+    // Save settings
+    const settings = {
+      schoolName: state.schoolName, adminPhone: state.adminPhone,
+      subjects: state.subjects, grades: state.grades,
+      stages: state.stages, teachers: state.teachers,
+      users: state.users, reportLog: state.reportLog||[],
+    };
+    await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
+
+    // Save all bundles
+    for(const b of state.bundles) {
+      await sbUpsert("bundles", {id:b.id, data:b, updated_at:new Date().toISOString()});
+    }
+
+    // Save all notifs
+    for(const n of state.notifLog||[]) {
+      await sbUpsert("notif_log", {id:n.id, data:n});
+    }
+
+    showLoading(false);
+    toast("✅ تمت مزامنة جميع البيانات مع السحابة");
+    showSyncDot("ok");
+  } catch(e) {
+    showLoading(false);
+    toast("❌ فشلت المزامنة: " + e.message, "err");
+    showSyncDot("err");
   }
 }
 
@@ -873,19 +912,36 @@ function showLoading(show) {
 // ═══════════════════════════════════════════════
 function renderLoginDemos() {
   const c = document.getElementById("demoBtns");
+  if(!c) return;
   c.innerHTML = "";
-  state.users.forEach(u => {
-    const [col,bg] = ROLE_COLORS[u.role]||["#888","#eee"];
-    const btn = document.createElement("button");
-    btn.className = "demoRow";
-    btn.onclick = () => { document.getElementById("loginUser").value=u.username; document.getElementById("loginPass").value=u.password; };
-    btn.innerHTML = `<span class="roleTag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span><span class="demoMono">${u.username} / ${u.password}</span>`;
-    c.appendChild(btn);
+  const icons = {admin:"🔑", controller:"📋", notifier:"📲"};
+  const DEFAULTS = [
+    {id:"U1", name:"مدير النظام",     username:"admin",  password:"admin123", role:"admin"},
+    {id:"U2", name:"الكنترول",        username:"ctrl",   password:"ctrl123",  role:"controller"},
+    {id:"U3", name:"مسؤول التنبيهات", username:"notify", password:"1234",     role:"notifier"},
+  ];
+  const users = (state.users && state.users.length) ? state.users : DEFAULTS;
+  users.forEach(function(u) {
+    const colors = ROLE_COLORS[u.role]||["#888","#eee"];
+    const col=colors[0], bg=colors[1];
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:8px;padding:7px 4px;border-radius:8px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border)";
+    row.onmouseover = function(){ this.style.background="rgba(11,29,58,.05)"; };
+    row.onmouseout  = function(){ this.style.background="transparent"; };
+    row.onclick = function(){
+      document.getElementById("loginUser").value = u.username;
+      document.getElementById("loginPass").value = u.password;
+    };
+    row.innerHTML =
+      '<span style="padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700;flex-shrink:0;background:'+bg+';color:'+col+'">'+(icons[u.role]||"")+" "+(ROLE_LABEL[u.role]||u.role)+'</span>'+
+      '<span style="font-size:12px;color:var(--navy);font-weight:600;flex:1">'+u.name+'</span>'+
+      '<span style="font-size:11px;color:var(--mid);font-family:monospace;direction:ltr">'+u.username+' / '+u.password+'</span>';
+    c.appendChild(row);
   });
-  document.getElementById("loginSchoolName").textContent = state.schoolName;
+  const titleEl = document.getElementById("loginSchoolName");
+  if(titleEl) titleEl.textContent = "متابعة سير الاختبارات الإلكتروني";
 }
 
-// ─── Enter app (called from login AND from session restore) ──
 function enterApp(found, restorePage) {
   currentUser = found;
   document.getElementById("loginScreen").style.display = "none";
@@ -897,13 +953,13 @@ function enterApp(found, restorePage) {
   document.getElementById("hRole").style.cssText = `background:${bg};color:${col};padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px`;
   document.getElementById("hUser").textContent = found.name;
   renderNav();
-  const page = restorePage || PAGES[found.role]?.[0]?.k || "ctrl_scan";
+  const page = restorePage || (PAGES[found.role]&&PAGES[found.role][0]&&PAGES[found.role][0].k) || "ctrl_scan";
   navigateTo(page);
 }
 
 function doLogin() {
-  const u     = (document.getElementById("loginUser")?.value||"").trim();
-  const p     = (document.getElementById("loginPass")?.value||"");
+  const u     = ((document.getElementById("loginUser")||{value:""}).value||"").trim();
+  const p     = ((document.getElementById("loginPass")||{value:""}).value||"");
   const errEl = document.getElementById("loginErr");
 
   // Search in state.users first, fallback to hardcoded defaults
@@ -920,7 +976,7 @@ function doLogin() {
     try {
       sessionStorage.setItem("examSession", JSON.stringify({
         username: found.username,
-        page: (PAGES[found.role]||[])[0]?.k || "ctrl_scan"
+        page: ((PAGES[found.role]||[])[0]&&(PAGES[found.role]||[])[0].k) || "ctrl_scan"
       }));
     } catch(e){}
     enterApp(found);
@@ -999,109 +1055,73 @@ let _newBundleCreated = null;
 
 function renderAdminNew(el) {
   if(_newBundleCreated) { renderBundleSuccess(el, _newBundleCreated); return; }
-  el.innerHTML = `
-  <div class="card">
-    <p class="card-title">➕ إنشاء مظروف جديد</p>
-    <div class="g2" style="margin-bottom:10px">
-      <div>
-        <label class="lbl">المادة *</label>
-        <select class="inp" id="bf_subject">
-          <option value="">-- اختر المادة --</option>
-          ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
-        </select>
-      </div>
-      <div>
-        <label class="lbl">الصف الدراسي</label>
-        <select class="inp" id="bf_grade">
-          <option value="">-- اختياري --</option>
-          ${state.grades.map(g=>`<option>${g}</option>`).join("")}
-        </select>
-      </div>
-    </div>
-    <div style="margin-bottom:10px">
-      <label class="lbl">عدد الأوراق في المظروف *</label>
-      <input class="inp" id="bf_count" type="number" min="1" placeholder="مثال: 32"/>
-    </div>
-    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">تكليفات المظروف</p>
-    <div class="g2" style="margin-bottom:10px">
-      <div>
-        <label class="lbl">✏️ المصحح</label>
-        <select class="inp" id="bf_corrector">
-          <option value="">-- اختر المصحح --</option>
-          ${state.teachers.filter(t=>t.role==="corrector"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          <optgroup label="── جميع المعلمين ──">
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          </optgroup>
-        </select>
-      </div>
-      <div>
-        <label class="lbl">🔍 المراجع</label>
-        <select class="inp" id="bf_reviewer">
-          <option value="">-- اختر المراجع --</option>
-          ${state.teachers.filter(t=>t.role==="reviewer"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          <optgroup label="── جميع المعلمين ──">
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          </optgroup>
-        </select>
-      </div>
-    </div>
-    <div class="g2" style="margin-bottom:10px">
-      <div>
-        <label class="lbl">🔏 المدقق الأول</label>
-        <select class="inp" id="bf_auditor">
-          <option value="">-- اختر المدقق الأول --</option>
-          ${state.teachers.filter(t=>t.role==="auditor"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          <optgroup label="── جميع المعلمين ──">
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          </optgroup>
-        </select>
-      </div>
-      <div>
-        <label class="lbl">🔏 المدقق الثاني <span style="font-weight:400;color:var(--muted)">(اختياري)</span></label>
-        <select class="inp" id="bf_auditor2">
-          <option value="">-- اختر المدقق الثاني --</option>
-          ${state.teachers.filter(t=>t.role==="auditor"||t.role==="").map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          <optgroup label="── جميع المعلمين ──">
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}${t.subject?" — "+t.subject:""}</option>`).join("")}
-          </optgroup>
-        </select>
-      </div>
-    </div>
-    <div style="margin-bottom:16px">
-      <label class="lbl">ملاحظة</label>
-      <input class="inp" id="bf_note" placeholder="ملاحظة اختيارية..."/>
-    </div>
-    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">📅 بيانات الاختبار</p>
-    <div class="g3" style="margin-bottom:10px">
-      <div>
-        <label class="lbl">يوم الاختبار</label>
-        <select class="inp" id="bf_day">
-          <option value="">-- اليوم --</option>
-          <option>الأحد</option><option>الاثنين</option><option>الثلاثاء</option>
-          <option>الأربعاء</option><option>الخميس</option>
-        </select>
-      </div>
-      <div>
-        <label class="lbl">تاريخ الاختبار</label>
-        <input class="inp" id="bf_examdate" type="date"/>
-      </div>
-      <div>
-        <label class="lbl">القاعة / اللجنة</label>
-        <input class="inp" id="bf_hall" placeholder="مثال: قاعة A"/>
-      </div>
-    </div>
-    <div class="g2" style="margin-bottom:14px">
-      <div>
-        <label class="lbl">وقت البدء</label>
-        <input class="inp" id="bf_start" type="time"/>
-      </div>
-      <div>
-        <label class="lbl">وقت الانتهاء</label>
-        <input class="inp" id="bf_end" type="time"/>
-      </div>
-    </div>
-    <button class="btn btn-navy btn-full" onclick="submitNewBundle()">إنشاء الباركود ←</button>
-  </div>`;
+
+  // Build teacher option HTML without nested template literals
+  function teacherOpts(filterRole) {
+    var filtered = filterRole
+      ? state.teachers.filter(function(t){ return t.role===filterRole; })
+      : [];
+    var all = state.teachers;
+    var html = "<option value=''>-- اختر --</option>";
+    if(filtered.length > 0) {
+      filtered.forEach(function(t){
+        html += "<option value='"+t.id+"'>"+t.name+(t.subject?" — "+t.subject:"")+"</option>";
+      });
+      html += "<optgroup label='── جميع المعلمين ──'>";
+    }
+    all.forEach(function(t){
+      html += "<option value='"+t.id+"'>"+t.name+(t.subject?" — "+t.subject:"")+"</option>";
+    });
+    if(filtered.length > 0) html += "</optgroup>";
+    return html;
+  }
+
+  function subjectOpts() {
+    return "<option value=''>-- اختر المادة --</option>" +
+      state.subjects.map(function(s){ return "<option>"+s+"</option>"; }).join("");
+  }
+  function gradeOpts() {
+    return "<option value=''>-- اختياري --</option>" +
+      state.grades.map(function(g){ return "<option>"+g+"</option>"; }).join("");
+  }
+  function dayOpts() {
+    return ["","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"]
+      .map(function(d){ return "<option value='"+d+"'>"+( d||"-- اليوم --")+"</option>"; }).join("");
+  }
+
+  el.innerHTML =
+    "<div class='card'>"+
+    "<p class='card-title'><span class='ct-icon' style='background:var(--greenBg);color:var(--green)'>✦</span>إنشاء مظروف جديد</p>"+
+    "<div class='g2' style='margin-bottom:10px'>"+
+      "<div><label class='lbl'>المادة *</label><select class='inp' id='bf_subject'>"+subjectOpts()+"</select></div>"+
+      "<div><label class='lbl'>الصف الدراسي</label><select class='inp' id='bf_grade'>"+gradeOpts()+"</select></div>"+
+    "</div>"+
+    "<div style='margin-bottom:10px'><label class='lbl'>عدد الأوراق في المظروف *</label>"+
+    "<input class='inp' id='bf_count' type='number' min='1' placeholder='مثال: 32'/></div>"+
+    "<p style='font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px'>تكليفات المظروف</p>"+
+    "<div class='g2' style='margin-bottom:10px'>"+
+      "<div><label class='lbl'>✏️ المصحح</label><select class='inp' id='bf_corrector'>"+teacherOpts("corrector")+"</select></div>"+
+      "<div><label class='lbl'>🔍 المراجع</label><select class='inp' id='bf_reviewer'>"+teacherOpts("reviewer")+"</select></div>"+
+    "</div>"+
+    "<div class='g2' style='margin-bottom:10px'>"+
+      "<div><label class='lbl'>🔏 المدقق الأول</label><select class='inp' id='bf_auditor'>"+teacherOpts("auditor")+"</select></div>"+
+      "<div><label class='lbl'>🔏 المدقق الثاني <span style='font-weight:400;color:var(--muted)'>(اختياري)</span></label>"+
+      "<select class='inp' id='bf_auditor2'>"+teacherOpts("auditor")+"</select></div>"+
+    "</div>"+
+    "<div style='margin-bottom:10px'><label class='lbl'>ملاحظة</label>"+
+    "<input class='inp' id='bf_note' placeholder='ملاحظة اختيارية...'/></div>"+
+    "<p style='font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px'>📅 بيانات الاختبار</p>"+
+    "<div class='g3' style='margin-bottom:10px'>"+
+      "<div><label class='lbl'>يوم الاختبار</label><select class='inp' id='bf_day'>"+dayOpts()+"</select></div>"+
+      "<div><label class='lbl'>تاريخ الاختبار</label><input class='inp' id='bf_examdate' type='date'/></div>"+
+      "<div><label class='lbl'>القاعة / اللجنة</label><input class='inp' id='bf_hall' placeholder='مثال: قاعة A'/></div>"+
+    "</div>"+
+    "<div class='g2' style='margin-bottom:14px'>"+
+      "<div><label class='lbl'>وقت البدء</label><input class='inp' id='bf_start' type='time'/></div>"+
+      "<div><label class='lbl'>وقت الانتهاء</label><input class='inp' id='bf_end' type='time'/></div>"+
+    "</div>"+
+    "<button class='btn btn-navy btn-full' onclick='submitNewBundle()'>إنشاء الباركود ←</button>"+
+    "</div>";
 }
 
 function submitNewBundle() {
@@ -1111,13 +1131,13 @@ function submitNewBundle() {
   const corrector = document.getElementById("bf_corrector").value;
   const reviewer  = document.getElementById("bf_reviewer").value;
   const auditor   = document.getElementById("bf_auditor").value;
-  const auditor2  = document.getElementById("bf_auditor2")?.value||"";
+  const auditor2  = (document.getElementById("bf_auditor2")||{value:""}).value||"";
   const note      = document.getElementById("bf_note").value;
-  const examDay   = document.getElementById("bf_day")?.value||"";
-  const examDate  = document.getElementById("bf_examdate")?.value||"";
-  const examHall  = document.getElementById("bf_hall")?.value||"";
-  const examStart = document.getElementById("bf_start")?.value||"";
-  const examEnd   = document.getElementById("bf_end")?.value||"";
+  const examDay   = (document.getElementById("bf_day")||{value:""}).value||"";
+  const examDate  = (document.getElementById("bf_examdate")||{value:""}).value||"";
+  const examHall  = (document.getElementById("bf_hall")||{value:""}).value||"";
+  const examStart = (document.getElementById("bf_start")||{value:""}).value||"";
+  const examEnd   = (document.getElementById("bf_end")||{value:""}).value||"";
   if(!subject) { toast("اختر المادة","err"); return; }
   if(!count||isNaN(count)||+count<1) { toast("أدخل عدد الأوراق","err"); return; }
   const b = {
@@ -1136,107 +1156,101 @@ function submitNewBundle() {
 }
 
 function renderBundleSuccess(el, b) {
-  const corrT = state.teachers.find(t=>t.id===b.corrector);
-  const revT  = state.teachers.find(t=>t.id===b.reviewer);
-  const audT  = state.teachers.find(t=>t.id===b.auditor);
-  const examInfo = [
-    b.examDay, b.examDate, b.examHall,
-    b.examStart?(b.examStart+(b.examEnd?" — "+b.examEnd:"")):"",
-  ].filter(Boolean).join(" · ");
-  el.innerHTML = `
-  <div class="card" style="text-align:center">
-    <div style="width:64px;height:64px;background:var(--greenBg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:32px">✓</div>
-    <h3 style="color:var(--green);font-size:18px;font-weight:800;margin-bottom:4px">تم إنشاء المظروف بنجاح</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
-    <!-- QR Code -->
-    <div class="qr-wrap" id="qrArea_${b.id}">${makeQR(b.barcode,160)}</div>
-    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:4px 0 16px">${b.barcode}</p>
-    <!-- Assignments -->
-    ${(corrT||revT||audT)?`
-    <div style="background:var(--blueBg);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--blue);margin-bottom:10px;text-align:right;border:1px solid rgba(37,99,235,.15)">
-      ${corrT?"✏️ المصحح: <strong>"+corrT.name+"</strong>&nbsp;&nbsp;":""}
-      ${revT?"🔍 المراجع: <strong>"+revT.name+"</strong>&nbsp;&nbsp;":""}
-      ${audT?"🔏 المدقق الأول: <strong>"+audT.name+"</strong>&nbsp;&nbsp;":""}
-      ${(()=>{ const a2=state.teachers.find(t=>t.id===newBundle.auditor2); return a2?"🔏 المدقق الثاني: <strong>"+a2.name+"</strong>":""; })()}
-    </div>`:""}
-    <!-- Exam info -->
-    ${examInfo?`<div style="background:var(--purBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--purple);margin-bottom:10px;text-align:right;border:1px solid rgba(124,58,237,.15)">📅 ${examInfo}</div>`:""}
-    <!-- Print hint -->
-    <div style="background:var(--amberBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px;border:1px solid rgba(180,83,9,.15)">
-      📌 اطبع هذا الباركود وألصقه على المظروف
-    </div>
-    <!-- Buttons -->
-    <div class="row" style="gap:8px">
-      <button class="btn btn-navy" style="flex:1" onclick="printBundleFull('${b.id}')">🖨️ طباعة الباركود</button>
-      <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo('admin_new')">➕ مظروف آخر</button>
-    </div>
-    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="navigateTo('admin_list')">◈ عرض كل المظاريف</button>
-  </div>`;
+  const corrT = state.teachers.find(function(t){ return t.id===b.corrector; });
+  const revT  = state.teachers.find(function(t){ return t.id===b.reviewer; });
+  const audT  = state.teachers.find(function(t){ return t.id===b.auditor; });
+  const audT2 = state.teachers.find(function(t){ return t.id===b.auditor2; });
+  const examParts = [b.examDay, b.examDate, b.examHall,
+    b.examStart ? (b.examStart + (b.examEnd ? " — "+b.examEnd : "")) : ""].filter(Boolean);
+  const examInfo = examParts.join(" · ");
+
+  let assignHtml = "";
+  if(corrT||revT||audT) {
+    assignHtml = "<div style='background:var(--blueBg);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--blue);margin-bottom:10px;text-align:right;border:1px solid rgba(37,99,235,.15)'>";
+    if(corrT)  assignHtml += "✏️ المصحح: <strong>"+corrT.name+"</strong>&nbsp;&nbsp;";
+    if(revT)   assignHtml += "🔍 المراجع: <strong>"+revT.name+"</strong>&nbsp;&nbsp;";
+    if(audT)   assignHtml += "🔏 المدقق الأول: <strong>"+audT.name+"</strong>";
+    if(audT2)  assignHtml += "&nbsp;&nbsp;🔏 المدقق الثاني: <strong>"+audT2.name+"</strong>";
+    assignHtml += "</div>";
+  }
+  const examHtml = examInfo
+    ? "<div style='background:var(--purBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--purple);margin-bottom:10px;text-align:right;border:1px solid rgba(124,58,237,.15)'>📅 "+examInfo+"</div>"
+    : "";
+
+  el.innerHTML =
+    "<div class='card' style='text-align:center'>"+
+    "<div style='width:64px;height:64px;background:var(--greenBg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:32px'>✓</div>"+
+    "<h3 style='color:var(--green);font-size:18px;font-weight:800;margin-bottom:4px'>تم إنشاء المظروف بنجاح</h3>"+
+    "<p style='color:var(--muted);font-size:13px;margin-bottom:20px'>"+b.subject+(b.grade?" — "+b.grade:"")+" · "+b.count+" ورقة</p>"+
+    "<div class='qr-wrap' id='qrArea_"+b.id+"'>"+makeQR(b.barcode,160)+"</div>"+
+    "<p style='font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:4px 0 16px'>"+b.barcode+"</p>"+
+    assignHtml + examHtml +
+    "<div style='background:var(--amberBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px;border:1px solid rgba(180,83,9,.15)'>"+
+    "📌 اطبع هذا الباركود وألصقه على المظروف</div>"+
+    "<div class='row' style='gap:8px'>"+
+      "<button class='btn btn-navy' style='flex:1' onclick="printBundleFull('"+b.id+"')">🖨️ طباعة الباركود</button>"+
+      "<button class='btn btn-mid' style='flex:1' onclick="_newBundleCreated=null;navigateTo('admin_new')">➕ مظروف آخر</button>"+
+    "</div>"+
+    "<button class='btn btn-outline' style='width:100%;margin-top:8px' onclick="navigateTo('admin_list')">◈ عرض كل المظاريف</button>"+
+    "</div>";
 }
 
 function printBundleFull(bundleId) {
-  const b = state.bundles.find(x=>x.id===bundleId);
+  const b = state.bundles.find(function(x){ return x.id===bundleId; });
   if(!b){ toast("المظروف غير موجود","err"); return; }
-  const corrT = state.teachers.find(t=>t.id===b.corrector);
-  const revT  = state.teachers.find(t=>t.id===b.reviewer);
-  const audT  = state.teachers.find(t=>t.id===b.auditor);
-  const examInfo = [b.examDay,b.examDate,b.examHall,
-    b.examStart?(b.examStart+(b.examEnd?" — "+b.examEnd:"")):""]
-    .filter(Boolean).join(" · ");
+  const corrT = state.teachers.find(function(t){ return t.id===b.corrector; });
+  const revT  = state.teachers.find(function(t){ return t.id===b.reviewer; });
+  const audT  = state.teachers.find(function(t){ return t.id===b.auditor; });
+  const audT2 = state.teachers.find(function(t){ return t.id===b.auditor2; });
+  const examParts = [b.examDay, b.examDate, b.examHall,
+    b.examStart?(b.examStart+(b.examEnd?" — "+b.examEnd:"")):""].filter(Boolean);
+
+  let rows = "";
+  rows += "<tr><td>المادة</td><td>"+b.subject+"</td></tr>";
+  if(b.grade)     rows += "<tr><td>الصف</td><td>"+b.grade+"</td></tr>";
+  rows += "<tr><td>عدد الأوراق</td><td>"+b.count+" ورقة</td></tr>";
+  if(b.examDate)  rows += "<tr><td>تاريخ الاختبار</td><td>"+(b.examDay||"")+" "+b.examDate+"</td></tr>";
+  if(b.examStart) rows += "<tr><td>الوقت</td><td>"+b.examStart+(b.examEnd?" — "+b.examEnd:"")+"</td></tr>";
+  if(b.examHall)  rows += "<tr><td>القاعة</td><td>"+b.examHall+"</td></tr>";
+  if(corrT)       rows += "<tr><td>المصحح</td><td>"+corrT.name+"</td></tr>";
+  if(revT)        rows += "<tr><td>المراجع</td><td>"+revT.name+"</td></tr>";
+  if(audT)        rows += "<tr><td>المدقق الأول</td><td>"+audT.name+"</td></tr>";
+  if(audT2)       rows += "<tr><td>المدقق الثاني</td><td>"+audT2.name+"</td></tr>";
+
   const win = window.open("","_blank","width=520,height=680");
-  win.document.write(`<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8"/>
-<title>طباعة الباركود — ${b.barcode}</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700;900&display=swap" rel="stylesheet"/>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#0B1D3A;padding:32px 28px;text-align:center}
-  .school{font-size:15px;font-weight:700;color:#0B1D3A;margin-bottom:2px}
-  .sub{font-size:12px;color:#8A95AE;margin-bottom:20px}
-  .qr-box{display:flex;justify-content:center;margin-bottom:12px}
-  .qr-box svg{border:2px solid #0B1D3A;border-radius:8px}
-  .barcode{font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:#0B1D3A;margin-bottom:18px}
-  .info-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;text-align:right}
-  .info-table td{padding:6px 10px;border-bottom:1px solid #EEF1F8}
-  .info-table td:first-child{color:#8A95AE;font-weight:600;width:35%}
-  .info-table td:last-child{font-weight:700;color:#0B1D3A}
-  .hint{background:#FEF3C7;border-radius:8px;padding:9px 13px;font-size:11px;color:#B45309;margin-bottom:20px;border:1px solid #FDE68A}
-  .actions{display:flex;gap:8px;justify-content:center}
-  .btn{padding:9px 22px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit}
-  .btn-print{background:#0B1D3A;color:#fff}
-  .btn-close{background:#F1F3F8;color:#4E5D7A}
-  @media print{.actions{display:none}body{padding:16px}}
-</style>
-</head>
-<body>
-  <p class="school">${state.schoolName}</p>
-  <p class="sub">بطاقة تعريف المظروف</p>
-  <div class="qr-box">${makeQR(b.barcode,170)}</div>
-  <p class="barcode">${b.barcode}</p>
-  <table class="info-table">
-    <tr><td>المادة</td><td>${b.subject}</td></tr>
-    ${b.grade?`<tr><td>الصف</td><td>${b.grade}</td></tr>`:""}
-    <tr><td>عدد الأوراق</td><td>${b.count} ورقة</td></tr>
-    ${b.examDate?`<tr><td>تاريخ الاختبار</td><td>${b.examDay||""} ${b.examDate}</td></tr>`:""}
-    ${b.examStart?`<tr><td>الوقت</td><td>${b.examStart}${b.examEnd?" — "+b.examEnd:""}</td></tr>`:""}
-    ${b.examHall?`<tr><td>القاعة</td><td>${b.examHall}</td></tr>`:""}
-    ${corrT?`<tr><td>المصحح</td><td>${corrT.name}</td></tr>`:""}
-    ${revT?`<tr><td>المراجع</td><td>${revT.name}</td></tr>`:""}
-    ${audT?`<tr><td>المدقق الأول</td><td>${audT.name}</td></tr>`:""}
-    ${(()=>{ const a2=state.teachers.find(t=>t.id===b.auditor2); return a2?`<tr><td>المدقق الثاني</td><td>${a2.name}</td></tr>`:""; })()}
-  </table>
-  <div class="hint">📌 الصق هذا الباركود على المظروف قبل توزيع الأوراق</div>
-  <div class="actions">
-    <button class="btn btn-print" onclick="window.print()">🖨️ طباعة</button>
-    <button class="btn btn-close" onclick="window.close()">إغلاق</button>
-  </div>
-</body>
-</html>`);
+  const html = "<!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='UTF-8'/>"
+    + "<title>طباعة الباركود — "+b.barcode+"</title>"
+    + "<link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700;900&display=swap' rel='stylesheet'/>"
+    + "<style>*{box-sizing:border-box;margin:0;padding:0}"
+    + "body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#0B1D3A;padding:32px 28px;text-align:center}"
+    + ".school{font-size:15px;font-weight:700;color:#0B1D3A;margin-bottom:2px}"
+    + ".sub{font-size:12px;color:#8A95AE;margin-bottom:20px}"
+    + ".qr-box{display:flex;justify-content:center;margin-bottom:12px}"
+    + ".qr-box svg{border:2px solid #0B1D3A;border-radius:8px}"
+    + ".barcode{font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:#0B1D3A;margin-bottom:18px}"
+    + "table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;text-align:right}"
+    + "td{padding:6px 10px;border-bottom:1px solid #EEF1F8}"
+    + "td:first-child{color:#8A95AE;font-weight:600;width:35%}"
+    + "td:last-child{font-weight:700;color:#0B1D3A}"
+    + ".hint{background:#FEF3C7;border-radius:8px;padding:9px 13px;font-size:11px;color:#B45309;margin-bottom:20px;border:1px solid #FDE68A}"
+    + ".actions{display:flex;gap:8px;justify-content:center}"
+    + ".btn{padding:9px 22px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit}"
+    + ".btn-print{background:#0B1D3A;color:#fff}.btn-close{background:#F1F3F8;color:#4E5D7A}"
+    + "@media print{.actions{display:none}body{padding:16px}}</style></head><body>"
+    + "<p class='school'>متابعة سير الاختبارات الإلكتروني</p>"
+    + "<p class='sub'>بطاقة تعريف المظروف</p>"
+    + "<div class='qr-box'>"+makeQR(b.barcode,170)+"</div>"
+    + "<p class='barcode'>"+b.barcode+"</p>"
+    + "<table><tbody>"+rows+"</tbody></table>"
+    + "<div class='hint'>📌 الصق هذا الباركود على المظروف قبل توزيع الأوراق</div>"
+    + "<div class='actions'>"
+    + "<button class='btn btn-print' onclick='window.print()'>🖨️ طباعة</button>"
+    + "<button class='btn btn-close' onclick='window.close()'>إغلاق</button>"
+    + "</div></body></html>";
+
+  win.document.write(html);
   win.document.close();
 }
-
 
 function renderAdminList(el) {
   if(state.bundles.length===0) {
@@ -1298,68 +1312,69 @@ function adminDeleteBundle(id) {
 }
 
 function adminEditBundle(id) {
-  const b = state.bundles.find(x=>x.id===id);
-  if(!b)return;
-  const overlay = document.createElement("div");
-  overlay.className="overlay";
-  overlay.id="editOverlay";
-  overlay.innerHTML=`
-  <div class="modal">
-    <p class="modalTitle">✏️ تعديل المظروف — ${b.barcode}</p>
-    <label class="lbl">المادة</label>
-    <select class="inp" id="eb_subject" style="margin-bottom:10px">
-      ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${s}</option>`).join("")}
-    </select>
-    <label class="lbl">الصف</label>
-    <select class="inp" id="eb_grade" style="margin-bottom:10px">
-      <option value="">-- اختياري --</option>
-      ${state.grades.map(g=>`<option${g===b.grade?" selected":""}>${g}</option>`).join("")}
-    </select>
-    <label class="lbl">عدد الأوراق</label>
-    <input class="inp" id="eb_count" type="number" value="${b.count}" style="margin-bottom:10px"/>
-    <label class="lbl">المصحح</label>
-    <select class="inp" id="eb_corrector" style="margin-bottom:10px">
-      <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector?" selected":""}>${t.name}</option>`).join("")}
-    </select>
-    <label class="lbl">المراجع</label>
-    <select class="inp" id="eb_reviewer" style="margin-bottom:10px">
-      <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer?" selected":""}>${t.name}</option>`).join("")}
-    </select>
-    <label class="lbl">المدقق</label>
-    <select class="inp" id="eb_auditor" style="margin-bottom:16px">
-      <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${t.name}</option>`).join("")}
-    </select>
-    <p style="font-size:12px;font-weight:700;color:var(--mid);margin:8px 0 6px">📅 بيانات الاختبار</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">اليوم</label>
-        <select class="inp" id="eb_day" style="font-size:12px">
-          <option value="">-- اليوم --</option>
-          <option ${b.examDay=='الأحد'?'selected':''}">الأحد</option>
-          <option ${b.examDay=='الاثنين'?'selected':''}">الاثنين</option>
-          <option ${b.examDay=='الثلاثاء'?'selected':''}">الثلاثاء</option>
-          <option ${b.examDay=='الأربعاء'?'selected':''}">الأربعاء</option>
-          <option ${b.examDay=='الخميس'?'selected':''}">الخميس</option>
-        </select></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ</label>
-        <input class="inp" id="eb_examdate" type="date" value="${b.examDate||''}" style="font-size:12px"/></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">القاعة</label>
-        <input class="inp" id="eb_hall" value="${b.examHall||''}" style="font-size:12px"/></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت البدء</label>
-        <input class="inp" id="eb_start" type="time" value="${b.examStart||''}" style="font-size:12px"/></div>
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت الانتهاء</label>
-      <input class="inp" id="eb_end" type="time" value="${b.examEnd||''}" style="font-size:12px"/>
-    </div>
-    <div class="row">
-      <button class="btn btn-navy" style="flex:1" onclick="saveEditBundle('${b.id}')">💾 حفظ</button>
-      <button class="btn btn-mid" style="flex:1" onclick="document.getElementById('editOverlay').remove()">إلغاء</button>
-    </div>
-  </div>`;
+  const b = state.bundles.find(function(x){ return x.id===id; });
+  if(!b) return;
+
+  function tOpts(selId) {
+    var html = "<option value=''>-- اختر --</option>";
+    state.teachers.forEach(function(t){
+      html += "<option value='"+t.id+"'"+(t.id===selId?" selected":"")+">"+t.name+"</option>";
+    });
+    return html;
+  }
+  function sOpts() {
+    return state.subjects.map(function(s){
+      return "<option"+(s===b.subject?" selected":"")+">"+s+"</option>";
+    }).join("");
+  }
+  function gOpts() {
+    return "<option value=''>-- اختياري --</option>"+
+      state.grades.map(function(g){
+        return "<option"+(g===b.grade?" selected":"")+">"+g+"</option>";
+      }).join("");
+  }
+
+  var overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.id = "editOverlay";
+  overlay.innerHTML =
+    "<div class='modal' style='max-width:460px'>"+
+    "<p class='modal-title'>✏️ تعديل المظروف — "+b.barcode+"</p>"+
+    "<label class='lbl'>المادة</label>"+
+    "<select class='inp' id='eb_subject' style='margin-bottom:10px'><option value=''>-- المادة --</option>"+sOpts()+"</select>"+
+    "<label class='lbl'>الصف</label>"+
+    "<select class='inp' id='eb_grade' style='margin-bottom:10px'>"+gOpts()+"</select>"+
+    "<label class='lbl'>عدد الأوراق</label>"+
+    "<input class='inp' id='eb_count' type='number' value='"+b.count+"' style='margin-bottom:10px'/>"+
+    "<div class='g3' style='margin-bottom:8px'>"+
+      "<div><label class='lbl' style='font-size:11px'>المصحح</label><select class='inp' id='eb_corrector' style='font-size:12px'>"+tOpts(b.corrector)+"</select></div>"+
+      "<div><label class='lbl' style='font-size:11px'>المراجع</label><select class='inp' id='eb_reviewer' style='font-size:12px'>"+tOpts(b.reviewer)+"</select></div>"+
+      "<div><label class='lbl' style='font-size:11px'>المدقق الأول</label><select class='inp' id='eb_auditor' style='font-size:12px'>"+tOpts(b.auditor)+"</select></div>"+
+    "</div>"+
+    "<div style='margin-bottom:12px'><label class='lbl' style='font-size:11px'>المدقق الثاني</label>"+
+    "<select class='inp' id='eb_auditor2' style='font-size:12px'>"+tOpts(b.auditor2||"")+"</select></div>"+
+    "<p style='font-size:12px;font-weight:700;color:var(--mid);margin:8px 0 6px'>📅 بيانات الاختبار</p>"+
+    "<div class='g2' style='margin-bottom:8px'>"+
+      "<div><label class='lbl' style='font-size:11px'>اليوم</label>"+
+      "<select class='inp' id='eb_day' style='font-size:12px'>"+
+        ["","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"].map(function(d){
+          return "<option value='"+d+"'"+(d===b.examDay?" selected":"")+">"+( d||"-- اليوم --")+"</option>";
+        }).join("")+
+      "</select></div>"+
+      "<div><label class='lbl' style='font-size:11px'>التاريخ</label>"+
+      "<input class='inp' id='eb_examdate' type='date' value='"+(b.examDate||"")+"' style='font-size:12px'/></div>"+
+    "</div>"+
+    "<div class='g2' style='margin-bottom:12px'>"+
+      "<div><label class='lbl' style='font-size:11px'>القاعة</label><input class='inp' id='eb_hall' value='"+(b.examHall||"")+"' style='font-size:12px'/></div>"+
+      "<div><label class='lbl' style='font-size:11px'>وقت البدء</label><input class='inp' id='eb_start' type='time' value='"+(b.examStart||"")+"' style='font-size:12px'/></div>"+
+    "</div>"+
+    "<div class='row'>"+
+      "<button class='btn btn-navy' style='flex:1' onclick="saveEditBundle('"+b.id+"')">💾 حفظ</button>"+
+      "<button class='btn btn-mid' style='flex:1' onclick="document.getElementById('editOverlay').remove()">إلغاء</button>"+
+    "</div></div>";
+
   document.body.appendChild(overlay);
+  overlay.addEventListener("click", function(e){ if(e.target===overlay) overlay.remove(); });
 }
 
 function saveEditBundle(id) {
@@ -1371,12 +1386,12 @@ function saveEditBundle(id) {
   b.corrector = document.getElementById("eb_corrector").value;
   b.reviewer  = document.getElementById("eb_reviewer").value;
   b.auditor   = document.getElementById("eb_auditor").value;
-  b.auditor2  = document.getElementById("eb_auditor2")?.value||"";
-  b.examDay   = document.getElementById("eb_day")?.value||b.examDay||"";
-  b.examDate  = document.getElementById("eb_examdate")?.value||b.examDate||"";
-  b.examHall  = document.getElementById("eb_hall")?.value||b.examHall||"";
-  b.examStart = document.getElementById("eb_start")?.value||b.examStart||"";
-  b.examEnd   = document.getElementById("eb_end")?.value||b.examEnd||"";
+  b.auditor2  = (document.getElementById("eb_auditor2")||{value:""}).value||"";
+  b.examDay   = (document.getElementById("eb_day")||{value:""}).value||b.examDay||"";
+  b.examDate  = (document.getElementById("eb_examdate")||{value:""}).value||b.examDate||"";
+  b.examHall  = (document.getElementById("eb_hall")||{value:""}).value||b.examHall||"";
+  b.examStart = (document.getElementById("eb_start")||{value:""}).value||b.examStart||"";
+  b.examEnd   = (document.getElementById("eb_end")||{value:""}).value||b.examEnd||"";
   saveState();
   saveBundleToCloud(b);
   document.getElementById("editOverlay").remove();
@@ -1667,7 +1682,7 @@ function renderStageSelector() {
 function doAdvance() {
   if(_confirmStg===null||!_scanHit)return;
   const idx=_confirmStg;
-  const note=document.getElementById("stageNote")?.value||"";
+  const note=(document.getElementById("stageNote")||{value:""}).value||"";
   const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
   const b=state.bundles.find(x=>x.id===_scanHit.id);
   if(!b)return;
@@ -1789,12 +1804,12 @@ function updatePreview() {
   const msg=msgEl.value.trim();
   if(!msg||_selTeachers.length===0){ prevEl.innerHTML=""; return; }
   const nt=NOTIFY_TYPES.find(t=>t.key===_selType);
-  const names=_selTeachers.map(id=>state.teachers.find(t=>t.id===id)?.name||"").filter(Boolean).join("، ");
+  const names=_selTeachers.map(id=>state.teachers.find(function(t){return t.id===id;})||{name:""}).name||"").filter(Boolean).join("، ");
   prevEl.innerHTML=`
   <div style="background:var(--bg);border-radius:10px;padding:12px 14px;border:1px solid var(--border)">
     <p style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:6px">معاينة الرسالة</p>
-    <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:1px solid ${nt?.color||"var(--border)"}40">
-      <p style="font-weight:800;color:${nt?.color};font-size:13px;margin-bottom:4px">${nt?.icon} ${nt?.label}</p>
+    <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:1px solid ${(nt&&nt.color)||"var(--border)"}40">
+      <p style="font-weight:800;color:${(nt&&nt.color)};font-size:13px;margin-bottom:4px">${(nt&&nt.icon)} ${(nt&&nt.label)}</p>
       <p style="font-size:13px;color:var(--text);margin-bottom:4px">${msg}</p>
       <p style="font-size:11px;color:var(--muted)">إلى: ${names}</p>
     </div>
@@ -1803,20 +1818,20 @@ function updatePreview() {
 
 function sendNotif() {
   if(_selTeachers.length===0){ toast("اختر معلماً على الأقل","err"); return; }
-  const msg=document.getElementById("notif_msg")?.value.trim();
+  const msg=(document.getElementById("notif_msg")||{value:""}).value.trim();
   if(!msg){ toast("أدخل نص الرسالة","err"); return; }
   const nt=NOTIFY_TYPES.find(t=>t.key===_selType);
   const bundle=state.bundles.find(b=>b.id===_selBundle)||null;
   const teachers=_selTeachers.map(id=>state.teachers.find(t=>t.id===id)).filter(Boolean);
 
   // Full WA message
-  const fullMsg=`*${nt?.icon} ${nt?.label}*\n${state.schoolName}\n\n${msg}${bundle?`\n\nالمظروف: ${bundle.barcode} — ${bundle.subject}`:""}\n\n— ${currentUser.name}`;
+  const fullMsg=`*${(nt&&nt.icon)} ${(nt&&nt.label)}*\n${state.schoolName}\n\n${msg}${bundle?`\n\nالمظروف: ${bundle.barcode} — ${bundle.subject}`:""}\n\n— ${currentUser.name}`;
 
   // Save to log
   // notifLog saved after push
   state.notifLog.unshift({
     id:uid(), ts:nowISO(), type:_selType,
-    typeLabel:nt?.label, typeColor:nt?.color, typeIcon:nt?.icon,
+    typeLabel:(nt&&nt.label), typeColor:(nt&&nt.color), typeIcon:(nt&&nt.icon),
     teachers, message:msg, bundle, sentBy:currentUser.name, waMsg:fullMsg,
   });
   saveState();
@@ -1919,13 +1934,19 @@ function renderSGeneral(el) {
       document.getElementById('hSchool').textContent=state.schoolName;
       document.getElementById('loginSchoolName').textContent=state.schoolName;
       saveState();toast('تم الحفظ ✅')">💾 حفظ</button>
-    <div style="background:var(--greenBg);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid #86EFAC">
+    <div style="background:var(--greenBg);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid #86EFAC;margin-bottom:10px">
       <span style="font-size:20px">☁️</span>
-      <div>
-        <p style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:2px">متصل بقاعدة البيانات</p>
+      <div style="flex:1">
+        <p style="font-weight:700;color:var(--green);font-size:12px;margin-bottom:2px">متصل بقاعدة البيانات المشتركة</p>
         <p style="font-size:11px;color:var(--green);font-family:monospace;direction:ltr">https://sdufrvefwvnojwaxodvd.supabase.co</p>
       </div>
     </div>
+    <button class="btn btn-navy btn-full" onclick="forceSyncAll()" style="margin-bottom:10px">
+      ☁️ مزامنة فورية — رفع جميع البيانات للسحابة
+    </button>
+    <button class="btn btn-full" style="background:var(--blue)" onclick="loadState().then(()=>{ renderLoginDemos(); toast('✅ تم تحديث البيانات من السحابة'); })">
+      ⬇️ تحديث — جلب أحدث البيانات من السحابة
+    </button>
   </div>
   </div>`;
 }
@@ -2092,11 +2113,11 @@ function renderSTeachers(el) {
 }
 
 function addTeacher() {
-  const name    = document.getElementById("nt_name")?.value.trim();
-  const phone   = document.getElementById("nt_phone")?.value.trim()||"";
-  const subject = document.getElementById("nt_subject")?.value||"";
-  const grade   = document.getElementById("nt_grade")?.value||"";
-  const role    = document.getElementById("nt_role")?.value||"corrector";
+  const name    = (document.getElementById("nt_name")||{value:""}).value.trim();
+  const phone   = (document.getElementById("nt_phone")||{value:""}).value.trim()||"";
+  const subject = (document.getElementById("nt_subject")||{value:""}).value||"";
+  const grade   = (document.getElementById("nt_grade")||{value:""}).value||"";
+  const role    = (document.getElementById("nt_role")||{value:""}).value||"corrector";
   if(!name){ toast("أدخل اسم المعلم","err"); return; }
   state.teachers.push({ id:"T"+uid(), name, phone, subject, grade, role });
   saveState();
@@ -2137,7 +2158,7 @@ function renderSUsers(el) {
             <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${u.username}</span>
           </div>
           <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
-          ${u.id!==currentUser?.id?`<button class="del-btn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
+          ${u.id!==(currentUser&&currentUser.id)?`<button class="del-btn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
         </div>`;
       }).join("")}
     </div>
@@ -2160,10 +2181,10 @@ function renderSUsers(el) {
 }
 
 function addUser() {
-  const name=document.getElementById("nu_name")?.value.trim();
-  const username=document.getElementById("nu_user")?.value.trim();
-  const password=document.getElementById("nu_pass")?.value;
-  const role=document.getElementById("nu_role")?.value;
+  const name=(document.getElementById("nu_name")||{value:""}).value.trim();
+  const username=(document.getElementById("nu_user")||{value:""}).value.trim();
+  const password=(document.getElementById("nu_pass")||{value:""}).value;
+  const role=(document.getElementById("nu_role")||{value:""}).value;
   if(!name||!username||!password){ toast("أكمل البيانات","err"); return; }
   if(state.users.find(u=>u.username===username)){ toast("اسم المستخدم موجود مسبقاً","err"); return; }
   state.users.push({ id:"U"+uid(), name, username, password, role });
@@ -2506,7 +2527,7 @@ function generatePDF(subjectFilter) {
     subject: subjectFilter==="ALL"?"جميع المواد":subjectFilter,
     bundleCount: bundles.length,
     paperCount: bundles.reduce((a,b)=>a+b.count,0),
-    generatedBy: currentUser?.name||"—",
+    generatedBy: (currentUser&&currentUser.name)||"—",
   };
   state.reportLog.unshift(reportEntry);
   saveState();
@@ -2782,25 +2803,25 @@ function openEditTeacher(id) {
 function saveEditTeacher(id) {
   const t = state.teachers.find(x=>x.id===id);
   if(!t) return;
-  const name = document.getElementById("et_name")?.value.trim();
+  const name = (document.getElementById("et_name")||{value:""}).value.trim();
   if(!name){ toast("الاسم مطلوب","err"); return; }
   t.name    = name;
-  t.phone   = document.getElementById("et_phone")?.value.trim()||t.phone||"";
-  t.subject = document.getElementById("et_subject")?.value||t.subject||"";
-  t.grade   = document.getElementById("et_grade")?.value||t.grade||"";
-  t.role    = document.getElementById("et_role")?.value||t.role;
-  t.note    = document.getElementById("et_note")?.value.trim()||"";
+  t.phone   = (document.getElementById("et_phone")||{value:""}).value.trim()||t.phone||"";
+  t.subject = (document.getElementById("et_subject")||{value:""}).value||t.subject||"";
+  t.grade   = (document.getElementById("et_grade")||{value:""}).value||t.grade||"";
+  t.role    = (document.getElementById("et_role")||{value:""}).value||t.role;
+  t.note    = (document.getElementById("et_note")||{value:""}).value.trim()||"";
   saveState();
-  document.getElementById("editTeacherOverlay")?.remove();
+  (document.getElementById("editTeacherOverlay")||{remove:""}).remove();
   toast("✅ تم حفظ التعديلات");
   renderSTabContent();
 }
 
 
 function filterTeachers() {
-  const q     = (document.getElementById("teacherSearch")?.value||"").trim().toLowerCase();
-  const role  = document.getElementById("teacherRoleFilter")?.value||"";
-  const grade = document.getElementById("teacherGradeFilter")?.value||"";
+  const q     = ((document.getElementById("teacherSearch")||{value:""}).value||"").trim().toLowerCase();
+  const role  = (document.getElementById("teacherRoleFilter")||{value:""}).value||"";
+  const grade = (document.getElementById("teacherGradeFilter")||{value:""}).value||"";
   const container = document.getElementById("teacherListContainer");
   if(!container) return;
   const filtered = state.teachers.filter(t => {
@@ -2880,6 +2901,8 @@ function deleteNotif(id) {
     sessionStorage.removeItem("examSession");
   }
 })();
+
+
 
 
 
