@@ -2,488 +2,512 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>نظام تتبع مظاريف الاختبارات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0B1D3A;--navy2:#142849;--navy3:#1D3561;
+  --gold:#C9961E;--goldL:#F2B830;--goldD:#A07818;
+  --bg:#EAEEF6;--surface:#F5F7FC;--white:#FFFFFF;
+  --border:#CDD4E4;--border2:#B8C2D8;
+  --text:#0B1D3A;--mid:#4E5D7A;--muted:#8A95AE;--faint:#C0C8D8;
+  --green:#0F7540;--greenBg:#D1FAE5;--greenM:#059669;
+  --red:#C41C1C;--redBg:#FEE2E2;
+  --amber:#B45309;--amberBg:#FEF3C7;--amberL:#F59E0B;
+  --blue:#1E40AF;--blueBg:#DBEAFE;--blueM:#2563EB;
+  --purple:#5B21B6;--purBg:#EDE9FE;--purM:#7C3AED;
+  --wa:#128C7E;--waBg:#D1FAE5;--waL:#25D366;
+  --r6:6px;--r8:8px;--r10:10px;--r12:12px;--r14:14px;--r20:20px;
+  --sh1:0 1px 4px rgba(11,29,58,.08);
+  --sh2:0 4px 16px rgba(11,29,58,.10);
+  --sh3:0 8px 32px rgba(11,29,58,.14);
+  --sh4:0 20px 60px rgba(11,29,58,.22);
+}
+body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+@keyframes scanAnim{0%{top:4px;opacity:.9}50%{opacity:1}100%{top:calc(100% - 6px);opacity:.9}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── LOGIN ───────────────────────────────────── */
+#loginScreen{
+  min-height:100vh;
+  background:linear-gradient(145deg,var(--navy) 0%,var(--navy3) 60%,#1E4080 100%);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  position:relative;overflow:hidden;
+}
+#loginScreen::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 30% 80%,rgba(201,150,30,.12) 0%,transparent 60%),
+             radial-gradient(ellipse at 80% 20%,rgba(30,64,128,.4) 0%,transparent 50%);
+}
+.login-card{
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(20px);
+  border-radius:24px;padding:44px 40px;width:400px;max-width:100%;
+  box-shadow:0 32px 80px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.2);
+  position:relative;z-index:1;animation:fadeIn .4s ease;
+}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-icon{
+  width:72px;height:72px;border-radius:18px;
+  background:linear-gradient(135deg,var(--navy),var(--navy3));
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 14px;box-shadow:var(--sh3);
+  font-size:32px;
+}
+.login-logo h1{font-size:21px;font-weight:700;color:var(--navy);letter-spacing:-.3px}
+.login-logo p{font-size:12px;color:var(--muted);margin-top:5px;font-weight:400}
+.login-err{background:var(--redBg);color:var(--red);border-radius:var(--r8);padding:10px 14px;font-size:12px;font-weight:500;margin-bottom:14px;border:1px solid #FECACA}
+.login-field{margin-bottom:14px}
+.login-field label{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-weight:500}
+.demo-section{margin-top:22px;background:var(--bg);border-radius:var(--r10);padding:14px 16px;border:1px solid var(--border)}
+.demo-section p{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.demo-btn{
+  display:flex;align-items:center;gap:10px;width:100%;
+  background:none;border:none;cursor:pointer;padding:6px 2px;
+  border-radius:var(--r6);transition:background .15s;
+}
+.demo-btn:hover{background:rgba(11,29,58,.06)}
+.role-badge{
+  padding:3px 10px;border-radius:99px;
+  font-size:10px;font-weight:700;flex-shrink:0;letter-spacing:.3px;
+}
+.demo-creds{font-size:11px;color:var(--mid);font-family:monospace}
 
-  :root {
-    --navy:    #0D1F3C;
-    --navyM:   #162D52;
-    --navyL:   #1E3E6E;
-    --gold:    #C8911F;
-    --goldL:   #F0B429;
-    --bg:      #EEF1F8;
-    --white:   #FFFFFF;
-    --border:  #D2D8E8;
-    --text:    #0D1F3C;
-    --mid:     #56607A;
-    --muted:   #96A0B5;
-    --green:   #15803D;
-    --greenBg: #DCFCE7;
-    --red:     #DC2626;
-    --redBg:   #FEE2E2;
-    --amber:   #D97706;
-    --amberBg: #FEF3C7;
-    --blue:    #2563EB;
-    --blueBg:  #DBEAFE;
-    --purple:  #7C3AED;
-    --purBg:   #EDE9FE;
-    --wa:      #25D366;
-    --waBg:    #DCFCE7;
-  }
+/* ── APP SHELL ───────────────────────────────── */
+#appShell{display:none;min-height:100vh;flex-direction:column}
 
-  body {
-    font-family: 'Tajawal', Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    direction: rtl;
-  }
+/* HEADER */
+#appHeader{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy3) 100%);
+  padding:0 24px;height:58px;display:flex;align-items:center;gap:12px;
+  flex-shrink:0;box-shadow:0 2px 16px rgba(0,0,0,.25);
+  position:sticky;top:0;z-index:100;
+}
+.h-logo{
+  width:36px;height:36px;background:linear-gradient(135deg,var(--goldD),var(--goldL));
+  border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;box-shadow:0 2px 8px rgba(201,150,30,.4);
+}
+.h-title{color:#fff;font-weight:700;font-size:15px;flex:1;letter-spacing:-.2px}
+.h-role{
+  padding:4px 12px;border-radius:99px;
+  font-size:11px;font-weight:700;letter-spacing:.3px;
+}
+.h-user{color:rgba(255,255,255,.65);font-size:12px;font-weight:400}
+.h-logout{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  color:rgba(255,255,255,.85);cursor:pointer;font-size:12px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;font-weight:600;
+  padding:6px 12px;border-radius:var(--r8);transition:all .15s;
+}
+.h-logout:hover{background:rgba(220,38,38,.25);border-color:rgba(220,38,38,.4);color:#fff}
 
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+/* NAV */
+#appNav{
+  background:var(--white);border-bottom:1px solid var(--border);
+  display:flex;padding:0 16px;gap:0;overflow-x:auto;flex-shrink:0;
+  box-shadow:var(--sh1);
+}
+#appNav::-webkit-scrollbar{height:0}
+.nav-btn{
+  padding:14px 16px;border:none;border-bottom:3px solid transparent;
+  background:none;cursor:pointer;color:var(--muted);font-weight:500;
+  font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+}
+.nav-btn:hover{color:var(--navy);background:rgba(11,29,58,.04)}
+.nav-btn.active{color:var(--navy);font-weight:700;border-bottom-color:var(--gold)}
+.nav-icon{font-size:16px}
 
-  /* ── LOGIN ── */
-  #loginScreen {
-    min-height: 100vh;
-    background: linear-gradient(145deg, var(--navy) 0%, var(--navyL) 100%);
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-  }
-  .loginBox {
-    background: var(--white);
-    border-radius: 20px;
-    padding: 44px 36px;
-    width: 360px;
-    max-width: 100%;
-    box-shadow: 0 28px 70px rgba(0,0,0,.35);
-  }
-  .loginLogo {
-    text-align: center;
-    margin-bottom: 28px;
-  }
-  .loginLogo .icon { font-size: 48px; display: block; margin-bottom: 8px; }
-  .loginLogo h1 { font-size: 20px; font-weight: 900; color: var(--navy); }
-  .loginLogo p  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* MAIN */
+#appMain{flex:1;padding:24px;overflow-y:auto;background:linear-gradient(180deg,var(--bg) 0%,#E5E9F4 100%);min-height:calc(100vh - 116px)}
+.page-wrap{max-width:740px;margin:0 auto;animation:fadeIn .25s ease}
 
-  .demoRow {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 0; background: none; border: none;
-    cursor: pointer; width: 100%; text-align: right;
-  }
-  .roleTag {
-    padding: 2px 9px; border-radius: 10px;
-    font-size: 10px; font-weight: 700; flex-shrink: 0;
-  }
-  .demoMono { font-size: 11px; color: var(--mid); font-family: monospace; }
+/* ── CARDS ───────────────────────────────────── */
+.card{
+  background:var(--white);border-radius:var(--r14);padding:22px;
+  box-shadow:var(--sh1);margin-bottom:16px;
+  border:1px solid rgba(205,212,228,.5);
+  transition:box-shadow .2s;
+}
+.card:focus-within{box-shadow:var(--sh2)}
+.card-title{
+  font-size:15px;font-weight:700;color:var(--navy);
+  margin-bottom:16px;display:flex;align-items:center;gap:8px;
+  letter-spacing:-.2px;
+}
+.card-title .ct-icon{
+  width:30px;height:30px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  background:var(--bg);flex-shrink:0;
+}
 
-  /* ── SHELL ── */
-  #appShell { display: none; min-height: 100vh; flex-direction: column; }
+/* ── FORM ────────────────────────────────────── */
+.inp{
+  width:100%;padding:10px 12px;
+  border:1.5px solid var(--border);border-radius:var(--r8);
+  font-size:13px;outline:none;background:#fff;color:var(--text);
+  font-family:'IBM Plex Sans Arabic',sans-serif;
+  transition:border-color .18s,box-shadow .18s;font-weight:400;
+}
+.inp:focus{border-color:var(--navy3);box-shadow:0 0 0 3px rgba(29,53,97,.1)}
+.inp::placeholder{color:var(--faint)}
+.inp[dir="ltr"]{direction:ltr;font-family:monospace}
+textarea.inp{resize:vertical;line-height:1.65}
+select.inp{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238A95AE' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 10px center;padding-left:28px;appearance:none}
+label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-weight:600;letter-spacing:.1px}
 
-  /* HEADER */
-  #appHeader {
-    background: var(--navy);
-    padding: 0 20px;
-    height: 54px;
-    display: flex; align-items: center; gap: 10px;
-    flex-shrink: 0;
-    box-shadow: 0 2px 12px rgba(0,0,0,.3);
-  }
-  #appHeader .hLogo { font-size: 22px; }
-  #appHeader .hTitle { color: #fff; font-weight: 900; font-size: 15px; flex: 1; }
-  #appHeader .hRole {
-    padding: 3px 11px; border-radius: 12px;
-    font-size: 11px; font-weight: 700;
-  }
-  #appHeader .hUser { color: #8AABCF; font-size: 12px; }
-  #appHeader .hLogout {
-    background: none; border: none; color: #EF4444;
-    cursor: pointer; font-size: 12px; font-family: 'Tajawal', sans-serif;
-    font-weight: 700; padding: 4px 8px;
-  }
+/* ── BUTTONS ─────────────────────────────────── */
+.btn{
+  padding:10px 20px;border:none;border-radius:var(--r8);
+  cursor:pointer;font-size:13px;font-weight:700;
+  font-family:'IBM Plex Sans Arabic',sans-serif;color:#fff;
+  transition:all .18s;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  white-space:nowrap;letter-spacing:.1px;
+}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn:active{transform:translateY(0);filter:brightness(.96)}
+.btn-navy{background:linear-gradient(135deg,var(--navy),var(--navy3))}
+.btn-gold{background:linear-gradient(135deg,var(--goldD),var(--goldL));color:var(--navy)!important}
+.btn-green{background:linear-gradient(135deg,#0F7540,#059669)}
+.btn-red{background:linear-gradient(135deg,#991B1B,var(--red))}
+.btn-mid{background:linear-gradient(135deg,#374151,#4B5563)}
+.btn-wa{background:linear-gradient(135deg,var(--wa),#25D366)}
+.btn-camera{background:linear-gradient(135deg,#0F4C75,#1B7FC4)}
+.btn-purple{background:linear-gradient(135deg,var(--purple),var(--purM))}
+.btn-full{width:100%;font-size:14px;padding:12px}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:var(--r6)}
+.btn-outline{background:transparent!important;border:1.5px solid var(--border);color:var(--mid)!important;filter:none!important}
+.btn-outline:hover{border-color:var(--navy);color:var(--navy)!important;background:var(--bg)!important}
 
-  /* NAV */
-  #appNav {
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    display: flex; padding: 0 14px; gap: 2px;
-    overflow-x: auto; flex-shrink: 0;
-  }
-  #appNav::-webkit-scrollbar { height: 0; }
-  .navBtn {
-    padding: 12px 15px;
-    border: none;
-    border-bottom: 3px solid transparent;
-    background: none; cursor: pointer;
-    color: var(--muted);
-    font-weight: 400; font-size: 13px;
-    display: flex; align-items: center; gap: 5px;
-    white-space: nowrap;
-    font-family: 'Tajawal', sans-serif;
-    transition: all .15s;
-  }
-  .navBtn.active {
-    color: var(--navy);
-    font-weight: 800;
-    border-bottom-color: var(--gold);
-  }
+/* ── TOAST ───────────────────────────────────── */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  padding:12px 24px;border-radius:var(--r12);color:#fff;font-weight:600;
+  font-size:13px;z-index:9999;box-shadow:0 8px 28px rgba(0,0,0,.22);
+  pointer-events:none;opacity:0;transition:opacity .25s;
+  font-family:'IBM Plex Sans Arabic',sans-serif;letter-spacing:.1px;
+  display:flex;align-items:center;gap:8px;min-width:220px;justify-content:center;
+}
+#toast.show{opacity:1}
 
-  /* MAIN */
-  #appMain { flex: 1; padding: 20px; overflow-y: auto; }
-  .pageWrap { max-width: 720px; margin: 0 auto; }
+/* ── TAGS ────────────────────────────────────── */
+.tag{
+  padding:3px 10px;border-radius:99px;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;
+  letter-spacing:.2px;
+}
 
-  /* ── CARDS ── */
-  .card {
-    background: var(--white);
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(0,0,0,.07);
-    margin-bottom: 14px;
-  }
-  .cardTitle {
-    font-size: 15px; font-weight: 800;
-    color: var(--navy); margin-bottom: 14px;
-  }
+/* ── GRID ────────────────────────────────────── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.row{display:flex;gap:8px;align-items:center}
 
-  /* ── FORM ELEMENTS ── */
-  .inp {
-    width: 100%; padding: 9px 11px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px; font-size: 13px;
-    outline: none; background: #fff;
-    color: var(--text);
-    font-family: 'Tajawal', sans-serif;
-    transition: border-color .15s;
-  }
-  .inp:focus { border-color: var(--navyL); }
-  .inp[dir="ltr"] { direction: ltr; font-family: monospace; }
-  textarea.inp { resize: vertical; line-height: 1.6; }
-  label.lbl { font-size: 12px; color: var(--mid); display: block; margin-bottom: 5px; }
+/* ── INFO GRID ───────────────────────────────── */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.info-cell{
+  background:var(--bg);border-radius:var(--r10);padding:10px 13px;
+  border:1px solid var(--border);
+}
+.info-cell .k{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.info-cell .v{font-size:13px;font-weight:700;color:var(--text);margin-top:3px}
 
-  .btn {
-    padding: 9px 20px;
-    border: none; border-radius: 8px;
-    cursor: pointer; font-size: 13px;
-    font-weight: 700;
-    font-family: 'Tajawal', sans-serif;
-    color: #fff; transition: opacity .15s;
-    white-space: nowrap;
-  }
-  .btn:hover { opacity: .88; }
-  .btn:active { opacity: .75; }
-  .btn-navy   { background: var(--navy); }
-  .btn-green  { background: var(--green); }
-  .btn-red    { background: var(--red); }
-  .btn-mid    { background: var(--mid); }
-  .btn-wa     { background: var(--wa); }
-  .btn-full   { width: 100%; font-size: 14px; padding: 12px; }
-  .btn-sm     { padding: 5px 12px; font-size: 11px; }
+/* ── STAGE HEADER ────────────────────────────── */
+.stage-header{
+  border-radius:var(--r12);padding:20px;margin-bottom:16px;
+  display:flex;align-items:center;gap:16px;
+  box-shadow:var(--sh2);
+}
+.stage-header .bc{color:rgba(255,255,255,.65);font-size:11px;font-weight:500;letter-spacing:.3px;text-transform:uppercase}
+.stage-header .bcode{color:#fff;font-family:monospace;font-size:18px;font-weight:700;letter-spacing:2.5px;margin:3px 0 9px}
+.stage-pill{
+  background:rgba(255,255,255,.18);display:inline-flex;border-radius:99px;
+  padding:5px 14px;color:#fff;font-weight:700;font-size:13px;
+  border:1px solid rgba(255,255,255,.25);align-items:center;gap:6px;
+  backdrop-filter:blur(4px);
+}
 
-  /* ── TOAST ── */
-  #toast {
-    position: fixed; bottom: 28px; left: 50%;
-    transform: translateX(-50%);
-    padding: 11px 28px; border-radius: 12px;
-    color: #fff; font-weight: 700; font-size: 14px;
-    z-index: 9999; box-shadow: 0 6px 24px rgba(0,0,0,.25);
-    pointer-events: none; opacity: 0;
-    transition: opacity .25s;
-    font-family: 'Tajawal', sans-serif;
-  }
-  #toast.show { opacity: 1; }
+/* ── PROGRESS ────────────────────────────────── */
+.progress-wrap{margin-bottom:16px}
+.progress-labels{display:flex;justify-content:space-between;margin-bottom:5px}
+.progress-labels span{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+.progress-strip{display:flex;gap:3px}
+.progress-seg{flex:1;height:7px;border-radius:99px;background:var(--border);transition:background .35s}
 
-  /* ── TAGS ── */
-  .tag {
-    padding: 2px 9px; border-radius: 20px;
-    font-size: 11px; font-weight: 700;
-    display: inline-block;
-  }
+/* ── STAGE LIST ──────────────────────────────── */
+.stage-item{
+  display:flex;align-items:center;gap:11px;padding:11px 14px;
+  border-radius:var(--r10);border:1.5px solid var(--border);
+  background:#fff;cursor:pointer;margin-bottom:6px;
+  transition:all .18s;font-family:'IBM Plex Sans Arabic',sans-serif;
+  width:100%;text-align:right;box-shadow:var(--sh1);
+}
+.stage-item:hover:not(:disabled){border-color:var(--navy3);box-shadow:var(--sh2);transform:translateX(-2px)}
+.stage-item:disabled{cursor:default;opacity:.6;box-shadow:none}
+.stage-num{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:11px;font-weight:800;flex-shrink:0;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.stage-item-label{flex:1;font-size:13px;color:var(--mid);font-weight:500}
+.stage-next-tag{font-size:11px;padding:3px 9px;border-radius:99px;font-weight:700}
 
-  /* ── GRID HELPERS ── */
-  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .row { display: flex; gap: 8px; align-items: center; }
+/* ── CONFIRM BOX ─────────────────────────────── */
+.confirm-box{border-radius:var(--r12);padding:18px;border:2px solid var(--border)}
+.confirm-hl{border-radius:var(--r10);padding:13px 16px;margin-bottom:13px;display:flex;align-items:center;gap:12px}
+.confirm-num{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;flex-shrink:0}
 
-  /* ── INFO GRID ── */
-  .infoGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-  .infoCell {
-    background: var(--bg); border-radius: 8px; padding: 9px 12px;
-  }
-  .infoCell .k { font-size: 10px; color: var(--muted); }
-  .infoCell .v { font-size: 13px; font-weight: 700; color: var(--text); margin-top: 2px; }
+/* ── LOG ─────────────────────────────────────── */
+.log-entry{display:flex;gap:11px;margin-bottom:10px;align-items:flex-start}
+.log-dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.log-label{font-size:12px;font-weight:700;color:var(--text)}
+.log-meta{font-size:11px;color:var(--muted);margin-right:5px}
+.log-note{font-size:11px;color:var(--mid);font-style:italic;margin-top:1px}
 
-  /* ── STAGE HEADER ── */
-  .stageHeader {
-    border-radius: 10px; padding: 16px 18px;
-    margin-bottom: 14px;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .stageHeader .bc {
-    color: rgba(255,255,255,.7); font-size: 11px;
-  }
-  .stageHeader .bcode {
-    color: #fff; font-family: monospace;
-    font-size: 18px; font-weight: 900;
-    letter-spacing: 2px; margin: 2px 0 8px;
-  }
-  .stagePill {
-    background: rgba(255,255,255,.2);
-    display: inline-block; border-radius: 20px;
-    padding: 4px 13px;
-    color: #fff; font-weight: 700; font-size: 13px;
-  }
+/* ── BUNDLE CARD ─────────────────────────────── */
+.bundle-card{
+  background:var(--white);border-radius:var(--r12);padding:14px 16px;
+  margin-bottom:10px;box-shadow:var(--sh1);border:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .18s;
+}
+.bundle-card:hover{box-shadow:var(--sh3);border-color:var(--navy3);transform:translateY(-2px)}
+.bundle-icon{
+  width:46px;height:46px;border-radius:var(--r10);display:flex;
+  align-items:center;justify-content:center;font-size:22px;flex-shrink:0;
+}
+.bundle-info{flex:1;min-width:0}
+.bundle-name{font-weight:700;color:var(--navy);font-size:14px}
+.bundle-meta{font-size:11px;color:var(--muted);margin:3px 0 7px;font-weight:400}
+.bundle-progress{display:flex;align-items:center;gap:7px}
+.pb-track{flex:1;height:5px;background:var(--border);border-radius:99px;overflow:hidden}
+.pb-fill{height:100%;border-radius:99px;transition:width .35s}
+.bundle-badge{
+  border:1.5px solid;padding:4px 11px;border-radius:99px;
+  font-size:11px;font-weight:700;text-align:center;
+  max-width:145px;flex-shrink:0;white-space:nowrap;
+}
+.bundle-actions{display:flex;gap:6px;align-items:center}
 
-  /* ── PROGRESS STRIP ── */
-  .progressWrap { margin-bottom: 14px; }
-  .progressLabel {
-    display: flex; justify-content: space-between;
-    margin-bottom: 5px; font-size: 11px; color: var(--muted);
-  }
-  .progressStrip { display: flex; gap: 2px; }
-  .progressSeg {
-    flex: 1; height: 8px; border-radius: 4px;
-    background: var(--border); transition: background .3s;
-  }
+/* ── TEACHER ROW ─────────────────────────────── */
+.teacher-row{
+  display:flex;align-items:center;gap:10px;padding:11px 13px;
+  border-radius:var(--r10);border:1.5px solid var(--border);
+  background:#fff;cursor:pointer;margin-bottom:6px;
+  transition:all .18s;font-family:'IBM Plex Sans Arabic',sans-serif;
+  width:100%;text-align:right;box-shadow:var(--sh1);
+}
+.teacher-row:hover{border-color:var(--navy3);box-shadow:var(--sh2)}
+.teacher-row.selected{border-color:var(--navy);background:rgba(11,29,58,.06);box-shadow:var(--sh2)}
+.t-avatar{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:13px;font-weight:800;flex-shrink:0;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
 
-  /* ── STAGE LIST ── */
-  .stageItem {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-radius: 9px;
-    border: 1.5px solid var(--border);
-    background: #fff; cursor: pointer;
-    margin-bottom: 6px; transition: all .15s;
-    font-family: 'Tajawal', sans-serif;
-    width: 100%; text-align: right;
-  }
-  .stageItem:hover:not(:disabled) { transform: translateX(-2px); }
-  .stageItem:disabled { cursor: default; opacity: .65; }
-  .stageNum {
-    width: 26px; height: 26px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 11px; font-weight: 800;
-    flex-shrink: 0;
-  }
-  .stageItemLabel {
-    flex: 1; font-size: 13px; color: var(--mid);
-  }
-  .stageDoneMark { font-size: 12px; color: var(--green); }
-  .stageNextTag {
-    font-size: 11px; padding: 2px 8px;
-    border-radius: 10px; font-weight: 700;
-  }
+/* ── NOTIFY TYPE BTNS ────────────────────────── */
+.ntype-btn{
+  padding:8px 13px;border-radius:var(--r8);border:2px solid var(--border);
+  background:#fff;cursor:pointer;font-size:12px;font-weight:500;
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+  box-shadow:var(--sh1);
+}
+.ntype-btn:hover{border-color:var(--border2);box-shadow:var(--sh2)}
+.ntype-btn.active{font-weight:700;box-shadow:var(--sh2)}
 
-  /* ── CONFIRM BOX ── */
-  .confirmBox {
-    border-radius: 10px; padding: 16px;
-    border: 2px solid var(--border);
-  }
-  .confirmHighlight {
-    border-radius: 8px; padding: 12px 14px;
-    margin-bottom: 12px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .confirmNum {
-    width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 900; flex-shrink: 0;
-  }
+/* ── NOTIF LOG CARD ──────────────────────────── */
+.nlog-card{
+  background:var(--white);border-radius:var(--r12);padding:15px 17px;
+  margin-bottom:10px;box-shadow:var(--sh1);border:1px solid var(--border);
+  border-right:4px solid;
+}
 
-  /* ── LOG ── */
-  .logEntry {
-    display: flex; gap: 10px; margin-bottom: 9px;
-    align-items: flex-start;
-  }
-  .logDot {
-    width: 8px; height: 8px; border-radius: 50%;
-    margin-top: 5px; flex-shrink: 0;
-  }
-  .logLabel { font-size: 12px; font-weight: 700; color: var(--text); }
-  .logMeta  { font-size: 11px; color: var(--muted); margin-right: 5px; }
-  .logNote  { font-size: 11px; color: var(--mid); font-style: italic; margin-top: 1px; }
+/* ── QR ──────────────────────────────────────── */
+.qr-wrap{display:flex;justify-content:center;margin-bottom:12px}
+.qr-wrap svg{border:2px solid var(--navy);border-radius:var(--r8);display:block}
 
-  /* ── BUNDLE CARD ── */
-  .bundleCard {
-    background: var(--white); border-radius: 12px;
-    padding: 14px 16px; margin-bottom: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.06);
-    display: flex; align-items: center; gap: 12px;
-    cursor: pointer; transition: box-shadow .15s;
-  }
-  .bundleCard:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
-  .bundleIcon {
-    width: 44px; height: 44px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex-shrink: 0;
-  }
-  .bundleInfo { flex: 1; min-width: 0; }
-  .bundleName { font-weight: 800; color: var(--navy); font-size: 14px; }
-  .bundleMeta { font-size: 11px; color: var(--muted); margin: 2px 0 6px; }
-  .bundleProgress { display: flex; align-items: center; gap: 6px; }
-  .progressBar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
-  .progressFill { height: 100%; border-radius: 3px; transition: width .3s; }
-  .bundleStageBadge {
-    border: 1px solid; padding: 4px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 700; text-align: center;
-    max-width: 140px; flex-shrink: 0; white-space: nowrap;
-  }
-  .bundleActions { display: flex; gap: 6px; align-items: center; }
+/* ── SETTINGS TABS ───────────────────────────── */
+.s-tabs{
+  display:flex;gap:2px;background:var(--white);border-radius:var(--r10);
+  padding:4px;margin-bottom:16px;border:1px solid var(--border);
+  flex-wrap:wrap;box-shadow:var(--sh1);
+}
+.s-tab{
+  flex:1;min-width:44px;padding:8px 4px;border:none;border-radius:var(--r8);
+  background:transparent;color:var(--muted);cursor:pointer;font-size:12px;
+  font-weight:500;font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+}
+.s-tab:hover{color:var(--navy)}
+.s-tab.active{background:var(--navy);color:#fff;font-weight:700;box-shadow:var(--sh2)}
 
-  /* ── TEACHER ROW ── */
-  .teacherRow {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 9px;
-    border: 1.5px solid var(--border); background: #fff;
-    cursor: pointer; margin-bottom: 5px;
-    transition: all .15s; font-family: 'Tajawal', sans-serif;
-    width: 100%; text-align: right;
-  }
-  .teacherRow.selected {
-    border-color: var(--navy);
-    background: rgba(13,31,60,.08);
-  }
-  .teacherAvatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 13px; font-weight: 800;
-    flex-shrink: 0;
-  }
+/* ── LIST ITEM ───────────────────────────────── */
+.list-item{
+  display:flex;align-items:center;gap:9px;background:var(--bg);
+  border-radius:var(--r8);padding:10px 13px;margin-bottom:6px;
+  border:1px solid var(--border);
+}
+.list-item .li-text{flex:1;font-size:13px;color:var(--navy);font-weight:500}
+.del-btn{
+  background:none;border:none;cursor:pointer;color:var(--muted);
+  font-size:18px;line-height:1;padding:0 3px;transition:color .15s;
+}
+.del-btn:hover{color:var(--red)}
 
-  /* ── NOTIF TYPE BTNS ── */
-  .ntypeBtn {
-    padding: 8px 12px; border-radius: 8px;
-    border: 2px solid var(--border); background: #fff;
-    cursor: pointer; font-size: 12px; font-weight: 400;
-    display: inline-flex; align-items: center; gap: 5px;
-    font-family: 'Tajawal', sans-serif;
-    transition: all .15s;
-  }
-  .ntypeBtn.active { font-weight: 800; }
+/* ── DIVIDER ─────────────────────────────────── */
+.divider{border:none;border-top:1px solid var(--border);margin:18px 0}
 
-  /* ── NOTIF LOG CARD ── */
-  .nlogCard {
-    background: var(--white); border-radius: 12px;
-    padding: 14px 16px; margin-bottom: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.06);
-    border-right: 4px solid var(--border);
-  }
+/* ── EMPTY ───────────────────────────────────── */
+.empty{
+  text-align:center;color:var(--muted);padding:40px 0;font-size:14px;font-weight:500;
+}
+.empty .empty-icon{font-size:42px;display:block;margin-bottom:10px;opacity:.5}
 
-  /* ── QR SVG (inline) ── */
-  .qrWrap { display: flex; justify-content: center; margin-bottom: 10px; }
-  .qrWrap svg { border: 2px solid var(--navy); border-radius: 6px; display: block; }
+/* ── MODAL ───────────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(11,29,58,.5);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(4px);animation:fadeIn .2s ease;
+}
+.modal{
+  background:#fff;border-radius:18px;padding:26px;width:100%;max-width:420px;
+  box-shadow:var(--sh4);animation:fadeIn .25s ease;max-height:90vh;overflow-y:auto;
+}
+.modal-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px;letter-spacing:-.2px}
 
-  /* ── SETTINGS TABS ── */
-  .settingsTabs {
-    display: flex; gap: 2px; background: var(--white);
-    border-radius: 10px; padding: 4px; margin-bottom: 14px;
-    border: 1px solid var(--border); flex-wrap: wrap;
-  }
-  .sTab {
-    flex: 1; min-width: 44px; padding: 7px 4px;
-    border: none; border-radius: 7px;
-    background: transparent; color: var(--mid);
-    cursor: pointer; font-size: 13px; font-weight: 400;
-    font-family: 'Tajawal', sans-serif; transition: all .15s;
-  }
-  .sTab.active { background: var(--navy); color: #fff; font-weight: 700; }
+/* ── CAMERA ──────────────────────────────────── */
+.cam-container{
+  display:none;border-radius:var(--r14);overflow:hidden;
+  position:relative;background:#000;box-shadow:var(--sh3);
+}
+.cam-overlay{
+  position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;pointer-events:none;
+}
+.cam-frame{width:210px;height:210px;position:relative}
+.cam-corner{position:absolute;width:28px;height:28px;border-color:var(--goldL);border-style:solid}
+.cam-corner.tr{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 4px 0 0}
+.cam-corner.tl{top:0;left:0;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
+.cam-corner.br{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+.cam-corner.bl{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 4px}
+.cam-line{
+  position:absolute;top:4px;left:4px;right:4px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--goldL),transparent);
+  animation:scanAnim 2s ease-in-out infinite;border-radius:99px;
+}
+.cam-status-bar{
+  position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(transparent,rgba(0,0,0,.75));
+  padding:16px;text-align:center;
+}
+.cam-close{
+  position:absolute;top:10px;left:10px;
+  background:rgba(0,0,0,.55);border:none;color:#fff;
+  width:34px;height:34px;border-radius:50%;cursor:pointer;
+  font-size:20px;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.cam-close:hover{background:rgba(220,38,38,.7)}
 
-  /* ── LIST ITEM ── */
-  .listItem {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--bg); border-radius: 8px;
-    padding: 9px 12px; margin-bottom: 6px;
-  }
-  .listItem .liText { flex: 1; font-size: 13px; color: var(--navy); }
-  .delBtn {
-    background: none; border: none; cursor: pointer;
-    color: var(--red); font-size: 18px; line-height: 1;
-    padding: 0 4px;
-  }
+/* ── UPLOAD AREA ─────────────────────────────── */
+.upload-area{
+  border:2.5px dashed var(--border);border-radius:var(--r12);
+  padding:32px 20px;text-align:center;cursor:pointer;
+  transition:all .22s;background:var(--bg);
+}
+.upload-area:hover{border-color:var(--navy3);background:var(--blueBg)}
+.upload-area.drag-over{border-color:var(--navy);background:var(--blueBg);transform:scale(1.01)}
 
-  /* ── EMPTY STATE ── */
-  .empty { text-align: center; color: var(--muted); padding: 32px 0; font-size: 14px; }
+/* ── KPI CARD ────────────────────────────────── */
+.kpi-card{
+  background:var(--white);border-radius:var(--r12);padding:18px;
+  box-shadow:var(--sh1);border:1px solid var(--border);
+  border-top:3px solid;display:flex;gap:12px;align-items:flex-start;
+}
+.kpi-icon{width:40px;height:40px;border-radius:var(--r10);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.kpi-value{font-size:30px;font-weight:800;margin-top:2px;letter-spacing:-1px}
 
-  /* ── DIVIDER ── */
-  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+/* ── TABLE ───────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table thead tr{background:var(--navy)}
+.data-table th{padding:10px 12px;text-align:right;color:#fff;font-weight:700;font-size:11px;letter-spacing:.3px}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+.data-table tbody tr:hover{background:var(--bg)}
+.data-table tbody tr:last-child td{border-bottom:none}
 
-  /* ── MODALS / OVERLAYS ── */
-  .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.45);
-    z-index: 500; display: flex; align-items: center;
-    justify-content: center; padding: 20px;
-  }
-  .modal {
-    background: var(--white); border-radius: 16px;
-    padding: 24px; width: 100%; max-width: 400px;
-    box-shadow: 0 16px 48px rgba(0,0,0,.3);
-  }
-  .modalTitle { font-size: 16px; font-weight: 800; color: var(--navy); margin-bottom: 14px; }
+/* ── INFO BANNER ─────────────────────────────── */
+.banner{border-radius:var(--r10);padding:13px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.banner-icon{font-size:22px;flex-shrink:0}
 
-  /* ── RESPONSIVE ── */
-  @media(max-width:480px) {
-    .g2,.g3 { grid-template-columns: 1fr; }
-    .infoGrid { grid-template-columns: 1fr; }
-    .loginBox { padding: 32px 22px; }
-    .card { padding: 14px; }
-  }
+/* ── PRINT ───────────────────────────────────── */
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:fixed;top:0;left:0;right:0;text-align:center;padding:40px}}
 
-  /* ── PRINT ── */
-  @media print {
-    body * { visibility: hidden; }
-    #printArea, #printArea * { visibility: visible; }
-    #printArea { position: fixed; top: 0; left: 0; right: 0; text-align: center; padding: 40px; }
-  }
+/* ── RESPONSIVE ──────────────────────────────── */
+@media(max-width:520px){
+  .g2,.g3{grid-template-columns:1fr}
+  .info-grid{grid-template-columns:1fr}
+  .login-card{padding:32px 22px}
+  .card{padding:16px}
+  #appMain{padding:14px}
+  #appHeader{padding:0 14px}
+}
 </style>
 </head>
 <body>
 
-<!-- ══════════════════ LOGIN ══════════════════ -->
 <div id="loginScreen">
-  <div class="loginBox">
-    <div class="loginLogo">
-      <span class="icon">📦</span>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-icon">📦</div>
       <h1 id="loginSchoolName">مدرسة النموذجية الثانوية</h1>
       <p>نظام تتبع مظاريف الاختبارات</p>
     </div>
-    <div id="loginErr" style="display:none;background:var(--redBg);color:var(--red);border-radius:8px;padding:9px 12px;font-size:12px;margin-bottom:12px;"></div>
-    <div style="margin-bottom:10px">
-      <input class="inp" id="loginUser" placeholder="اسم المستخدم" autocomplete="username"/>
+    <div id="loginErr" class="login-err" style="display:none"></div>
+    <div class="login-field">
+      <label>اسم المستخدم</label>
+      <input class="inp" id="loginUser" placeholder="أدخل اسم المستخدم" autocomplete="username"/>
     </div>
-    <div style="margin-bottom:16px">
-      <input class="inp" id="loginPass" placeholder="كلمة المرور" type="password" dir="ltr" autocomplete="current-password"/>
+    <div class="login-field">
+      <input class="inp" id="loginPass" placeholder="كلمة المرور" type="password" dir="ltr" autocomplete="current-password" style="margin-bottom:16px"/>
     </div>
-    <button class="btn btn-navy btn-full" onclick="doLogin()">دخول</button>
-    <hr class="divider"/>
-    <p style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">الحسابات التجريبية</p>
-    <div id="demoBtns"></div>
+    <button class="btn btn-navy btn-full" onclick="doLogin()">دخول إلى النظام</button>
+    <div class="demo-section">
+      <p>حسابات تجريبية — اضغط للملء التلقائي</p>
+      <div id="demoBtns"></div>
+    </div>
   </div>
 </div>
 
-<!-- ══════════════════ APP SHELL ══════════════════ -->
 <div id="appShell">
   <header id="appHeader">
-    <span class="hLogo">📦</span>
-    <span class="hTitle" id="hSchool"></span>
-    <span class="hRole" id="hRole"></span>
-    <span class="hUser" id="hUser"></span>
-    <button class="hLogout" onclick="doLogout()">خروج 🚪</button>
+    <div class="h-logo">📦</div>
+    <span class="h-title" id="hSchool"></span>
+    <span class="h-role" id="hRole"></span>
+    <span class="h-user" id="hUser"></span>
+    <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
   <nav id="appNav"></nav>
-  <div id="appMain"><div class="pageWrap" id="pageContent"></div></div>
+  <div id="appMain"><div class="page-wrap" id="pageContent"></div></div>
 </div>
 
-<!-- ══════════════════ TOAST ══════════════════ -->
 <div id="toast"></div>
-
-<!-- ══════════════════ PRINT AREA ══════════════════ -->
 <div id="printArea" style="display:none"></div>
 
 <script>
+
+
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
@@ -493,7 +517,7 @@ const sc = i => PALETTE[i % PALETTE.length];
 let state = {
   schoolName: "مدرسة النموذجية الثانوية",
   adminPhone: "+966551121498",   // <--- رقم الواتساب الافتراضي للمدير
-  subjects: ["الكيمياء","الفيزياء","الأحياء","الرياضيات","اللغة العربية","اللغة الإنجليزية"],
+  subjects: ["لغة إنجليزية", "رياضيات", "علم البيئة", "فيزياء", "الكفايات اللغوية", "أحياء", "كيمياء", "علوم الأرض والفضاء"],
   grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
   stages: [
     "تم توزيع الأوراق على الطلاب",
@@ -507,12 +531,58 @@ let state = {
     "تم الأرشفة والحفظ",
   ],
   teachers: [
-    { id:"T1", name:"أحمد الغامدي",  phone:"+966501001001", subject:"الكيمياء",      role:"corrector" },
-    { id:"T2", name:"سمر الزهراني",  phone:"+966502002002", subject:"الفيزياء",      role:"reviewer"  },
-    { id:"T3", name:"خالد العتيبي",  phone:"+966503003003", subject:"الأحياء",       role:"auditor"   },
-    { id:"T4", name:"نورة القحطاني", phone:"+966504004004", subject:"الرياضيات",     role:"corrector" },
-    { id:"T5", name:"وليد الشهري",   phone:"+966505005005", subject:"اللغة العربية", role:"reviewer"  },
-  ],
+  {id:"TBL001",name:"فهد المحبوب",role:"corrector",subject:"لغة إنجليزية",grade:"أول ثانوي",phone:""},
+  {id:"TBL002",name:"فهد السقوفي",role:"corrector",subject:"لغة إنجليزية",grade:"أول ثانوي",phone:""},
+  {id:"TBL003",name:"فهد العودة",role:"reviewer",subject:"لغة إنجليزية",grade:"أول ثانوي",phone:""},
+  {id:"TBL004",name:"عبدالرحمن العمري",role:"auditor",subject:"لغة إنجليزية",grade:"أول ثانوي",phone:""},
+  {id:"TBL005",name:"عبدالعزيز القحطاني",role:"corrector",subject:"رياضيات",grade:"أول ثانوي",phone:""},
+  {id:"TBL006",name:"فيصل المطيري",role:"corrector",subject:"رياضيات",grade:"أول ثانوي",phone:""},
+  {id:"TBL007",name:"عبدالرحمن الجابر",role:"reviewer",subject:"رياضيات",grade:"أول ثانوي",phone:""},
+  {id:"TBL008",name:"حسين القحطاني",role:"auditor",subject:"رياضيات",grade:"أول ثانوي",phone:""},
+  {id:"TBL009",name:"عبدالرحمن الغامدي",role:"corrector",subject:"علم البيئة",grade:"أول ثانوي",phone:""},
+  {id:"TBL010",name:"محمد العلي",role:"reviewer",subject:"علم البيئة",grade:"أول ثانوي",phone:""},
+  {id:"TBL011",name:"عبد الله العنزي",role:"auditor",subject:"علم البيئة",grade:"أول ثانوي",phone:""},
+  {id:"TBL012",name:"بدر الحربي",role:"auditor",subject:"علم البيئة",grade:"أول ثانوي",phone:""},
+  {id:"TBL013",name:"أسامة الحارثي",role:"corrector",subject:"فيزياء",grade:"أول ثانوي",phone:""},
+  {id:"TBL014",name:"فهد الدوسري",role:"corrector",subject:"فيزياء",grade:"أول ثانوي",phone:""},
+  {id:"TBL015",name:"بندر الزهراني",role:"reviewer",subject:"فيزياء",grade:"أول ثانوي",phone:""},
+  {id:"TBL016",name:"فارس الغامدي",role:"auditor",subject:"فيزياء",grade:"أول ثانوي",phone:""},
+  {id:"TBL017",name:"خالد القحطاني",role:"corrector",subject:"الكفايات اللغوية",grade:"أول ثانوي",phone:""},
+  {id:"TBL018",name:"محمد العميري",role:"corrector",subject:"الكفايات اللغوية",grade:"أول ثانوي",phone:""},
+  {id:"TBL019",name:"إبراهيم السلمي",role:"reviewer",subject:"الكفايات اللغوية",grade:"أول ثانوي",phone:""},
+  {id:"TBL020",name:"محمد عياشي",role:"auditor",subject:"الكفايات اللغوية",grade:"أول ثانوي",phone:""},
+  {id:"TBL021",name:"أحمد أبو ملحة",role:"corrector",subject:"لغة إنجليزية",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL022",name:"عبدالملك الصقعبي",role:"corrector",subject:"لغة إنجليزية",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL023",name:"سعد الرشيدي",role:"reviewer",subject:"لغة إنجليزية",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL024",name:"محمد العلي",role:"auditor",subject:"لغة إنجليزية",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL025",name:"محمد الزايدي",role:"corrector",subject:"رياضيات",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL026",name:"أسعيد السهمي",role:"corrector",subject:"رياضيات",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL027",name:"فهد السقوفي",role:"reviewer",subject:"رياضيات",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL028",name:"محمد ال عقيل",role:"auditor",subject:"رياضيات",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL029",name:"ناصر المالكي",role:"corrector",subject:"أحياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL030",name:"محمد العلي",role:"corrector",subject:"أحياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL031",name:"عبدالملك الصقعبي",role:"reviewer",subject:"أحياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL032",name:"أسامة الحارثي",role:"auditor",subject:"أحياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL033",name:"سعد الرشيدي",role:"corrector",subject:"كيمياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL034",name:"محمد ال عقيل",role:"corrector",subject:"كيمياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL035",name:"عبد الله حمدي",role:"corrector",subject:"كيمياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL036",name:"فهد المحبوب",role:"reviewer",subject:"كيمياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL037",name:"فيصل الغفيلي",role:"auditor",subject:"كيمياء",grade:"ثاني ثانوي",phone:""},
+  {id:"TBL038",name:"نايف الحواس",role:"corrector",subject:"لغة إنجليزية",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL039",name:"محمد العميري",role:"reviewer",subject:"لغة إنجليزية",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL040",name:"ناصر المالكي",role:"auditor",subject:"لغة إنجليزية",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL041",name:"إبراهيم القحطاني",role:"corrector",subject:"رياضيات",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL042",name:"بدر الحربي",role:"corrector",subject:"رياضيات",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL043",name:"صقر العنزي",role:"reviewer",subject:"رياضيات",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL044",name:"عبدالرحمن الغامدي",role:"auditor",subject:"رياضيات",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL045",name:"محمد عياشي",role:"corrector",subject:"فيزياء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL046",name:"فهد الدوسري",role:"corrector",subject:"فيزياء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL047",name:"محمد الزايدي",role:"reviewer",subject:"فيزياء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL048",name:"عبدالله الشهري",role:"auditor",subject:"فيزياء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL049",name:"عبدالله الشهري",role:"corrector",subject:"علوم الأرض والفضاء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL050",name:"ناصر المالكي",role:"reviewer",subject:"علوم الأرض والفضاء",grade:"ثالث ثانوي",phone:""},
+  {id:"TBL051",name:"أحمد أبو ملحة",role:"auditor",subject:"علوم الأرض والفضاء",grade:"ثالث ثانوي",phone:""}
+],
   users: [
     { id:"U1", name:"مدير النظام",        username:"admin",   password:"admin123", role:"admin"      },
     { id:"U2", name:"الكنترول",           username:"ctrl",    password:"ctrl123",  role:"controller" },
@@ -527,19 +597,19 @@ let currentUser = null;
 let currentPage = "";
 
 const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات" };
-const ROLE_COLORS = { admin:["#C8911F","#FEF3C7"], controller:["#2563EB","#DBEAFE"], notifier:["#7C3AED","#EDE9FE"] };
+const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"] };
 const TEACHER_ROLE_LABEL = { corrector:"مصحح", reviewer:"مراجع", auditor:"مدقق" };
 const NOTIFY_TYPES = [
-  { key:"correction", label:"طلب تصحيح",   icon:"✏️", color:"#EF4444" },
-  { key:"review",     label:"طلب مراجعة",  icon:"🔍", color:"#F97316" },
-  { key:"audit",      label:"طلب تدقيق",   icon:"🔏", color:"#8B5CF6" },
-  { key:"urgent",     label:"مراجعة عاجلة",icon:"🚨", color:"#DC2626" },
-  { key:"info",       label:"إشعار عام",   icon:"ℹ️", color:"#2563EB" },
+  { key:"correction", label:"طلب تصحيح",    icon:"✎", color:"#EF4444" },
+  { key:"review",     label:"طلب مراجعة",   icon:"◎", color:"#F97316" },
+  { key:"audit",      label:"طلب تدقيق",    icon:"◈", color:"#8B5CF6" },
+  { key:"urgent",     label:"تنبيه عاجل",   icon:"◉", color:"#DC2626" },
+  { key:"info",       label:"إشعار عام",    icon:"◌", color:"#2563EB" },
 ];
 const PAGES = {
-  admin:      [ {k:"admin_new", icon:"➕", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙️",label:"الإعدادات"} ],
-  controller: [ {k:"ctrl_scan",icon:"📷",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
-  notifier:   [ {k:"notif_send",icon:"📲",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
+  admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
+  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
+  notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -552,8 +622,13 @@ function fmt(iso) { try { return new Date(iso).toLocaleString("ar-SA",{dateStyle
 let _toastTimer;
 function toast(msg, type="ok") {
   const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.style.background = type==="err" ? "var(--red)" : type==="wa" ? "var(--wa)" : "var(--green)";
+  const icons = {ok:"✓", err:"✕", wa:"◈"};
+  el.innerHTML = `<span style="font-size:16px;font-weight:900;opacity:.9">${icons[type]||"✓"}</span><span>${msg}</span>`;
+  el.style.background = type==="err"
+    ? "linear-gradient(135deg,#991B1B,var(--red))"
+    : type==="wa"
+    ? "linear-gradient(135deg,var(--wa),#25D366)"
+    : "linear-gradient(135deg,#0F7540,#059669)";
   el.classList.add("show");
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(()=>el.classList.remove("show"), 3200);
@@ -632,27 +707,38 @@ function renderLoginDemos() {
   document.getElementById("loginSchoolName").textContent = state.schoolName;
 }
 
+// ─── Enter app (called from login AND from session restore) ──
+function enterApp(found, restorePage) {
+  currentUser = found;
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("appShell").style.display    = "flex";
+  document.getElementById("hSchool").textContent = state.schoolName;
+  const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
+  const rIcons = {admin:"🔑",controller:"📋",notifier:"📲"};
+  document.getElementById("hRole").textContent = (rIcons[found.role]||"") + " " + (ROLE_LABEL[found.role]||found.role);
+  document.getElementById("hRole").style.cssText = `background:${bg};color:${col};padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px`;
+  document.getElementById("hUser").textContent = found.name;
+  renderNav();
+  const page = restorePage || PAGES[found.role]?.[0]?.k || "ctrl_scan";
+  navigateTo(page);
+}
+
 function doLogin() {
   const u = document.getElementById("loginUser").value.trim();
   const p = document.getElementById("loginPass").value;
   const found = state.users.find(x=>x.username===u&&x.password===p);
   const errEl = document.getElementById("loginErr");
   if(found) {
-    currentUser = found; errEl.style.display="none";
-    document.getElementById("loginScreen").style.display="none";
-    const shell = document.getElementById("appShell");
-    shell.style.display="flex";
-    document.getElementById("hSchool").textContent = state.schoolName;
-    const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
-    document.getElementById("hRole").textContent = ROLE_LABEL[found.role]||found.role;
-    document.getElementById("hRole").style.cssText = `background:${bg};color:${col}`;
-    document.getElementById("hUser").textContent = found.name;
-    renderNav();
-    const defaultPage = PAGES[found.role]?.[0]?.k || "ctrl_scan";
-    navigateTo(defaultPage);
+    errEl.style.display = "none";
+    // Save session so refresh keeps user logged in
+    sessionStorage.setItem("examSession", JSON.stringify({
+      username: found.username,
+      page: PAGES[found.role]?.[0]?.k || "ctrl_scan"
+    }));
+    enterApp(found);
   } else {
-    errEl.textContent="بيانات الدخول غير صحيحة";
-    errEl.style.display="block";
+    errEl.textContent = "بيانات الدخول غير صحيحة";
+    errEl.style.display = "block";
   }
 }
 
@@ -662,6 +748,8 @@ document.addEventListener("keydown", e => {
 
 function doLogout() {
   currentUser=null; currentPage="";
+  sessionStorage.removeItem("examSession");   // clear session
+  stopCamera();                                // stop camera if running
   document.getElementById("loginScreen").style.display="flex";
   document.getElementById("appShell").style.display="none";
   document.getElementById("loginUser").value="";
@@ -686,6 +774,11 @@ function renderNav() {
 
 function navigateTo(page) {
   currentPage = page;
+  // Keep session in sync with current page
+  try {
+    const sess = JSON.parse(sessionStorage.getItem("examSession")||"{}");
+    if(sess.username) { sess.page = page; sessionStorage.setItem("examSession", JSON.stringify(sess)); }
+  } catch(e){}
   renderNav();
   const el = document.getElementById("pageContent");
   // reset scroll
@@ -714,7 +807,7 @@ function renderAdminNew(el) {
   if(_newBundleCreated) { renderBundleSuccess(el, _newBundleCreated); return; }
   el.innerHTML = `
   <div class="card">
-    <p class="cardTitle">➕ إنشاء مظروف جديد</p>
+    <p class="card-title">➕ إنشاء مظروف جديد</p>
     <div class="g2" style="margin-bottom:10px">
       <div>
         <label class="lbl">المادة *</label>
@@ -829,48 +922,106 @@ function renderBundleSuccess(el, b) {
   const corrT = state.teachers.find(t=>t.id===b.corrector);
   const revT  = state.teachers.find(t=>t.id===b.reviewer);
   const audT  = state.teachers.find(t=>t.id===b.auditor);
+  const examInfo = [
+    b.examDay, b.examDate, b.examHall,
+    b.examStart?(b.examStart+(b.examEnd?" — "+b.examEnd:"")):"",
+  ].filter(Boolean).join(" · ");
   el.innerHTML = `
   <div class="card" style="text-align:center">
-    <div style="font-size:48px;margin-bottom:8px">✅</div>
-    <h3 style="color:var(--green);font-size:18px;margin-bottom:4px">تم إنشاء المظروف</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
-    <div id="printArea" class="qrWrap">${makeQR(b.barcode,150)}</div>
-    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${b.barcode}</p>
-    <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;text-align:right">
-      ${corrT?`✏️ المصحح: <strong>${corrT.name}</strong>&nbsp;&nbsp;`:""}
-      ${revT?`🔍 المراجع: <strong>${revT.name}</strong>&nbsp;&nbsp;`:""}
-      ${audT?`🔏 المدقق: <strong>${audT.name}</strong>`:""}
-    </div>
-    <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px">
+    <div style="width:64px;height:64px;background:var(--greenBg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:32px">✓</div>
+    <h3 style="color:var(--green);font-size:18px;font-weight:800;margin-bottom:4px">تم إنشاء المظروف بنجاح</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
+    <!-- QR Code -->
+    <div class="qr-wrap" id="qrArea_${b.id}">${makeQR(b.barcode,160)}</div>
+    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:4px 0 16px">${b.barcode}</p>
+    <!-- Assignments -->
+    ${(corrT||revT||audT)?`
+    <div style="background:var(--blueBg);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--blue);margin-bottom:10px;text-align:right;border:1px solid rgba(37,99,235,.15)">
+      ${corrT?"✏️ المصحح: <strong>"+corrT.name+"</strong>&nbsp;&nbsp;":""}
+      ${revT?"🔍 المراجع: <strong>"+revT.name+"</strong>&nbsp;&nbsp;":""}
+      ${audT?"🔏 المدقق: <strong>"+audT.name+"</strong>":""}
+    </div>`:""}
+    <!-- Exam info -->
+    ${examInfo?`<div style="background:var(--purBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--purple);margin-bottom:10px;text-align:right;border:1px solid rgba(124,58,237,.15)">📅 ${examInfo}</div>`:""}
+    <!-- Print hint -->
+    <div style="background:var(--amberBg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px;border:1px solid rgba(180,83,9,.15)">
       📌 اطبع هذا الباركود وألصقه على المظروف
     </div>
+    <!-- Buttons -->
     <div class="row" style="gap:8px">
-      <button class="btn btn-navy" style="flex:1" onclick="printBundle('${b.barcode}','${b.subject}','${b.count}')">🖨️ طباعة</button>
+      <button class="btn btn-navy" style="flex:1" onclick="printBundleFull('${b.id}')">🖨️ طباعة الباركود</button>
       <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo('admin_new')">➕ مظروف آخر</button>
     </div>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="navigateTo('admin_list')">◈ عرض كل المظاريف</button>
   </div>`;
 }
 
-function printBundle(barcode, subject, count) {
-  const pa = document.getElementById("printArea");
-  pa.style.display="block";
-  pa.innerHTML = `
-    <div style="font-family:'Tajawal',Arial,sans-serif;direction:rtl;text-align:center">
-      <h2 style="margin-bottom:8px">${state.schoolName}</h2>
-      <p style="font-size:14px;margin-bottom:16px">${subject} · ${count} ورقة</p>
-      ${makeQR(barcode,180)}
-      <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${barcode}</p>
-    </div>`;
-  window.print();
-  setTimeout(()=>{ pa.style.display="none"; pa.innerHTML=""; }, 1000);
+function printBundleFull(bundleId) {
+  const b = state.bundles.find(x=>x.id===bundleId);
+  if(!b){ toast("المظروف غير موجود","err"); return; }
+  const corrT = state.teachers.find(t=>t.id===b.corrector);
+  const revT  = state.teachers.find(t=>t.id===b.reviewer);
+  const audT  = state.teachers.find(t=>t.id===b.auditor);
+  const examInfo = [b.examDay,b.examDate,b.examHall,
+    b.examStart?(b.examStart+(b.examEnd?" — "+b.examEnd:"")):""]
+    .filter(Boolean).join(" · ");
+  const win = window.open("","_blank","width=520,height=680");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>طباعة الباركود — ${b.barcode}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#0B1D3A;padding:32px 28px;text-align:center}
+  .school{font-size:15px;font-weight:700;color:#0B1D3A;margin-bottom:2px}
+  .sub{font-size:12px;color:#8A95AE;margin-bottom:20px}
+  .qr-box{display:flex;justify-content:center;margin-bottom:12px}
+  .qr-box svg{border:2px solid #0B1D3A;border-radius:8px}
+  .barcode{font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:#0B1D3A;margin-bottom:18px}
+  .info-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;text-align:right}
+  .info-table td{padding:6px 10px;border-bottom:1px solid #EEF1F8}
+  .info-table td:first-child{color:#8A95AE;font-weight:600;width:35%}
+  .info-table td:last-child{font-weight:700;color:#0B1D3A}
+  .hint{background:#FEF3C7;border-radius:8px;padding:9px 13px;font-size:11px;color:#B45309;margin-bottom:20px;border:1px solid #FDE68A}
+  .actions{display:flex;gap:8px;justify-content:center}
+  .btn{padding:9px 22px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit}
+  .btn-print{background:#0B1D3A;color:#fff}
+  .btn-close{background:#F1F3F8;color:#4E5D7A}
+  @media print{.actions{display:none}body{padding:16px}}
+</style>
+</head>
+<body>
+  <p class="school">${state.schoolName}</p>
+  <p class="sub">بطاقة تعريف المظروف</p>
+  <div class="qr-box">${makeQR(b.barcode,170)}</div>
+  <p class="barcode">${b.barcode}</p>
+  <table class="info-table">
+    <tr><td>المادة</td><td>${b.subject}</td></tr>
+    ${b.grade?`<tr><td>الصف</td><td>${b.grade}</td></tr>`:""}
+    <tr><td>عدد الأوراق</td><td>${b.count} ورقة</td></tr>
+    ${b.examDate?`<tr><td>تاريخ الاختبار</td><td>${b.examDay||""} ${b.examDate}</td></tr>`:""}
+    ${b.examStart?`<tr><td>الوقت</td><td>${b.examStart}${b.examEnd?" — "+b.examEnd:""}</td></tr>`:""}
+    ${b.examHall?`<tr><td>القاعة</td><td>${b.examHall}</td></tr>`:""}
+    ${corrT?`<tr><td>المصحح</td><td>${corrT.name}</td></tr>`:""}
+    ${revT?`<tr><td>المراجع</td><td>${revT.name}</td></tr>`:""}
+    ${audT?`<tr><td>المدقق</td><td>${audT.name}</td></tr>`:""}
+  </table>
+  <div class="hint">📌 الصق هذا الباركود على المظروف قبل توزيع الأوراق</div>
+  <div class="actions">
+    <button class="btn btn-print" onclick="window.print()">🖨️ طباعة</button>
+    <button class="btn btn-close" onclick="window.close()">إغلاق</button>
+  </div>
+</body>
+</html>`);
+  win.document.close();
 }
 
-// ═══════════════════════════════════════════════
-// ADMIN — LIST (with delete)
-// ═══════════════════════════════════════════════
+
 function renderAdminList(el) {
   if(state.bundles.length===0) {
-    el.innerHTML=`<div class="card"><p class="empty">لا توجد مظاريف — أنشئ مظروفاً أولاً من قسم "مظروف جديد"</p></div>`;
+    el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◈</span>لا توجد مظاريف بعد<br/><span style="font-size:12px;color:var(--faint)">أنشئ مظروفاً من قسم "مظروف جديد"</span></div></div>`;
     return;
   }
   el.innerHTML=`
@@ -887,7 +1038,7 @@ function renderAdminBundleList() {
   if(!container)return;
   container.innerHTML = "";
   state.bundles.forEach((b,idx) => {
-    const stageName = b.stage<0?"🆕 جديد":state.stages[b.stage]||"—";
+    const stageName = b.stage<0?"◈ جديد":state.stages[b.stage]||"—";
     const color     = b.stage<0?"var(--muted)":sc(b.stage);
     const corrT     = state.teachers.find(t=>t.id===b.corrector);
     const pct       = state.stages.length ? Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)) : 0;
@@ -895,23 +1046,24 @@ function renderAdminBundleList() {
     div.className="bundleCard";
     div.style.cursor="default";
     div.innerHTML=`
-      <div class="bundleIcon" style="background:${color}20">${makeQR(b.barcode,42).replace('<svg','<svg style="border-radius:4px"')}</div>
-      <div class="bundleInfo">
+      <div class="bundle-icon" style="background:${color}20">${makeQR(b.barcode,42).replace('<svg','<svg style="border-radius:4px"')}</div>
+      <div class="bundle-info">
         <div class="row" style="flex-wrap:wrap;gap:5px">
-          <span class="bundleName">${b.subject}</span>
+          <span class="bundle-name">${b.subject}</span>
           ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
           <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
         </div>
-        <p class="bundleMeta">${b.barcode}${corrT?" · ✏️ "+corrT.name:""}</p>
-        <div class="bundleProgress">
-          <div class="progressBar"><div class="progressFill" style="width:${pct}%;background:${color}"></div></div>
+        <p class="bundle-meta">${b.barcode}${corrT?" · ✏️ "+corrT.name:""}</p>
+        <div class="bundle-progress">
+          <div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${color}"></div></div>
           <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
         </div>
       </div>
-      <div class="bundleActions">
-        <span class="bundleStageBadge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>
-        <button class="btn btn-sm" style="background:var(--navy);color:#fff" onclick="adminEditBundle('${b.id}')">✏️</button>
-        <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="adminDeleteBundle('${b.id}')">🗑️</button>
+      <div class="bundle-actions">
+        <span class="bundle-badge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>
+        <button class="btn btn-sm" style="background:var(--mid);color:#fff" onclick="printBundleFull('${b.id}')" title="طباعة الباركود">🖨️</button>
+        <button class="btn btn-sm" style="background:var(--navy);color:#fff" onclick="adminEditBundle('${b.id}')" title="تعديل">✏️</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="adminDeleteBundle('${b.id}')" title="حذف">🗑️</button>
       </div>`;
     container.appendChild(div);
   });
@@ -1019,15 +1171,43 @@ let _confirmStg = null;
 function renderCtrlScan(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📷 مسح باركود المظروف</p>
+    <p class="card-title"><span class="ct-icon" style="background:var(--blueBg);color:var(--blue)">◉</span>مسح باركود المظروف</p>
+    <!-- Camera scanner -->
+    <div id="cameraSection" style="margin-bottom:14px">
+      <button id="camToggleBtn" class="btn btn-camera btn-full" onclick="toggleCamera()" style="margin-bottom:10px">📸 &nbsp;مسح بكاميرا الجوال</button>
+      <div id="cameraContainer" class="cam-container">
+        <video id="camVideo" autoplay playsinline muted style="width:100%;max-height:300px;display:block;object-fit:cover"></video>
+        <canvas id="camCanvas" style="display:none"></canvas>
+        <div class="cam-overlay">
+          <div class="cam-frame">
+            <div class="cam-corner tr"></div>
+            <div class="cam-corner tl"></div>
+            <div class="cam-corner br"></div>
+            <div class="cam-corner bl"></div>
+            <div class="cam-line"></div>
+          </div>
+        </div>
+        <div class="cam-status-bar">
+          <p id="camStatus" style="color:#fff;font-size:13px;margin:0">وجّه الكاميرا نحو الباركود المطبوع</p>
+        </div>
+        <button onclick="stopCamera()" class="cam-close">&#215;</button>
+      </div>
+    </div>
+    <!-- Divider -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;color:var(--muted)">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;font-weight:600;color:var(--muted);background:var(--bg);padding:0 10px">أو أدخل الرقم يدوياً</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <!-- Manual input -->
     <div class="row" style="margin-bottom:12px">
-      <input class="inp" id="scanInput" placeholder="أدخل رقم الباركود..." dir="ltr" style="flex:1;font-family:monospace;font-size:15px;letter-spacing:1px" autofocus/>
-      <button class="btn btn-navy" onclick="doScan()">مسح ◀</button>
+      <input class="inp" id="scanInput" placeholder="M1A2B3 ..." dir="ltr" style="flex:1;font-family:monospace;font-size:15px;letter-spacing:1px"/>
+      <button class="btn btn-navy" onclick="doScan()">بحث</button>
     </div>
     ${state.bundles.length?`
     <p style="font-size:11px;color:var(--muted);margin-bottom:6px">اختر للاختبار السريع:</p>
     <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">
-      ${state.bundles.map(b=>`<button onclick="quickScan('${b.id}')" style="padding:3px 9px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--mid);font-family:monospace">${b.barcode}</button>`).join("")}
+      ${state.bundles.map(b=>`<button onclick="quickScan('${b.id}')" style="padding:4px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r6);font-size:11px;cursor:pointer;color:var(--navy);font-family:monospace;font-weight:600;transition:all .15s;box-shadow:var(--sh1)">${b.barcode}</button>`).join("")}
     </div>`:""}
     <div id="scanErr"></div>
   </div>
@@ -1035,6 +1215,100 @@ function renderCtrlScan(el) {
 
   document.getElementById("scanInput").addEventListener("keydown", e=>{ if(e.key==="Enter") doScan(); });
   if(_scanHit) renderScanResult();
+}
+
+// ── Camera QR scanning ──────────────────────────────────────
+let _camStream = null;
+let _camAnimFrame = null;
+let _camActive = false;
+
+function toggleCamera() {
+  if(_camActive) { stopCamera(); return; }
+  startCamera();
+}
+
+async function startCamera() {
+  const container = document.getElementById("cameraContainer");
+  const btn       = document.getElementById("camToggleBtn");
+  const status    = document.getElementById("camStatus");
+  if(!container || !btn) return;
+
+  // Check jsQR loaded
+  if(typeof jsQR === "undefined") {
+    toast("مكتبة القراءة غير محملة — تحقق من الاتصال بالإنترنت","err");
+    return;
+  }
+
+  try {
+    _camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width:{ideal:1280}, height:{ideal:720} }
+    });
+    const video = document.getElementById("camVideo");
+    video.srcObject = _camStream;
+    await video.play();
+    container.style.display = "block";
+    btn.innerHTML = `⏹ &nbsp;إيقاف الكاميرا`;
+    btn.style.background = "var(--red)";
+    _camActive = true;
+    scanFrame();
+  } catch(err) {
+    if(err.name === "NotAllowedError") {
+      toast("يرجى السماح بالوصول للكاميرا من إعدادات المتصفح","err");
+    } else if(err.name === "NotFoundError") {
+      toast("لم يتم الععثور على كاميرا في هذا الجهاز","err");
+    } else {
+      toast("تعذّر تشغيل الكاميرا: " + err.message,"err");
+    }
+  }
+}
+
+function scanFrame() {
+  const video  = document.getElementById("camVideo");
+  const canvas = document.getElementById("camCanvas");
+  const status = document.getElementById("camStatus");
+  if(!video || !canvas || !_camActive) return;
+
+  if(video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts:"dontInvert" });
+    if(code) {
+      stopCamera();
+      const val = code.data.trim();
+      const inp = document.getElementById("scanInput");
+      if(inp) inp.value = val;
+      // Try to find bundle
+      const b = state.bundles.find(x=>x.barcode===val);
+      if(b) {
+        _scanHit=b; _confirmStg=null;
+        document.getElementById("scanErr").innerHTML="";
+        renderScanResult();
+        toast("✅ تم مسح الباركود: " + val);
+      } else {
+        document.getElementById("scanErr").innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${val}</p>`;
+        toast("الباركود غير معروف: " + val,"err");
+      }
+      return;
+    }
+    if(status) status.textContent = "جارٍ البحث عن الباركود...";
+  }
+  _camAnimFrame = requestAnimationFrame(scanFrame);
+}
+
+function stopCamera() {
+  _camActive = false;
+  cancelAnimationFrame(_camAnimFrame);
+  if(_camStream) { _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; }
+  const container = document.getElementById("cameraContainer");
+  const btn       = document.getElementById("camToggleBtn");
+  if(container) container.style.display="none";
+  if(btn) {
+    btn.innerHTML = `<span style="font-size:20px">📸</span> مسح بالكاميرا`;
+    btn.style.background="";
+  }
 }
 
 function quickScan(id) {
@@ -1072,51 +1346,51 @@ function renderScanResult() {
   const audT  = state.teachers.find(t=>t.id===b.auditor);
   const pct   = state.stages.length ? Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)) : 0;
   const logHTML = [...b.log].reverse().map(e=>`
-    <div class="logEntry">
-      <div class="logDot" style="background:${sc(e.stageIdx)}"></div>
+    <div class="log-entry">
+      <div class="log-dot" style="background:${sc(e.stageIdx)}"></div>
       <div>
-        <span class="logLabel">${e.stageLabel}</span>
-        <span class="logMeta">${fmt(e.ts)} — ${e.user}</span>
-        ${e.note?`<p class="logNote">"${e.note}"</p>`:""}
+        <span class="log-label">${e.stageLabel}</span>
+        <span class="log-meta">${fmt(e.ts)} — ${e.user}</span>
+        ${e.note?`<p class="log-note">"${e.note}"</p>`:""}
       </div>
     </div>`).join("");
 
   container.innerHTML=`
   <div class="card">
     <!-- Stage header -->
-    <div class="stageHeader" style="background:${color}">
-      <div style="font-size:34px">📦</div>
+    <div class="stage-header" style="background:${color}">
+      <div style="width:52px;height:52px;background:rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.25)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
       <div style="flex:1">
         <p class="bc">باركود المظروف</p>
         <p class="bcode">${b.barcode}</p>
-        <span class="stagePill">${b.stage<0?"🆕 جديد — لم تبدأ المراحل بعد":state.stages[b.stage]||"—"}</span>
+        <span class="stage-pill">${b.stage<0?"◈ جديد — لم تبدأ المراحل بعد":state.stages[b.stage]||"—"}</span>
       </div>
     </div>
     <!-- Info -->
-    <div class="infoGrid">
-      <div class="infoCell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
-      <div class="infoCell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
-      <div class="infoCell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
-      <div class="infoCell"><p class="k">تاريخ الإنشاء</p><p class="v">${fmt(b.created)}</p></div>
-      <div class="infoCell"><p class="k">✏️ المصحح</p><p class="v">${corrT?corrT.name:"—"}</p></div>
-      <div class="infoCell"><p class="k">🔍 المراجع</p><p class="v">${revT?revT.name:"—"}</p></div>
-      <div class="infoCell"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>
-      ${b.note?`<div class="infoCell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
-      ${b.examDate?`<div class="infoCell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
-      ${b.examStart?`<div class="infoCell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
-      ${b.examHall?`<div class="infoCell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
+    <div class="info-grid">
+      <div class="info-cell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
+      <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
+      <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
+      <div class="info-cell"><p class="k">تاريخ الإنشاء</p><p class="v">${fmt(b.created)}</p></div>
+      <div class="info-cell"><p class="k">✏️ المصحح</p><p class="v">${corrT?corrT.name:"—"}</p></div>
+      <div class="info-cell"><p class="k">🔍 المراجع</p><p class="v">${revT?revT.name:"—"}</p></div>
+      <div class="info-cell" style="grid-column:span 2"><p class="k">🔏 المدقق</p><p class="v">${audT?audT.name:"—"}</p></div>
+      ${b.note?`<div class="info-cell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
+      ${b.examDate?`<div class="info-cell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
+      ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
+      ${b.examHall?`<div class="info-cell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
     </div>
     <!-- Progress -->
-    <div class="progressWrap">
-      <div class="progressLabel"><span>مسار الأوراق</span><span style="font-weight:700;color:var(--navy)">${Math.max(0,b.stage+1)} / ${state.stages.length}</span></div>
-      <div class="progressStrip">
-        ${state.stages.map((_,i)=>`<div class="progressSeg" title="${state.stages[i]}" style="background:${i<=b.stage?sc(i):"var(--border)"}"></div>`).join("")}
+    <div class="progress-wrap">
+      <div class="progress-labels"><span>مسار الأوراق</span><span style="font-weight:700;color:var(--navy)">${Math.max(0,b.stage+1)} / ${state.stages.length}</span></div>
+      <div class="progress-strip">
+        ${state.stages.map((_,i)=>`<div class="progress-seg" title="${state.stages[i]}" style="background:${i<=b.stage?sc(i):"var(--border)"}"></div>`).join("")}
       </div>
     </div>
     <!-- Stage selector / confirm -->
     <div id="stageSelectorArea"></div>
     <!-- Log -->
-    ${b.log.length?`<hr class="divider"><p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">سجل الحركة</p>${logHTML}`:""}
+    ${b.log.length?`<hr class="divider"><p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="color:var(--gold)">▤</span>سجل الحركة</p>${logHTML}`:""}
   </div>`;
   renderStageSelector();
 }
@@ -1129,11 +1403,11 @@ function renderStageSelector() {
     const idx=_confirmStg;
     const c=sc(idx);
     area.innerHTML=`
-    <div class="confirmBox" style="border-color:${c}">
-      <p style="font-weight:800;font-size:14px;color:var(--navy);margin-bottom:4px">تأكيد تحديث المرحلة</p>
+    <div class="confirm-box" style="border-color:${c}">
+      <p style="font-weight:800;font-size:14px;color:var(--navy);margin-bottom:4px;display:flex;align-items:center;gap:7px"><span style="font-size:18px">◎</span>تأكيد تحديث المرحلة</p>
       <p style="font-size:12px;color:var(--mid);margin-bottom:12px">سيتم تحديث المظروف <strong>${b.barcode}</strong> إلى:</p>
-      <div class="confirmHighlight" style="background:${c}15;border:1px solid ${c}40">
-        <div class="confirmNum" style="background:${c}">${idx+1}</div>
+      <div class="confirm-hl" style="background:${c}15;border:1px solid ${c}40">
+        <div class="confirm-num" style="background:${c}">${idx+1}</div>
         <span style="font-weight:800;color:${c};font-size:14px">${state.stages[idx]}</span>
       </div>
       <input class="inp" id="stageNote" placeholder="ملاحظة (اختياري)" style="margin-bottom:10px"/>
@@ -1144,19 +1418,19 @@ function renderStageSelector() {
     </div>`;
     return;
   }
-  let html=`<p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">اختر المرحلة الجديدة للمظروف:</p>`;
+  let html=`<p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="width:20px;height:20px;background:var(--navy);color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px">▸</span>اختر المرحلة الجديدة للمظروف:</p>`;
   state.stages.forEach((s,i)=>{
     const done=i<=b.stage;
     const next=i===b.stage+1;
     const c=sc(i);
-    html+=`<button class="stageItem"
+    html+=`<button class="stage-item"
       style="${done?`border-color:var(--border);background:var(--bg);`:next?`border-color:${c};background:${c}15`:""}"
       ${done?"disabled":""}
       onclick="if(!this.disabled){_confirmStg=${i};renderStageSelector()}">
-      <div class="stageNum" style="background:${done?"var(--green)":next?c:"var(--border)"}">${done?"✓":i+1}</div>
-      <span class="stageItemLabel" style="${done?"color:var(--muted)":next?`color:${c};font-weight:700`:"color:var(--mid)"}">${s}</span>
-      ${next?`<span class="stageNextTag" style="background:${c}20;color:${c}">التالية</span>`:""}
-      ${done?`<span class="stageDoneMark">✓</span>`:""}
+      <div class="stage-num" style="background:${done?"var(--green)":next?c:"var(--border)"}">${done?"✓":i+1}</div>
+      <span class="stage-item-label" style="${done?"color:var(--muted)":next?`color:${c};font-weight:700`:"color:var(--mid)"}">${s}</span>
+      ${next?`<span class="stage-next-tag" style="background:${c}20;color:${c}">التالية</span>`:""}
+      ${done?`<span style="font-size:12px;color:var(--green)">✓</span>`:""}
     </button>`;
   });
   area.innerHTML=html;
@@ -1180,31 +1454,31 @@ function doAdvance() {
 // CONTROLLER — LIST
 // ═══════════════════════════════════════════════
 function renderCtrlList(el) {
-  if(state.bundles.length===0){ el.innerHTML=`<div class="card"><p class="empty">لا توجد مظاريف حتى الآن</p></div>`; return; }
+  if(state.bundles.length===0){ el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◈</span>لا توجد مظاريف حتى الآن<br/><span style="font-size:12px;color:var(--faint)">أنشئ مظروفاً جديداً من حساب المدير</span></div></div>`; return; }
   el.innerHTML=`<div id="ctrlBundleList"></div>`;
   const container=document.getElementById("ctrlBundleList");
   state.bundles.forEach(b=>{
-    const stageName=b.stage<0?"🆕 جديد":state.stages[b.stage]||"—";
+    const stageName=b.stage<0?"◈ جديد":state.stages[b.stage]||"—";
     const color=b.stage<0?"var(--muted)":sc(b.stage);
     const pct=state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
     const div=document.createElement("div");
     div.className="bundleCard";
     div.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
     div.innerHTML=`
-      <div class="bundleIcon" style="background:${color}20;font-size:22px">📦</div>
-      <div class="bundleInfo">
+      <div class="bundle-icon" style="background:${color}20;overflow:hidden"><svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='${color}' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/><polyline points='3.27 6.96 12 12.01 20.73 6.96'/><line x1='12' y1='22.08' x2='12' y2='12'/></svg></div>
+      <div class="bundle-info">
         <div class="row" style="flex-wrap:wrap;gap:5px">
-          <span class="bundleName">${b.subject}</span>
+          <span class="bundle-name">${b.subject}</span>
           ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
           <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
         </div>
-        <p class="bundleMeta">${b.barcode}</p>
-        <div class="bundleProgress">
-          <div class="progressBar"><div class="progressFill" style="width:${pct}%;background:${color}"></div></div>
+        <p class="bundle-meta">${b.barcode}</p>
+        <div class="bundle-progress">
+          <div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${color}"></div></div>
           <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
         </div>
       </div>
-      <span class="bundleStageBadge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>`;
+      <span class="bundle-badge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>`;
     container.appendChild(div);
   });
 }
@@ -1223,18 +1497,18 @@ function renderNotifSend(el) {
 
   const teachersHTML=state.teachers.map(t=>`
     <button class="teacherRow${_selTeachers.includes(t.id)?" selected":""}" onclick="toggleTeacher('${t.id}')">
-      <div class="teacherAvatar" style="background:${_selTeachers.includes(t.id)?"var(--navy)":"var(--border)"}">${_selTeachers.includes(t.id)?"✓":t.name.charAt(0)}</div>
+      <div class="t-avatar" style="background:${_selTeachers.includes(t.id)?"var(--navy)":"var(--border)"}">${_selTeachers.includes(t.id)?"✓":t.name.charAt(0)}</div>
       <div style="flex:1;text-align:right">
         <span style="font-weight:${_selTeachers.includes(t.id)?800:400};color:${_selTeachers.includes(t.id)?"var(--navy)":"var(--mid)"};font-size:13px">${t.name}</span>
         <span style="font-size:11px;color:var(--muted);margin-right:6px">${t.subject}</span>
       </div>
       <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
-      <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
+      <span style="font-size:10px;color:var(--wa);font-family:monospace;direction:ltr;background:var(--waBg);padding:2px 7px;border-radius:99px">◈ ${t.phone}</span>
     </button>`).join("") || `<p class="empty">لا يوجد معلمون — أضفهم من الإعدادات</p>`;
 
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📲 إرسال تنبيه واتساب للمعلمين</p>
+    <p class="card-title">📲 إرسال تنبيه واتساب للمعلمين</p>
     <label class="lbl">نوع التنبيه</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${ntHTML}</div>
     <label class="lbl">المعلمون المستهدفون (اختر واحداً أو أكثر)</label>
@@ -1334,11 +1608,11 @@ function sendNotif() {
 // ═══════════════════════════════════════════════
 function renderNotifLog(el) {
   if(state.notifLog.length===0){
-    el.innerHTML=`<div class="card"><p class="empty">لم يتم إرسال أي تنبيهات بعد</p></div>`;
+    el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◌</span>لا توجد تنبيهات مرسلة بعد</div></div>`;
     return;
   }
   el.innerHTML=`<div>${state.notifLog.map(n=>`
-    <div class="nlogCard" style="border-right-color:${n.typeColor||"var(--border)"}">
+    <div class="nlog-card" style="border-right-color:${n.typeColor||"var(--border)"}">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <span style="font-size:24px;flex-shrink:0">${n.typeIcon}</span>
         <div style="flex:1">
@@ -1369,7 +1643,7 @@ let _sTab="general", _editStages=null;
 function renderSettings(el) {
   if(!_editStages) _editStages=[...state.stages];
   el.innerHTML=`
-  <div class="settingsTabs">
+  <div class="s-tabs">
     ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["users","👥 حسابات"],["phone","📱 واتساب"]].map(([k,l])=>`
     <button class="sTab${_sTab===k?" active":""}" onclick="switchSTab('${k}')">${l}</button>`).join("")}
   </div>
@@ -1396,7 +1670,7 @@ function renderSTabContent() {
 function renderSGeneral(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">🏫 اسم المدرسة / المؤسسة</p>
+    <p class="card-title">🏫 اسم المدرسة / المؤسسة</p>
     <input class="inp" id="s_school" value="${state.schoolName}" style="margin-bottom:12px"/>
     <div class="row" style="flex-wrap:wrap;gap:8px">
     <button class="btn btn-navy" onclick="
@@ -1417,12 +1691,12 @@ function renderSGeneral(el) {
 function renderSSubjects(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📚 المواد الدراسية</p>
+    <p class="card-title">📚 المواد الدراسية</p>
     <div id="subjectList">
       ${state.subjects.map((s,i)=>`
-      <div class="listItem">
-        <span class="liText">${s}</span>
-        <button class="delBtn" onclick="state.subjects.splice(${i},1);saveState();renderSTabContent()">×</button>
+      <div class="list-item">
+        <span class="li-text">${s}</span>
+        <button class="del-btn" onclick="state.subjects.splice(${i},1);saveState();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
@@ -1437,12 +1711,12 @@ function renderSSubjects(el) {
 function renderSGrades(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">🎓 الصفوف الدراسية</p>
+    <p class="card-title">🎓 الصفوف الدراسية</p>
     <div>
       ${state.grades.map((g,i)=>`
-      <div class="listItem">
-        <span class="liText">${g}</span>
-        <button class="delBtn" onclick="state.grades.splice(${i},1);saveState();renderSTabContent()">×</button>
+      <div class="list-item">
+        <span class="li-text">${g}</span>
+        <button class="del-btn" onclick="state.grades.splice(${i},1);saveState();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
@@ -1458,14 +1732,14 @@ function renderSStages(el) {
   if(!_editStages) _editStages=[...state.stages];
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">🔄 مراحل سير المظروف</p>
+    <p class="card-title">🔄 مراحل سير المظروف</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px">عدّل أسماء المراحل أو احذف أو أضف جديدة</p>
     <div id="stageEditList">
       ${_editStages.map((s,i)=>`
       <div class="row" style="margin-bottom:6px">
-        <div class="stageNum" style="background:${sc(i)};width:26px;height:26px;flex-shrink:0">${i+1}</div>
+        <div class="stage-num" style="background:${sc(i)};width:26px;height:26px;flex-shrink:0">${i+1}</div>
         <input class="inp" value="${s}" style="flex:1;margin:0" onchange="_editStages[${i}]=this.value"/>
-        <button class="delBtn" onclick="_editStages.splice(${i},1);renderSTabContent()">×</button>
+        <button class="del-btn" onclick="_editStages.splice(${i},1);renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin:10px 0">
@@ -1481,21 +1755,49 @@ function renderSStages(el) {
 function renderSTeachers(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">👨‍🏫 المعلمون (مصححون / مراجعون / مدققون)</p>
-    <div>
-      ${state.teachers.map(t=>`
-      <div class="listItem" style="flex-wrap:wrap;gap:6px">
-        <div style="flex:1;min-width:120px">
-          <span style="font-weight:700;color:var(--navy);font-size:13px">${t.name}</span>
-          <span style="font-size:11px;color:var(--muted);margin-right:5px">${t.subject}</span>
-        </div>
-        <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
-        <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
-        <button class="delBtn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');saveState();renderSTabContent()">×</button>
-      </div>`).join("")}
+    <p class="card-title">👨‍🏫 المعلمون — ${state.teachers.length} معلم</p>
+    <!-- Filter bar -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <input class="inp" id="teacherSearch" placeholder="بحث بالاسم أو المادة..." oninput="filterTeachers()" style="flex:1;min-width:160px"/>
+      <select class="inp" id="teacherRoleFilter" onchange="filterTeachers()" style="width:120px;flex-shrink:0">
+        <option value="">كل الأدوار</option>
+        <option value="corrector">مصحح</option>
+        <option value="reviewer">مراجع</option>
+        <option value="auditor">مدقق</option>
+      </select>
+      <select class="inp" id="teacherGradeFilter" onchange="filterTeachers()" style="width:130px;flex-shrink:0">
+        <option value="">كل الصفوف</option>
+        ${state.grades.map(g=>`<option value="${g}">${g}</option>`).join("")}
+      </select>
     </div>
+    <div id="teacherListContainer">
+    <div>
+      ${state.teachers.map(t=>{
+      const roleColors={corrector:["var(--blue)","var(--blueBg)"],reviewer:["var(--purple)","var(--purBg)"],auditor:["var(--green)","var(--greenBg)"]};
+      const [rc,rb]=roleColors[t.role]||["var(--mid)","var(--bg)"];
+      return `
+      <div class="list-item" style="flex-wrap:wrap;gap:7px;padding:11px 13px">
+        <div style="flex:1;min-width:140px">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-weight:700;color:var(--navy);font-size:13px">${t.name}</span>
+            <span class="tag" style="background:${rb};color:${rc};font-size:10px">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
+          </div>
+          <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap">
+            ${t.subject?`<span style="font-size:11px;color:var(--mid)">◈ ${t.subject}</span>`:""}
+            ${t.grade?`<span style="font-size:11px;color:var(--muted)">· ${t.grade}</span>`:""}
+          </div>
+          ${t.phone?`<span style="font-size:10px;color:var(--wa);font-family:monospace;direction:ltr;background:var(--waBg);padding:2px 7px;border-radius:99px;display:inline-block;margin-top:3px">📱 ${t.phone}</span>`:""}
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <button onclick="openEditTeacher('${t.id}')" style="padding:5px 10px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">✏️</button>
+          <button class="del-btn" onclick="if(confirm('حذف '+t.name+'؟')){state.teachers=state.teachers.filter(x=>x.id!==t.id);saveState();renderSTabContent()}">×</button>
+        </div>
+      </div>`;
+    }).join("")}}
+    </div>
+    </div><!-- /teacherListContainer -->
     <hr class="divider"/>
-    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">إضافة معلم جديد</p>
+    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">➕ إضافة معلم جديد</p>
     <div class="g2" style="margin-bottom:8px">
       <input class="inp" id="nt_name" placeholder="الاسم"/>
       <input class="inp" id="nt_phone" placeholder="+966XXXXXXXXX" dir="ltr"/>
@@ -1515,7 +1817,7 @@ function renderSTeachers(el) {
   </div>
 
   <div class="card" style="margin-top:0">
-    <p class="cardTitle">📥 رفع ملف Excel دفعة واحدة</p>
+    <p class="card-title">📥 رفع ملف Excel دفعة واحدة</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">ارفع ملف Excel يحتوي على بيانات المعلمين لإضافتهم جميعاً دفعة واحدة</p>
 
     <!-- Download template -->
@@ -1535,7 +1837,7 @@ function renderSTeachers(el) {
       ondragover="event.preventDefault();this.style.borderColor='var(--navy)';this.style.background='var(--blueBg)'"
       ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg)'"
       ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='var(--bg)';handleXlsxDrop(event)">
-      <div style="font-size:36px;margin-bottom:8px">📂</div>
+      <div style="width:56px;height:56px;background:var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--mid)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
       <p style="font-weight:700;color:var(--navy);font-size:14px">الخطوة 2 — رفع الملف</p>
       <p style="font-size:12px;color:var(--muted);margin-top:4px">اضغط هنا أو اسحب ملف Excel إلى هذه المنطقة</p>
       <p style="font-size:11px;color:var(--border);margin-top:8px">يدعم .xlsx و .xls</p>
@@ -1548,12 +1850,13 @@ function renderSTeachers(el) {
 }
 
 function addTeacher() {
-  const name  = document.getElementById("nt_name")?.value.trim();
-  const phone = document.getElementById("nt_phone")?.value.trim();
-  const subject=document.getElementById("nt_subject")?.value;
-  const role  = document.getElementById("nt_role")?.value;
-  if(!name||!phone){ toast("أدخل الاسم ورقم الواتساب","err"); return; }
-  state.teachers.push({ id:"T"+uid(), name, phone, subject, role });
+  const name    = document.getElementById("nt_name")?.value.trim();
+  const phone   = document.getElementById("nt_phone")?.value.trim()||"";
+  const subject = document.getElementById("nt_subject")?.value||"";
+  const grade   = document.getElementById("nt_grade")?.value||"";
+  const role    = document.getElementById("nt_role")?.value||"corrector";
+  if(!name){ toast("أدخل اسم المعلم","err"); return; }
+  state.teachers.push({ id:"T"+uid(), name, phone, subject, grade, role });
   saveState();
   toast("تم إضافة المعلم ✅");
   renderSTabContent();
@@ -1562,7 +1865,7 @@ function addTeacher() {
 function renderSPhone(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📱 رقم واتساب المدير</p>
+    <p class="card-title">📱 رقم واتساب المدير</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يستخدم في المراسلات المباشرة ومسؤول التنبيهات</p>
     <label class="lbl">رقم الواتساب (بمفتاح الدولة +966)</label>
     <input class="inp" id="s_adminPhone" value="${state.adminPhone}" dir="ltr" placeholder="+966XXXXXXXXX" style="margin-bottom:12px"/>
@@ -1582,17 +1885,17 @@ function renderSPhone(el) {
 function renderSUsers(el) {
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">👥 حسابات النظام</p>
+    <p class="card-title">👥 حسابات النظام</p>
     <div>
       ${state.users.map(u=>{
         const[col,bg]=ROLE_COLORS[u.role]||["#888","#eee"];
-        return `<div class="listItem" style="flex-wrap:wrap;gap:6px">
+        return `<div class="list-item" style="flex-wrap:wrap;gap:6px">
           <div style="flex:1">
             <span style="font-weight:700;color:var(--navy);font-size:13px">${u.name}</span>
             <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${u.username}</span>
           </div>
           <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
-          ${u.id!==currentUser?.id?`<button class="delBtn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
+          ${u.id!==currentUser?.id?`<button class="del-btn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
         </div>`;
       }).join("")}
     </div>
@@ -1637,7 +1940,7 @@ function renderCtrlSchedule(el) {
   const bundlesWithDate = state.bundles.filter(b=>b.examDate);
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📅 جدول الاختبارات</p>
+    <p class="card-title">📅 جدول الاختبارات</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يعرض جميع المظاريف التي تم تحديد تاريخ اختبار لها</p>
     ${bundlesWithDate.length===0?`<p class="empty">لا توجد مظاريف بتاريخ اختبار محدد — أضف التاريخ عند إنشاء المظروف أو من تعديله</p>`:`
     <div style="overflow-x:auto">
@@ -1724,7 +2027,7 @@ function renderCtrlReport(el) {
   const subjects = [...new Set(state.bundles.map(b=>b.subject))].sort();
   el.innerHTML=`
   <div class="card">
-    <p class="cardTitle">📄 تقارير PDF للكنترول</p>
+    <p class="card-title">📄 تقارير PDF للكنترول</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:16px">اختر المادة لإنشاء تقرير تفصيلي كامل قابل للطباعة</p>
     ${state.bundles.length===0?`<p class="empty">لا توجد مظاريف لإنشاء تقارير</p>`:`
     <!-- All subjects report -->
@@ -2129,11 +2432,154 @@ function confirmBulkImport(teachers) {
   renderSTabContent();
 }
 
+
+// ─── Edit teacher modal ──────────────────────────────────────
+function openEditTeacher(id) {
+  const t = state.teachers.find(x=>x.id===id);
+  if(!t) return;
+  const roleColors={corrector:"مصحح",reviewer:"مراجع",auditor:"مدقق"};
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.id = "editTeacherOverlay";
+  overlay.innerHTML = `
+  <div class="modal" style="max-width:460px">
+    <p class="modal-title" style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px">✏️</span> تعديل بيانات المعلم
+    </p>
+    <div class="g2" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">الاسم *</label>
+        <input class="inp" id="et_name" value="${t.name}"/>
+      </div>
+      <div>
+        <label class="lbl">رقم الجوال (واتساب)</label>
+        <input class="inp" id="et_phone" value="${t.phone||''}" dir="ltr" placeholder="+966XXXXXXXXX"/>
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:10px">
+      <div>
+        <label class="lbl">المادة</label>
+        <select class="inp" id="et_subject">
+          <option value="">-- المادة --</option>
+          ${state.subjects.map(s=>`<option value="${s}"${s===t.subject?' selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">الصف</label>
+        <select class="inp" id="et_grade">
+          <option value="">-- الصف --</option>
+          ${state.grades.map(g=>`<option value="${g}"${g===t.grade?' selected':''}>${g}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="lbl">الدور</label>
+        <select class="inp" id="et_role">
+          <option value="corrector"${t.role==='corrector'?' selected':''}>مصحح</option>
+          <option value="reviewer"${t.role==='reviewer'?' selected':''}>مراجع</option>
+          <option value="auditor"${t.role==='auditor'?' selected':''}>مدقق</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="lbl">ملاحظة</label>
+      <input class="inp" id="et_note" value="${t.note||''}" placeholder="اختياري"/>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-navy" style="flex:1" onclick="saveEditTeacher('${t.id}')">💾 حفظ التعديلات</button>
+      <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('editTeacherOverlay').remove()">إلغاء</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  // Close on backdrop click
+  overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+}
+
+function saveEditTeacher(id) {
+  const t = state.teachers.find(x=>x.id===id);
+  if(!t) return;
+  const name = document.getElementById("et_name")?.value.trim();
+  if(!name){ toast("الاسم مطلوب","err"); return; }
+  t.name    = name;
+  t.phone   = document.getElementById("et_phone")?.value.trim()||t.phone||"";
+  t.subject = document.getElementById("et_subject")?.value||t.subject||"";
+  t.grade   = document.getElementById("et_grade")?.value||t.grade||"";
+  t.role    = document.getElementById("et_role")?.value||t.role;
+  t.note    = document.getElementById("et_note")?.value.trim()||"";
+  saveState();
+  document.getElementById("editTeacherOverlay")?.remove();
+  toast("✅ تم حفظ التعديلات");
+  renderSTabContent();
+}
+
+
+function filterTeachers() {
+  const q     = (document.getElementById("teacherSearch")?.value||"").trim().toLowerCase();
+  const role  = document.getElementById("teacherRoleFilter")?.value||"";
+  const grade = document.getElementById("teacherGradeFilter")?.value||"";
+  const container = document.getElementById("teacherListContainer");
+  if(!container) return;
+  const filtered = state.teachers.filter(t => {
+    const matchQ     = !q || t.name.includes(q) || (t.subject||"").includes(q);
+    const matchRole  = !role  || t.role===role;
+    const matchGrade = !grade || t.grade===grade;
+    return matchQ && matchRole && matchGrade;
+  });
+  const TEACHER_ROLE_LABEL = {corrector:"مصحح",reviewer:"مراجع",auditor:"مدقق"};
+  const roleColors={corrector:["var(--blue)","var(--blueBg)"],reviewer:["var(--purple)","var(--purBg)"],auditor:["var(--green)","var(--greenBg)"]};
+  if(filtered.length===0){
+    container.innerHTML=`<div class="empty"><span class="empty-icon">◌</span>لا توجد نتائج مطابقة</div>`;
+    return;
+  }
+  container.innerHTML = filtered.map(t=>{
+    const [rc,rb]=roleColors[t.role]||["var(--mid)","var(--bg)"];
+    return `
+    <div class="list-item" style="flex-wrap:wrap;gap:7px;padding:11px 13px">
+      <div style="flex:1;min-width:140px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-weight:700;color:var(--navy);font-size:13px">${t.name}</span>
+          <span class="tag" style="background:${rb};color:${rc};font-size:10px">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
+        </div>
+        <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap">
+          ${t.subject?`<span style="font-size:11px;color:var(--mid)">◈ ${t.subject}</span>`:""}
+          ${t.grade?`<span style="font-size:11px;color:var(--muted)">· ${t.grade}</span>`:""}
+        </div>
+        ${t.phone?`<span style="font-size:10px;color:var(--wa);font-family:monospace;direction:ltr;background:var(--waBg);padding:2px 7px;border-radius:99px;display:inline-block;margin-top:3px">📱 ${t.phone}</span>`:""}
+      </div>
+      <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+        <button onclick="openEditTeacher('${t.id}')" style="padding:5px 10px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">✏️ تعديل</button>
+        <button class="del-btn" onclick="if(confirm('حذف ${t.name}؟')){state.teachers=state.teachers.filter(x=>x.id!='${t.id}');saveState();renderSTabContent()}">×</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-loadState();          // ← restore from localStorage on page load
-renderLoginDemos();
+loadState();           // restore data from localStorage
+
+// ── Auto-login: restore session after page refresh ──────────
+(function restoreSession() {
+  try {
+    const raw = sessionStorage.getItem("examSession");
+    if (!raw) { renderLoginDemos(); return; }
+    const sess = JSON.parse(raw);
+    if (!sess || !sess.username) { renderLoginDemos(); return; }
+
+    // Find user in current state (works even after data changes)
+    const found = state.users.find(u => u.username === sess.username);
+    if (!found) { sessionStorage.removeItem("examSession"); renderLoginDemos(); return; }
+
+    // Re-enter the app on the same page the user was on
+    renderLoginDemos();
+    enterApp(found, sess.page || null);
+  } catch(e) {
+    sessionStorage.removeItem("examSession");
+    renderLoginDemos();
+  }
+})();
+
+
 </script>
 </body>
 </html>
