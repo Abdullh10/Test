@@ -512,6 +512,15 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
           </div>
           <span style="color:rgba(255,255,255,.35);font-size:18px">←</span>
         </button>
+        <button onclick="quickLogin('principal','prin123')"
+          style="display:flex;align-items:center;gap:12px;padding:13px 15px;background:linear-gradient(135deg,#065F46,#059669);border:none;border-radius:12px;cursor:pointer;width:100%;font-family:inherit">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏫</div>
+          <div style="flex:1;text-align:right">
+            <p style="color:#fff;font-weight:700;font-size:13px;margin:0">مدير المدرسة</p>
+            <p style="color:rgba(255,255,255,.5);font-size:11px;margin:0;font-family:monospace;direction:ltr">principal / prin123</p>
+          </div>
+          <span style="color:rgba(255,255,255,.35);font-size:18px">←</span>
+        </button>
       </div>
       <div id="demoBtns" style="display:none"></div>
     </div>
@@ -716,9 +725,10 @@ let state = {
     {id:"TBL051",name:"فيصل المطيري",role:"auditor",subject:"علوم الأرض والفضاء",grade:"ثالث ثانوي",phone:"+966551051051"},
   ],
   users: [
-    { id:"U1", name:"مدير النظام",        username:"admin",   password:"admin123", role:"admin"      },
-    { id:"U2", name:"الكنترول",           username:"ctrl",    password:"ctrl123",  role:"controller" },
-    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",  password:"1234",     role:"notifier"   },
+    { id:"U1", name:"مدير النظام",        username:"admin",     password:"admin123", role:"admin"      },
+    { id:"U2", name:"الكنترول",           username:"ctrl",      password:"ctrl123",  role:"controller" },
+    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    password:"1234",     role:"notifier"   },
+    { id:"U4", name:"مدير المدرسة",       username:"principal", password:"prin123",  role:"principal"  },
   ],
   bundles: [],
   notifLog: [],
@@ -728,8 +738,8 @@ let state = {
 let currentUser = null;
 let currentPage = "";
 
-const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات" };
-const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"] };
+const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات", principal:"مدير المدرسة" };
+const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"], principal:["#065F46","#D1FAE5"] };
 const TEACHER_ROLE_LABEL = { corrector:"مصحح 1", corrector2:"مصحح 2", reviewer:"مراجع 1", reviewer2:"مراجع 2", auditor:"مدقق 1", auditor2:"مدقق 2" };
 const NOTIFY_TYPES = [
   { key:"correction", label:"طلب تصحيح",    icon:"✎", color:"#EF4444" },
@@ -742,6 +752,7 @@ const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
   controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
+  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -844,9 +855,10 @@ function renderLoginDemos() {
 
 function quickLogin(username, password) {
   var allUsers = (state.users && state.users.length > 0) ? state.users : [
-    {id:"U1",name:"مدير النظام",      username:"admin",  password:"admin123", role:"admin"},
-    {id:"U2",name:"الكنترول",         username:"ctrl",   password:"ctrl123",  role:"controller"},
-    {id:"U3",name:"مسؤول التنبيهات", username:"notify", password:"1234",     role:"notifier"}
+    {id:"U1",name:"مدير النظام",      username:"admin",     password:"admin123", role:"admin"},
+    {id:"U2",name:"الكنترول",         username:"ctrl",      password:"ctrl123",  role:"controller"},
+    {id:"U3",name:"مسؤول التنبيهات", username:"notify",    password:"1234",     role:"notifier"},
+    {id:"U4",name:"مدير المدرسة",     username:"principal", password:"prin123",  role:"principal"},
   ];
   var found = null;
   for(var i=0;i<allUsers.length;i++){
@@ -946,6 +958,8 @@ function navigateTo(page) {
     case "notif_log":    renderNotifLog(el);      break;
     case "ctrl_schedule":renderCtrlSchedule(el);  break;
     case "ctrl_report":  renderCtrlReport(el);    break;
+    case "principal_dashboard": renderPrincipalDashboard(el); break;
+    case "principal_report":    renderPrincipalReport(el);    break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
   }
 }
@@ -1384,28 +1398,61 @@ async function startCamera() {
     return;
   }
 
+  // Try advanced constraints first, fall back to simple
+  const constraintSets = [
+    { video: { facingMode: { exact:"environment" }, width:{ideal:1920}, height:{ideal:1080}, focusMode:"continuous" } },
+    { video: { facingMode: "environment", width:{ideal:1280}, height:{ideal:720} } },
+    { video: { facingMode: "environment" } },
+    { video: true }
+  ];
+
+  let stream = null;
+  for(const constraints of constraintSets) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      break;
+    } catch(e) { /* try next */ }
+  }
+
+  if(!stream) {
+    toast("تعذّر تشغيل الكاميرا — تحقق من الصلاحيات","err");
+    return;
+  }
+
   try {
-    _camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width:{ideal:1280}, height:{ideal:720} }
-    });
+    _camStream = stream;
     const video = document.getElementById("camVideo");
     video.srcObject = _camStream;
+
+    // Apply torch/zoom if supported
+    const track = _camStream.getVideoTracks()[0];
+    if(track && track.getCapabilities) {
+      const caps = track.getCapabilities();
+      const adv = {};
+      if(caps.zoom && caps.zoom.max) adv.zoom = Math.min(2.0, caps.zoom.max * 0.4);
+      if(caps.focusMode && caps.focusMode.includes("continuous")) adv.focusMode = "continuous";
+      if(Object.keys(adv).length) try { await track.applyConstraints({advanced:[adv]}); } catch(e){}
+    }
+
     await video.play();
     container.style.display = "block";
     btn.innerHTML = `⏹ &nbsp;إيقاف الكاميرا`;
     btn.style.background = "var(--red)";
     _camActive = true;
+    _camFrameCount = 0;
     scanFrame();
   } catch(err) {
     if(err.name === "NotAllowedError") {
       toast("يرجى السماح بالوصول للكاميرا من إعدادات المتصفح","err");
     } else if(err.name === "NotFoundError") {
-      toast("لم يتم الععثور على كاميرا في هذا الجهاز","err");
+      toast("لم يتم الكاميرا في هذا الجهاز","err");
     } else {
       toast("تعذّر تشغيل الكاميرا: " + err.message,"err");
     }
   }
 }
+
+let _camFrameCount = 0;
 
 function scanFrame() {
   const video  = document.getElementById("camVideo");
@@ -1414,18 +1461,35 @@ function scanFrame() {
   if(!video || !canvas || !_camActive) return;
 
   if(video.readyState === video.HAVE_ENOUGH_DATA) {
+    _camFrameCount++;
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts:"dontInvert" });
+
+    // Try full frame first
+    let code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts:"dontInvert" });
+
+    // If not found, try inverted (dark on light)
+    if(!code) {
+      code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts:"onlyInvert" });
+    }
+
+    // If still not found, try center crop (focus zone)
+    if(!code) {
+      const cw = Math.floor(canvas.width * 0.6);
+      const ch = Math.floor(canvas.height * 0.6);
+      const cx = Math.floor((canvas.width - cw) / 2);
+      const cy = Math.floor((canvas.height - ch) / 2);
+      const cropData = ctx.getImageData(cx, cy, cw, ch);
+      code = jsQR(cropData.data, cw, ch, { inversionAttempts:"attemptBoth" });
+    }
+
     if(code) {
       stopCamera();
       const val = code.data.trim();
       const inp = document.getElementById("scanInput");
       if(inp) inp.value = val;
-      // Try to find bundle
       const b = state.bundles.find(x=>x.barcode===val);
       if(b) {
         _scanHit=b; _confirmStg=null;
@@ -1438,7 +1502,14 @@ function scanFrame() {
       }
       return;
     }
-    if(status) status.textContent = "جارٍ البحث عن الباركود...";
+
+    // Update status periodically
+    if(status) {
+      if(_camFrameCount % 30 === 0) {
+        const msgs = ["وجّه الكاميرا نحو الباركود المطبوع","ثبّت الكاميرا وقرّبها من الباركود","تأكد من الإضاءة الجيدة ووضوح الباركود"];
+        status.textContent = msgs[Math.floor(_camFrameCount/30) % msgs.length];
+      }
+    }
   }
   _camAnimFrame = requestAnimationFrame(scanFrame);
 }
@@ -1519,7 +1590,6 @@ function renderScanResult() {
       <div class="info-cell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
       <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
       <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
-      <div class="info-cell"><p class="k">تاريخ الإنشاء</p><p class="v">${fmt(b.created)}</p></div>
       <div class="info-cell"><p class="k">✏️ مصحح 1</p><p class="v">${corrT?corrT.name:"—"}</p></div>
       ${corrT2?`<div class="info-cell"><p class="k">✏️ مصحح 2</p><p class="v">${corrT2.name}</p></div>`:""}
       <div class="info-cell"><p class="k">🔍 مراجع 1</p><p class="v">${revT?revT.name:"—"}</p></div>
@@ -2034,6 +2104,7 @@ function renderSUsers(el) {
       <input class="inp" id="nu_pass" placeholder="كلمة المرور" dir="ltr"/>
       <select class="inp" id="nu_role">
         <option value="admin">مدير النظام</option>
+        <option value="principal">مدير المدرسة</option>
         <option value="controller">الكنترول</option>
         <option value="notifier">مسؤول التنبيهات</option>
       </select>
@@ -2562,6 +2633,311 @@ function confirmBulkImport(teachers) {
 }
 
 // ═══════════════════════════════════════════════
+// PRINCIPAL — DASHBOARD
+// ═══════════════════════════════════════════════
+function renderPrincipalDashboard(el) {
+  const total   = state.bundles.length;
+  const done    = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg  = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB    = state.bundles.filter(b=>b.stage<0).length;
+  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
+  const pct = total>0?Math.round((done/total)*100):0;
+
+  // Subject breakdown
+  const subjectMap = {};
+  state.bundles.forEach(b=>{
+    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,papers:0};
+    subjectMap[b.subject].total++;
+    subjectMap[b.subject].papers += b.count;
+    if(b.stage===state.stages.length-1) subjectMap[b.subject].done++;
+  });
+
+  // Stage distribution for bar chart
+  const stageDistrib = state.stages.map((s,i)=>{
+    const cnt = state.bundles.filter(b=>b.stage===i).length;
+    return {label:s.length>10?s.substring(0,10)+"…":s, count:cnt, color:sc(i)};
+  }).filter(s=>s.count>0);
+
+  // Recent activity (last 5 log entries across all bundles)
+  const allLogs = [];
+  state.bundles.forEach(b=>b.log.forEach(e=>allLogs.push({...e, barcode:b.barcode, subject:b.subject})));
+  allLogs.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const recentLogs = allLogs.slice(0,6);
+
+  el.innerHTML=`
+  <!-- KPI Row -->
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">
+    <div class="kpi-card" style="border-top-color:#3B82F6">
+      <div class="kpi-icon" style="background:#DBEAFE">📦</div>
+      <div><p class="kpi-label">إجمالي المظاريف</p><p class="kpi-value" style="color:#1E40AF">${total}</p></div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#10B981">
+      <div class="kpi-icon" style="background:#D1FAE5">✅</div>
+      <div><p class="kpi-label">مكتملة</p><p class="kpi-value" style="color:#065F46">${done}</p></div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#F59E0B">
+      <div class="kpi-icon" style="background:#FEF3C7">⏳</div>
+      <div><p class="kpi-label">قيد التنفيذ</p><p class="kpi-value" style="color:#92400E">${inProg}</p></div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#8B5CF6">
+      <div class="kpi-icon" style="background:#EDE9FE">📄</div>
+      <div><p class="kpi-label">إجمالي الأوراق</p><p class="kpi-value" style="color:#5B21B6">${totalPapers}</p></div>
+    </div>
+  </div>
+
+  <!-- Overall Progress -->
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">📊</span>نسبة الإنجاز الكلية</p>
+    <div style="display:flex;align-items:center;gap:16px">
+      <!-- Circular gauge -->
+      <div style="position:relative;width:90px;height:90px;flex-shrink:0">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border)" stroke-width="8"/>
+          <circle cx="45" cy="45" r="38" fill="none" stroke="${pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6"}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="${Math.round(2*3.14159*38*pct/100)} ${Math.round(2*3.14159*38*(100-pct)/100)}"
+            transform="rotate(-90 45 45)"/>
+          <text x="45" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="var(--navy)" font-family="inherit">${pct}%</text>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <p style="font-size:13px;color:var(--mid);margin-bottom:8px">
+          تم إنجاز <strong style="color:var(--navy)">${done}</strong> من أصل <strong style="color:var(--navy)">${total}</strong> مظروف
+        </p>
+        <!-- Mini stage pills -->
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          <span style="background:var(--greenBg);color:var(--green);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">✅ مكتمل: ${done}</span>
+          <span style="background:var(--amberBg);color:var(--amber);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">⏳ جارٍ: ${inProg}</span>
+          <span style="background:var(--bg);color:var(--muted);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">◈ جديد: ${newB}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bar Chart: Stage Distribution -->
+  ${stageDistrib.length>0?`
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">📈</span>توزيع المظاريف حسب المرحلة</p>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      ${stageDistrib.map(s=>{
+        const barW = total>0?Math.round((s.count/total)*100):0;
+        return `<div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--mid);font-weight:600">${s.label}</span>
+            <span style="font-size:11px;color:var(--navy);font-weight:800">${s.count}</span>
+          </div>
+          <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${barW}%;background:${s.color};border-radius:99px;transition:width .5s"></div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`:""}
+
+  <!-- Subject Table -->
+  ${Object.keys(subjectMap).length>0?`
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📚</span>الإنجاز حسب المادة</p>
+    <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead><tr>
+        <th>المادة</th><th style="text-align:center">المظاريف</th>
+        <th style="text-align:center">الأوراق</th><th style="text-align:center">مكتمل</th><th>التقدم</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(subjectMap).map(([subj,d])=>{
+          const subjPct = d.total>0?Math.round((d.done/d.total)*100):0;
+          const c = subjPct>=80?"#10B981":subjPct>=50?"#F59E0B":"#3B82F6";
+          return `<tr>
+            <td style="font-weight:700;color:var(--navy)">${subj}</td>
+            <td style="text-align:center">${d.total}</td>
+            <td style="text-align:center;color:var(--mid)">${d.papers}</td>
+            <td style="text-align:center"><span style="background:${c}20;color:${c};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.done}/${d.total}</span></td>
+            <td style="min-width:80px">
+              <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;width:${subjPct}%;background:${c};border-radius:99px"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>`:""}
+
+  <!-- Recent Activity -->
+  ${recentLogs.length>0?`
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">🕒</span>آخر الأنشطة</p>
+    ${recentLogs.map(e=>`
+    <div class="log-entry">
+      <div class="log-dot" style="background:${sc(e.stageIdx||0)}"></div>
+      <div style="flex:1">
+        <span class="log-label">${e.stageLabel}</span>
+        <span class="log-meta"> · ${e.subject} · ${fmt(e.ts)}</span>
+        <span class="log-meta"> — ${e.user}</span>
+      </div>
+    </div>`).join("")}
+  </div>`:""}`;
+}
+
+function renderPrincipalReport(el) {
+  const total = state.bundles.length;
+  const done  = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
+
+  // By grade
+  const gradeMap = {};
+  state.bundles.forEach(b=>{
+    const g = b.grade||"غير محدد";
+    if(!gradeMap[g]) gradeMap[g]={total:0,done:0,inProg:0,papers:0};
+    gradeMap[g].total++;
+    gradeMap[g].papers += b.count;
+    if(b.stage===state.stages.length-1) gradeMap[g].done++;
+    else if(b.stage>=0) gradeMap[g].inProg++;
+  });
+
+  // By teacher (correctors)
+  const teacherMap = {};
+  state.bundles.forEach(b=>{
+    [b.corrector, b.corrector2].filter(Boolean).forEach(tid=>{
+      const t = state.teachers.find(x=>x.id===tid);
+      if(!t) return;
+      if(!teacherMap[t.name]) teacherMap[t.name]={bundles:0,papers:0,done:0};
+      teacherMap[t.name].bundles++;
+      teacherMap[t.name].papers += b.count;
+      if(b.stage>=5) teacherMap[t.name].done++;
+    });
+  });
+
+  el.innerHTML=`
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📊</span>ملخص تنفيذي</p>
+    <div class="info-grid">
+      <div class="info-cell"><p class="k">إجمالي المظاريف</p><p class="v">${total}</p></div>
+      <div class="info-cell"><p class="k">إجمالي الأوراق</p><p class="v">${totalPapers}</p></div>
+      <div class="info-cell"><p class="k">مكتملة تماماً</p><p class="v" style="color:var(--green)">${done}</p></div>
+      <div class="info-cell"><p class="k">نسبة الإنجاز</p><p class="v">${total>0?Math.round((done/total)*100):0}%</p></div>
+    </div>
+    <button class="btn btn-navy btn-full" style="margin-top:8px" onclick="generatePrincipalPDF()">📄 تصدير تقرير مدير المدرسة PDF</button>
+  </div>
+
+  <!-- By Grade -->
+  ${Object.keys(gradeMap).length>0?`
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">🎓</span>الإنجاز حسب الصف</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${Object.entries(gradeMap).map(([grade,d])=>{
+        const p=d.total>0?Math.round((d.done/d.total)*100):0;
+        const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
+        return `<div style="background:var(--bg);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+            <span style="font-weight:700;color:var(--navy)">${grade}</span>
+            <span style="font-size:12px;color:var(--muted)">${d.papers} ورقة</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-size:11px;background:var(--greenBg);color:var(--green);padding:2px 8px;border-radius:99px;font-weight:700">✅ ${d.done}</span>
+            <span style="font-size:11px;background:var(--amberBg);color:var(--amber);padding:2px 8px;border-radius:99px;font-weight:700">⏳ ${d.inProg}</span>
+            <span style="font-size:11px;font-weight:700;color:${c}">${p}%</span>
+          </div>
+          <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${p}%;background:${c};border-radius:99px;transition:width .5s"></div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`:""}
+
+  <!-- By Teacher (Correctors) -->
+  ${Object.keys(teacherMap).length>0?`
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">👨‍🏫</span>أداء المصححين</p>
+    <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead><tr>
+        <th>المعلم</th><th style="text-align:center">المظاريف</th>
+        <th style="text-align:center">الأوراق</th><th style="text-align:center">منجزة</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(teacherMap).sort((a,b)=>b[1].bundles-a[1].bundles).map(([name,d])=>`
+        <tr>
+          <td style="font-weight:700;color:var(--navy)">${name}</td>
+          <td style="text-align:center">${d.bundles}</td>
+          <td style="text-align:center;color:var(--mid)">${d.papers}</td>
+          <td style="text-align:center"><span style="background:var(--greenBg);color:var(--green);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.done}</span></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>`:""}`;
+}
+
+function generatePrincipalPDF() {
+  const total = state.bundles.length;
+  const done  = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg= state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB  = state.bundles.filter(b=>b.stage<0).length;
+  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
+  const pct = total>0?Math.round((done/total)*100):0;
+  const printDate = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+
+  const subjectRows = {};
+  state.bundles.forEach(b=>{
+    if(!subjectRows[b.subject]) subjectRows[b.subject]={total:0,done:0,papers:0};
+    subjectRows[b.subject].total++;
+    subjectRows[b.subject].papers+=b.count;
+    if(b.stage===state.stages.length-1) subjectRows[b.subject].done++;
+  });
+
+  const win=window.open("","_blank","width=900,height=700");
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
+  <title>تقرير مدير المدرسة</title>
+  <style>
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;padding:30px;font-size:13px}
+    h1{font-size:22px;font-weight:900;margin-bottom:4px}
+    .sub{font-size:13px;color:#64748b;margin-bottom:20px}
+    .kpi-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:100px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
+    .kpi .val{font-size:26px;font-weight:900;color:#0D1F3C}
+    .kpi .lbl{font-size:11px;color:#64748b}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
+    th{background:#0D1F3C;color:#fff;padding:9px 10px;text-align:right}
+    td{padding:8px 10px;border-bottom:1px solid #e5e7eb}
+    .prog-bg{background:#e5e7eb;border-radius:4px;height:8px}
+    .prog-fill{height:100%;border-radius:4px}
+    h3{font-size:15px;font-weight:800;margin:18px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h1>${state.schoolName}</h1>
+  <p class="sub">تقرير الإنجاز — مدير المدرسة · ${printDate}</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="val">${total}</div><div class="lbl">إجمالي المظاريف</div></div>
+    <div class="kpi"><div class="val">${totalPapers}</div><div class="lbl">إجمالي الأوراق</div></div>
+    <div class="kpi"><div class="val" style="color:#059669">${done}</div><div class="lbl">مكتملة</div></div>
+    <div class="kpi"><div class="val" style="color:#D97706">${inProg}</div><div class="lbl">قيد التنفيذ</div></div>
+    <div class="kpi"><div class="val">${pct}%</div><div class="lbl">نسبة الإنجاز</div></div>
+  </div>
+  <h3>📚 الإنجاز حسب المادة</h3>
+  <table>
+    <thead><tr><th>المادة</th><th>المظاريف</th><th>الأوراق</th><th>مكتمل</th><th>نسبة الإنجاز</th></tr></thead>
+    <tbody>
+    ${Object.entries(subjectRows).map(([s,d])=>{
+      const p=d.total>0?Math.round((d.done/d.total)*100):0;
+      return `<tr><td style="font-weight:700">${s}</td><td>${d.total}</td><td>${d.papers}</td>
+      <td>${d.done}/${d.total}</td><td>${p}%</td></tr>`;
+    }).join("")}
+    </tbody>
+  </table>
+  <div style="margin-top:20px;display:flex;gap:10px">
+    <button onclick="window.print()" style="padding:10px 24px;background:#0D1F3C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">🖨️ طباعة / PDF</button>
+    <button onclick="window.close()" style="padding:10px 18px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">إغلاق</button>
+  </div>
+  </body></html>`);
+  win.document.close();
+  toast("تم فتح تقرير مدير المدرسة ✅");
+}
+
+// ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
 // ── INIT ─────────────────────────────────────────
@@ -2592,7 +2968,8 @@ renderLoginDemos();
       var allU = (state.users && state.users.length) ? state.users : [
         {id:"U1",name:"مدير النظام",username:"admin",password:"admin123",role:"admin"},
         {id:"U2",name:"الكنترول",username:"ctrl",password:"ctrl123",role:"controller"},
-        {id:"U3",name:"مسؤول التنبيهات",username:"notify",password:"1234",role:"notifier"}
+        {id:"U3",name:"مسؤول التنبيهات",username:"notify",password:"1234",role:"notifier"},
+        {id:"U4",name:"مدير المدرسة",username:"principal",password:"prin123",role:"principal"},
       ];
       var found = null;
       for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
