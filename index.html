@@ -2633,40 +2633,55 @@ function confirmBulkImport(teachers) {
 }
 
 // ═══════════════════════════════════════════════
-// PRINCIPAL — DASHBOARD
+// PRINCIPAL — FULL DRILL-DOWN SYSTEM
 // ═══════════════════════════════════════════════
-function renderPrincipalDashboard(el) {
-  const total   = state.bundles.length;
-  const done    = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
-  const inProg  = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
-  const newB    = state.bundles.filter(b=>b.stage<0).length;
-  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
-  const pct = total>0?Math.round((done/total)*100):0;
 
-  // Subject breakdown
+// State for drill-down navigation
+let _prinView = "home";       // "home" | "subject" | "bundle"
+let _prinSubject = null;      // selected subject name
+let _prinBundle  = null;      // selected bundle id
+let _prinGradeFilter = "";    // grade filter on subject view
+
+function principalBack(to) {
+  if(to==="home")    { _prinView="home";    _prinSubject=null; _prinBundle=null; _prinGradeFilter=""; }
+  if(to==="subject") { _prinView="subject"; _prinBundle=null; }
+  renderPrincipalDashboard(document.getElementById("pageContent"));
+}
+
+// ─── HOME VIEW ─────────────────────────────────
+function renderPrincipalDashboard(el) {
+  if(_prinView==="subject" && _prinSubject) { renderPrinSubject(el); return; }
+  if(_prinView==="bundle"  && _prinBundle)  { renderPrinBundle(el);  return; }
+
+  const total      = state.bundles.length;
+  const done       = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg     = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB       = state.bundles.filter(b=>b.stage<0).length;
+  const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
+  const pct        = total>0?Math.round((done/total)*100):0;
+  const gaugeColor = pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6";
+  const circumf    = Math.round(2*3.14159*38);
+
+  // Build subject map with full stage breakdown
   const subjectMap = {};
   state.bundles.forEach(b=>{
-    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,papers:0};
+    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,inProg:0,newB:0,papers:0};
     subjectMap[b.subject].total++;
     subjectMap[b.subject].papers += b.count;
-    if(b.stage===state.stages.length-1) subjectMap[b.subject].done++;
+    if(b.stage===state.stages.length-1)           subjectMap[b.subject].done++;
+    else if(b.stage>=0)                            subjectMap[b.subject].inProg++;
+    else                                           subjectMap[b.subject].newB++;
   });
 
-  // Stage distribution for bar chart
-  const stageDistrib = state.stages.map((s,i)=>{
-    const cnt = state.bundles.filter(b=>b.stage===i).length;
-    return {label:s.length>10?s.substring(0,10)+"…":s, count:cnt, color:sc(i)};
-  }).filter(s=>s.count>0);
-
-  // Recent activity (last 5 log entries across all bundles)
-  const allLogs = [];
-  state.bundles.forEach(b=>b.log.forEach(e=>allLogs.push({...e, barcode:b.barcode, subject:b.subject})));
+  // Recent activity
+  const allLogs=[];
+  state.bundles.forEach(b=>b.log.forEach(e=>allLogs.push({...e,barcode:b.barcode,subject:b.subject})));
   allLogs.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  const recentLogs = allLogs.slice(0,6);
+  const recentLogs=allLogs.slice(0,5);
 
   el.innerHTML=`
-  <!-- KPI Row -->
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
     <div class="kpi-card" style="border-top-color:#3B82F6">
       <div class="kpi-icon" style="background:#DBEAFE">📦</div>
       <div><p class="kpi-label">إجمالي المظاريف</p><p class="kpi-value" style="color:#1E40AF">${total}</p></div>
@@ -2685,186 +2700,566 @@ function renderPrincipalDashboard(el) {
     </div>
   </div>
 
-  <!-- Overall Progress -->
-  <div class="card" style="margin-bottom:16px">
+  <!-- Overall Progress gauge -->
+  <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">📊</span>نسبة الإنجاز الكلية</p>
     <div style="display:flex;align-items:center;gap:16px">
-      <!-- Circular gauge -->
-      <div style="position:relative;width:90px;height:90px;flex-shrink:0">
-        <svg width="90" height="90" viewBox="0 0 90 90">
-          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border)" stroke-width="8"/>
-          <circle cx="45" cy="45" r="38" fill="none" stroke="${pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6"}"
-            stroke-width="8" stroke-linecap="round"
-            stroke-dasharray="${Math.round(2*3.14159*38*pct/100)} ${Math.round(2*3.14159*38*(100-pct)/100)}"
-            transform="rotate(-90 45 45)"/>
-          <text x="45" y="50" text-anchor="middle" font-size="18" font-weight="900" fill="var(--navy)" font-family="inherit">${pct}%</text>
+      <div style="flex-shrink:0">
+        <svg width="88" height="88" viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="36" fill="none" stroke="#E5E7EB" stroke-width="9"/>
+          <circle cx="44" cy="44" r="36" fill="none" stroke="${gaugeColor}"
+            stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${Math.round(circumf*pct/100)} ${circumf}"
+            transform="rotate(-90 44 44)" style="transition:stroke-dasharray .6s"/>
+          <text x="44" y="49" text-anchor="middle" font-size="17" font-weight="900"
+            fill="#0B1D3A" font-family="'IBM Plex Sans Arabic',sans-serif">${pct}%</text>
         </svg>
       </div>
       <div style="flex:1">
-        <p style="font-size:13px;color:var(--mid);margin-bottom:8px">
-          تم إنجاز <strong style="color:var(--navy)">${done}</strong> من أصل <strong style="color:var(--navy)">${total}</strong> مظروف
+        <p style="font-size:13px;color:var(--mid);margin-bottom:10px">
+          أُنجز <strong style="color:var(--navy)">${done}</strong> من أصل <strong style="color:var(--navy)">${total}</strong> مظروف
         </p>
-        <!-- Mini stage pills -->
         <div style="display:flex;flex-wrap:wrap;gap:5px">
-          <span style="background:var(--greenBg);color:var(--green);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">✅ مكتمل: ${done}</span>
-          <span style="background:var(--amberBg);color:var(--amber);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">⏳ جارٍ: ${inProg}</span>
-          <span style="background:var(--bg);color:var(--muted);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">◈ جديد: ${newB}</span>
+          <span style="background:#D1FAE5;color:#065F46;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700">✅ مكتمل ${done}</span>
+          <span style="background:#FEF3C7;color:#92400E;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700">⏳ جارٍ ${inProg}</span>
+          <span style="background:var(--bg);color:var(--muted);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700">◈ جديد ${newB}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Bar Chart: Stage Distribution -->
-  ${stageDistrib.length>0?`
-  <div class="card" style="margin-bottom:16px">
-    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">📈</span>توزيع المظاريف حسب المرحلة</p>
+  <!-- Subject cards — tap to drill down -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📚</span>المواد — اضغط لتفاصيل أي مادة</p>
+    ${Object.keys(subjectMap).length===0
+      ? `<p class="empty">لا توجد مظاريف بعد</p>`
+      : Object.entries(subjectMap).map(([subj,d],idx)=>{
+          const p   = d.total>0?Math.round((d.done/d.total)*100):0;
+          const c   = p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
+          const bg  = p>=80?"#D1FAE5":p>=50?"#FEF3C7":"#DBEAFE";
+          const col = PALETTE[idx%PALETTE.length];
+          return `
+          <button onclick="
+            _prinView='subject';_prinSubject='${subj.replace(/'/g,"\\'")}';_prinGradeFilter='';
+            renderPrincipalDashboard(document.getElementById('pageContent'))
+          " style="
+            display:flex;align-items:center;gap:12px;width:100%;text-align:right;
+            background:var(--white);border:1.5px solid var(--border);border-radius:var(--r10);
+            padding:13px 14px;margin-bottom:7px;cursor:pointer;transition:all .18s;
+            font-family:inherit;box-shadow:var(--sh1);
+          "
+          onmouseover="this.style.borderColor='${col}';this.style.boxShadow='var(--sh2)';this.style.transform='translateX(-2px)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow='var(--sh1)';this.style.transform=''">
+            <!-- Colored dot -->
+            <div style="width:42px;height:42px;border-radius:var(--r10);background:${col}20;
+              display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">📚</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                <span style="font-weight:700;color:var(--navy);font-size:14px">${subj}</span>
+                <span style="font-size:11px;background:${bg};color:${c};padding:2px 9px;border-radius:99px;font-weight:800">${p}%</span>
+              </div>
+              <div style="display:flex;gap:10px;margin-bottom:6px;font-size:11px;color:var(--muted)">
+                <span>📦 ${d.total} مظروف</span>
+                <span>📄 ${d.papers} ورقة</span>
+                <span style="color:#059669">✅ ${d.done}</span>
+                <span style="color:#D97706">⏳ ${d.inProg}</span>
+              </div>
+              <div style="height:5px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;width:${p}%;background:${c};border-radius:99px;transition:width .5s"></div>
+              </div>
+            </div>
+            <span style="color:var(--muted);font-size:18px;flex-shrink:0">←</span>
+          </button>`;
+        }).join("")
+    }
+  </div>
+
+  <!-- Recent activity -->
+  ${recentLogs.length>0?`
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">🕒</span>آخر الأنشطة</p>
+    ${recentLogs.map(e=>`
+    <div style="display:flex;gap:10px;margin-bottom:9px;align-items:flex-start">
+      <div style="width:8px;height:8px;border-radius:50%;background:${sc(e.stageIdx||0)};margin-top:4px;flex-shrink:0"></div>
+      <div style="flex:1">
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${e.stageLabel}</span>
+        <span style="font-size:11px;color:var(--muted)"> · ${e.subject}</span>
+        <br/><span style="font-size:10px;color:var(--muted)">${fmt(e.ts)} — ${e.user}</span>
+      </div>
+    </div>`).join("")}
+  </div>`:""}`;
+}
+
+// ─── SUBJECT DRILL-DOWN VIEW ────────────────────
+function renderPrinSubject(el) {
+  const subj    = _prinSubject;
+  const bundles = state.bundles.filter(b=>b.subject===subj);
+  const grades  = [...new Set(bundles.map(b=>b.grade||"غير محدد"))].sort();
+  const filtered= _prinGradeFilter
+    ? bundles.filter(b=>(b.grade||"غير محدد")===_prinGradeFilter)
+    : bundles;
+
+  const total = filtered.length;
+  const done  = filtered.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg= filtered.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB  = filtered.filter(b=>b.stage<0).length;
+  const totalPapers = filtered.reduce((a,b)=>a+b.count,0);
+  const pct = total>0?Math.round((done/total)*100):0;
+  const gaugeColor = pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6";
+
+  // Stage distribution
+  const stageDist = state.stages.map((s,i)=>({
+    name:s, idx:i, count:filtered.filter(b=>b.stage===i).length, color:sc(i)
+  }));
+
+  // Teacher workload for this subject
+  const tMap={};
+  filtered.forEach(b=>{
+    [[b.corrector,"مصحح"],[b.corrector2,"مصحح 2"],[b.reviewer,"مراجع"],[b.reviewer2,"مراجع 2"],[b.auditor,"مدقق"],[b.auditor2,"مدقق 2"]]
+    .filter(([id])=>id).forEach(([id,role])=>{
+      const t=state.teachers.find(x=>x.id===id);
+      if(!t) return;
+      if(!tMap[t.name]) tMap[t.name]={role,bundles:0,papers:0,stageSum:0};
+      tMap[t.name].bundles++;
+      tMap[t.name].papers+=b.count;
+      tMap[t.name].stageSum+=Math.max(0,b.stage+1);
+    });
+  });
+
+  el.innerHTML=`
+  <!-- Breadcrumb -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <button onclick="principalBack('home')" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r8);padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;color:var(--mid);font-family:inherit;display:flex;align-items:center;gap:5px">
+      → لوحة المتابعة
+    </button>
+    <span style="color:var(--border);font-size:16px">/</span>
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">${subj}</span>
+  </div>
+
+  <!-- Subject header -->
+  <div class="stage-header" style="background:linear-gradient(135deg,var(--navy),var(--navy3));margin-bottom:14px">
+    <div style="width:52px;height:52px;background:rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📚</div>
+    <div style="flex:1">
+      <p style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;letter-spacing:.3px">تفاصيل المادة</p>
+      <p style="color:#fff;font-size:20px;font-weight:800;margin:3px 0 8px">${subj}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="stage-pill">📦 ${total} مظروف</span>
+        <span class="stage-pill">📄 ${totalPapers} ورقة</span>
+        <span class="stage-pill">${pct}% مكتمل</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:#D1FAE5;border-radius:var(--r10);padding:12px;text-align:center;border:1px solid #A7F3D0">
+      <p style="font-size:22px;font-weight:900;color:#065F46">${done}</p>
+      <p style="font-size:10px;color:#065F46;font-weight:600">✅ مكتملة</p>
+    </div>
+    <div style="background:#FEF3C7;border-radius:var(--r10);padding:12px;text-align:center;border:1px solid #FDE68A">
+      <p style="font-size:22px;font-weight:900;color:#92400E">${inProg}</p>
+      <p style="font-size:10px;color:#92400E;font-weight:600">⏳ جارية</p>
+    </div>
+    <div style="background:var(--bg);border-radius:var(--r10);padding:12px;text-align:center;border:1px solid var(--border)">
+      <p style="font-size:22px;font-weight:900;color:var(--navy)">${newB}</p>
+      <p style="font-size:10px;color:var(--muted);font-weight:600">◈ جديدة</p>
+    </div>
+  </div>
+
+  <!-- Grade filter tabs -->
+  ${grades.length>1?`
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">
+    <button onclick="_prinGradeFilter='';renderPrincipalDashboard(document.getElementById('pageContent'))"
+      style="padding:5px 12px;border-radius:99px;border:1.5px solid ${!_prinGradeFilter?"var(--navy)":"var(--border)"};
+      background:${!_prinGradeFilter?"var(--navy)":"#fff"};color:${!_prinGradeFilter?"#fff":"var(--mid)"};
+      cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">الكل</button>
+    ${grades.map(g=>`
+    <button onclick="_prinGradeFilter='${g}';renderPrincipalDashboard(document.getElementById('pageContent'))"
+      style="padding:5px 12px;border-radius:99px;border:1.5px solid ${_prinGradeFilter===g?"var(--navy)":"var(--border)"};
+      background:${_prinGradeFilter===g?"var(--navy)":"#fff"};color:${_prinGradeFilter===g?"#fff":"var(--mid)"};
+      cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">${g}</button>`).join("")}
+  </div>`:""}
+
+  <!-- Progress bar across stages -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">📈</span>التوزيع على مراحل سير الأوراق</p>
+    ${stageDist.map(s=>`
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--mid);font-weight:600;flex:1">${s.idx+1}. ${s.name}</span>
+        <span style="font-size:12px;font-weight:800;color:${s.count>0?s.color:"var(--faint)"};min-width:28px;text-align:left">${s.count}</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${total>0?Math.round(s.count/total*100):0}%;background:${s.color};border-radius:99px;transition:width .5s"></div>
+      </div>
+    </div>`).join("")}
+    <!-- New bundles row -->
+    <div style="margin-bottom:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--muted);font-weight:600">◈ جديد (لم تبدأ بعد)</span>
+        <span style="font-size:12px;font-weight:800;color:var(--muted)">${newB}</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${total>0?Math.round(newB/total*100):0}%;background:var(--muted);border-radius:99px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Teacher workload table -->
+  ${Object.keys(tMap).length>0?`
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">👨‍🏫</span>المعلمون المعيّنون لهذه المادة</p>
+    <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead><tr>
+        <th>المعلم</th><th>الدور</th>
+        <th style="text-align:center">المظاريف</th>
+        <th style="text-align:center">الأوراق</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(tMap).sort((a,b)=>b[1].bundles-a[1].bundles).map(([name,d])=>`
+        <tr>
+          <td style="font-weight:700;color:var(--navy)">${name}</td>
+          <td><span style="background:var(--purBg);color:var(--purple);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.role}</span></td>
+          <td style="text-align:center;font-weight:700">${d.bundles}</td>
+          <td style="text-align:center;color:var(--mid)">${d.papers}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    </div>
+  </div>`:""}
+
+  <!-- Bundle cards — tap to see full detail -->
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">📦</span>المظاريف (${filtered.length}) — اضغط لتفاصيل أي مظروف</p>
+    ${filtered.length===0
+      ? `<p class="empty">لا توجد مظاريف</p>`
+      : filtered.map(b=>{
+          const stageName = b.stage<0?"◈ جديد":state.stages[b.stage]||"—";
+          const color     = b.stage<0?"#94A3B8":sc(b.stage);
+          const pctB      = state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
+          const corrT     = state.teachers.find(t=>t.id===b.corrector);
+          const isDone    = b.stage===state.stages.length-1;
+          const lastLog   = b.log[b.log.length-1];
+          return `
+          <button onclick="
+            _prinView='bundle';_prinBundle='${b.id}';
+            renderPrincipalDashboard(document.getElementById('pageContent'))
+          " style="
+            display:flex;align-items:center;gap:12px;width:100%;text-align:right;
+            background:${isDone?"#F0FDF4":"#fff"};border:1.5px solid ${isDone?"#86EFAC":color+"40"};
+            border-radius:var(--r10);padding:12px 13px;margin-bottom:6px;cursor:pointer;
+            transition:all .18s;font-family:inherit;box-shadow:var(--sh1);
+          "
+          onmouseover="this.style.borderColor='${color}';this.style.boxShadow='var(--sh2)';this.style.transform='translateX(-2px)'"
+          onmouseout="this.style.borderColor='${isDone?"#86EFAC":color+"40"}';this.style.boxShadow='var(--sh1)';this.style.transform=''">
+            <div style="width:38px;height:38px;border-radius:var(--r8);background:${color}20;
+              display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px">
+              ${isDone?"✅":"📦"}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <span style="font-family:monospace;font-size:13px;font-weight:800;color:var(--navy)">${b.barcode}</span>
+                <span style="font-size:11px;background:${color}20;color:${color};padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid ${color}40">${stageName}</span>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:5px">
+                ${b.grade?`${b.grade} · `:""}${b.count} ورقة${corrT?` · ✏️ ${corrT.name}`:""}
+                ${lastLog?` · 🕒 ${fmt(lastLog.ts)}`:""}
+              </div>
+              <div style="height:4px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;width:${pctB}%;background:${color};border-radius:99px;transition:width .5s"></div>
+              </div>
+            </div>
+            <span style="color:var(--muted);font-size:16px;flex-shrink:0">←</span>
+          </button>`;
+        }).join("")
+    }
+  </div>`;
+}
+
+// ─── BUNDLE DETAIL VIEW ─────────────────────────
+function renderPrinBundle(el) {
+  const b = state.bundles.find(x=>x.id===_prinBundle);
+  if(!b) { principalBack("subject"); return; }
+
+  const color    = b.stage<0?"#94A3B8":sc(b.stage);
+  const stageName= b.stage<0?"◈ جديد — لم تبدأ المراحل بعد":state.stages[b.stage]||"—";
+  const pct      = state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
+  const isDone   = b.stage===state.stages.length-1;
+
+  const corrT  = state.teachers.find(t=>t.id===b.corrector);
+  const corrT2 = state.teachers.find(t=>t.id===b.corrector2);
+  const revT   = state.teachers.find(t=>t.id===b.reviewer);
+  const revT2  = state.teachers.find(t=>t.id===b.reviewer2);
+  const audT   = state.teachers.find(t=>t.id===b.auditor);
+  const audT2  = state.teachers.find(t=>t.id===b.auditor2);
+
+  // Build full stage timeline (all 9 stages with status)
+  const timeline = state.stages.map((s,i)=>{
+    const logEntry = b.log.find(e=>e.stageIdx===i);
+    const isCurrent= i===b.stage;
+    const isCompleted= i<b.stage || (isDone && i===b.stage);
+    const isNext   = i===b.stage+1;
+    const isPending= i>b.stage+1 || (b.stage<0 && i>0);
+    const stageColor= sc(i);
+    return {s,i,logEntry,isCurrent,isCompleted,isNext,isPending,stageColor};
+  });
+
+  el.innerHTML=`
+  <!-- Breadcrumb -->
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <button onclick="principalBack('home')" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r8);padding:5px 11px;cursor:pointer;font-size:11px;font-weight:700;color:var(--mid);font-family:inherit">
+      → لوحة المتابعة
+    </button>
+    <span style="color:var(--border);">/</span>
+    <button onclick="principalBack('subject')" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r8);padding:5px 11px;cursor:pointer;font-size:11px;font-weight:700;color:var(--mid);font-family:inherit">
+      ${b.subject}
+    </button>
+    <span style="color:var(--border);">/</span>
+    <span style="font-size:11px;font-weight:700;color:var(--navy);font-family:monospace">${b.barcode}</span>
+  </div>
+
+  <!-- Bundle header -->
+  <div class="stage-header" style="background:${isDone?"linear-gradient(135deg,#065F46,#059669)":color==="#94A3B8"?"linear-gradient(135deg,#475569,#64748B)":"background:"+color};background:${isDone?"linear-gradient(135deg,#065F46,#059669)":color};margin-bottom:14px">
+    <div style="width:52px;height:52px;background:rgba(255,255,255,.18);border-radius:14px;
+      display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${isDone?"✅":"📦"}</div>
+    <div style="flex:1">
+      <p style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;letter-spacing:.3px">باركود المظروف</p>
+      <p style="color:#fff;font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin:3px 0 8px">${b.barcode}</p>
+      <span class="stage-pill">${stageName}</span>
+    </div>
+  </div>
+
+  <!-- Info grid -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:var(--bg)">📋</span>بيانات المظروف</p>
+    <div class="info-grid">
+      <div class="info-cell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
+      <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
+      <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
+      <div class="info-cell"><p class="k">التقدم</p><p class="v" style="color:${color}">${pct}%</p></div>
+      ${b.examDate?`<div class="info-cell"><p class="k">📅 تاريخ الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
+      ${b.examHall?`<div class="info-cell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
+      ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
+      ${b.note?`<div class="info-cell" style="grid-column:span 2"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
+    </div>
+  </div>
+
+  <!-- Staff assignments -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">👨‍🏫</span>فريق العمل المعيّن</p>
     <div style="display:flex;flex-direction:column;gap:7px">
-      ${stageDistrib.map(s=>{
-        const barW = total>0?Math.round((s.count/total)*100):0;
-        return `<div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-            <span style="font-size:11px;color:var(--mid);font-weight:600">${s.label}</span>
-            <span style="font-size:11px;color:var(--navy);font-weight:800">${s.count}</span>
-          </div>
-          <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
-            <div style="height:100%;width:${barW}%;background:${s.color};border-radius:99px;transition:width .5s"></div>
+      ${[
+        [corrT,"مصحح 1","#EFF6FF","#1E40AF","✏️"],
+        [corrT2,"مصحح 2","#EFF6FF","#1E40AF","✏️"],
+        [revT,"مراجع 1","#F3E8FF","#5B21B6","🔍"],
+        [revT2,"مراجع 2","#F3E8FF","#5B21B6","🔍"],
+        [audT,"مدقق 1","#DCFCE7","#065F46","🔏"],
+        [audT2,"مدقق 2","#DCFCE7","#065F46","🔏"],
+      ].filter(([t])=>t).map(([t,role,bg,col,icon])=>`
+      <div style="display:flex;align-items:center;gap:10px;background:${bg};border-radius:var(--r8);padding:9px 12px">
+        <span style="font-size:16px">${icon}</span>
+        <div style="flex:1">
+          <span style="font-weight:700;color:${col};font-size:13px">${t.name}</span>
+          <span style="font-size:11px;color:${col}88;margin-right:6px">${role}</span>
+        </div>
+        <span style="font-size:11px;color:${col};background:rgba(255,255,255,.6);padding:2px 8px;border-radius:99px;font-family:monospace">${t.phone}</span>
+      </div>`).join("")}
+    </div>
+  </div>
+
+  <!-- Full progress bar -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:var(--blueBg)">🔄</span>مسار الأوراق — ${Math.max(0,b.stage+1)} من ${state.stages.length} مرحلة</p>
+    <div style="display:flex;gap:2px;margin-bottom:12px">
+      ${state.stages.map((_,i)=>`
+      <div style="flex:1;height:8px;border-radius:99px;background:${i<=b.stage?sc(i):"var(--border)"}"></div>`).join("")}
+    </div>
+
+    <!-- Detailed stage timeline -->
+    <div style="position:relative;padding-right:20px">
+      <!-- Vertical line -->
+      <div style="position:absolute;right:7px;top:8px;bottom:8px;width:2px;background:var(--border);border-radius:99px"></div>
+      ${timeline.map(({s,i,logEntry,isCurrent,isCompleted,isNext,stageColor})=>{
+        const dotBg   = isCompleted?"#10B981":isCurrent?stageColor:isNext?"#E5E7EB":"#E5E7EB";
+        const dotBorder= isCurrent?`2px solid ${stageColor}`:isCompleted?"2px solid #10B981":"2px solid #E5E7EB";
+        const textCol = isCompleted?"var(--navy)":isCurrent?stageColor:"var(--faint)";
+        const rowBg   = isCurrent?`${stageColor}0D`:"transparent";
+        return `
+        <div style="display:flex;gap:12px;margin-bottom:4px;padding:6px 8px;border-radius:var(--r8);background:${rowBg};align-items:flex-start">
+          <!-- Dot -->
+          <div style="width:14px;height:14px;border-radius:50%;background:${dotBg};border:${dotBorder};
+            margin-top:3px;flex-shrink:0;position:relative;z-index:1;box-shadow:0 0 0 3px #fff"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:${isCurrent||isCompleted?700:400};color:${textCol}">
+                ${isCompleted?"✓ ":isCurrent?"▶ ":"  "}${i+1}. ${s}
+              </span>
+              ${isCurrent?`<span style="font-size:10px;background:${stageColor};color:#fff;padding:2px 8px;border-radius:99px;font-weight:700">المرحلة الحالية</span>`:""}
+              ${isCompleted&&!isCurrent?`<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:99px;font-weight:700">✓ منجزة</span>`:""}
+            </div>
+            ${logEntry?`
+            <div style="margin-top:4px;background:rgba(0,0,0,.03);border-radius:var(--r6);padding:5px 8px">
+              <span style="font-size:10px;color:var(--muted)">🕒 ${fmt(logEntry.ts)} — ${logEntry.user}</span>
+              ${logEntry.note?`<br/><span style="font-size:10px;color:var(--mid);font-style:italic">"${logEntry.note}"</span>`:""}
+            </div>`:""}
           </div>
         </div>`;
       }).join("")}
     </div>
-  </div>`:""}
+  </div>
 
-  <!-- Subject Table -->
-  ${Object.keys(subjectMap).length>0?`
-  <div class="card" style="margin-bottom:16px">
+  <!-- Movement log -->
+  ${b.log.length>0?`
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:var(--bg)">📜</span>سجل الحركة الكامل</p>
+    ${[...b.log].reverse().map((e,i)=>`
+    <div style="display:flex;gap:11px;margin-bottom:${i<b.log.length-1?10:0}px;align-items:flex-start">
+      <div style="width:9px;height:9px;border-radius:50%;background:${sc(e.stageIdx)};margin-top:4px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.2)"></div>
+      <div>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${e.stageLabel}</span>
+        <span style="font-size:11px;color:var(--muted);margin-right:5px">${fmt(e.ts)} — ${e.user}</span>
+        ${e.note?`<p style="font-size:11px;color:var(--mid);font-style:italic;margin-top:1px">"${e.note}"</p>`:""}
+      </div>
+    </div>`).join("")}
+  </div>`:`
+  <div class="card">
+    <p style="text-align:center;color:var(--muted);font-size:13px;padding:16px 0">لا توجد حركات مسجّلة بعد على هذا المظروف</p>
+  </div>`}`;
+}
+
+// ─── PRINCIPAL REPORT PAGE ──────────────────────
+function renderPrincipalReport(el) {
+  const total      = state.bundles.length;
+  const done       = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg     = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
+  const pct        = total>0?Math.round((done/total)*100):0;
+
+  // By grade
+  const gradeMap={};
+  state.bundles.forEach(b=>{
+    const g=b.grade||"غير محدد";
+    if(!gradeMap[g]) gradeMap[g]={total:0,done:0,inProg:0,newB:0,papers:0};
+    gradeMap[g].total++; gradeMap[g].papers+=b.count;
+    if(b.stage===state.stages.length-1) gradeMap[g].done++;
+    else if(b.stage>=0)                 gradeMap[g].inProg++;
+    else                                gradeMap[g].newB++;
+  });
+
+  // By subject
+  const subjectMap={};
+  state.bundles.forEach(b=>{
+    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,papers:0};
+    subjectMap[b.subject].total++; subjectMap[b.subject].papers+=b.count;
+    if(b.stage===state.stages.length-1) subjectMap[b.subject].done++;
+  });
+
+  // Teachers workload
+  const tMap={};
+  state.bundles.forEach(b=>{
+    [b.corrector,b.corrector2,b.reviewer,b.reviewer2,b.auditor,b.auditor2].filter(Boolean).forEach(tid=>{
+      const t=state.teachers.find(x=>x.id===tid);
+      if(!t) return;
+      if(!tMap[t.name]) tMap[t.name]={bundles:0,papers:0};
+      tMap[t.name].bundles++; tMap[t.name].papers+=b.count;
+    });
+  });
+
+  el.innerHTML=`
+  <!-- Summary card -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📊</span>الملخص التنفيذي</p>
+    <div class="info-grid">
+      <div class="info-cell"><p class="k">إجمالي المظاريف</p><p class="v">${total}</p></div>
+      <div class="info-cell"><p class="k">إجمالي الأوراق</p><p class="v">${totalPapers}</p></div>
+      <div class="info-cell"><p class="k">مكتملة تماماً</p><p class="v" style="color:var(--green)">${done}</p></div>
+      <div class="info-cell"><p class="k">نسبة الإنجاز الكلية</p><p class="v" style="color:${pct>=80?"var(--green)":pct>=50?"var(--amber)":"var(--blue)"}">${pct}%</p></div>
+    </div>
+    <button class="btn btn-navy btn-full" style="margin-top:10px" onclick="generatePrincipalPDF()">📄 تصدير تقرير مدير المدرسة PDF</button>
+  </div>
+
+  <!-- By subject table -->
+  <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📚</span>الإنجاز حسب المادة</p>
     <div style="overflow-x:auto">
     <table class="data-table">
       <thead><tr>
         <th>المادة</th><th style="text-align:center">المظاريف</th>
-        <th style="text-align:center">الأوراق</th><th style="text-align:center">مكتمل</th><th>التقدم</th>
+        <th style="text-align:center">الأوراق</th>
+        <th style="text-align:center">مكتمل</th><th>نسبة الإنجاز</th>
+        <th></th>
       </tr></thead>
       <tbody>
         ${Object.entries(subjectMap).map(([subj,d])=>{
-          const subjPct = d.total>0?Math.round((d.done/d.total)*100):0;
-          const c = subjPct>=80?"#10B981":subjPct>=50?"#F59E0B":"#3B82F6";
+          const p=d.total>0?Math.round((d.done/d.total)*100):0;
+          const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
           return `<tr>
             <td style="font-weight:700;color:var(--navy)">${subj}</td>
             <td style="text-align:center">${d.total}</td>
             <td style="text-align:center;color:var(--mid)">${d.papers}</td>
             <td style="text-align:center"><span style="background:${c}20;color:${c};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.done}/${d.total}</span></td>
-            <td style="min-width:80px">
-              <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
-                <div style="height:100%;width:${subjPct}%;background:${c};border-radius:99px"></div>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden;min-width:50px">
+                  <div style="height:100%;width:${p}%;background:${c};border-radius:99px"></div>
+                </div>
+                <span style="font-size:11px;font-weight:700;color:${c}">${p}%</span>
               </div>
+            </td>
+            <td>
+              <button onclick="_prinView='subject';_prinSubject='${subj.replace(/'/g,"\\'")}';_prinGradeFilter='';navigateTo('principal_dashboard')"
+                style="background:var(--navy);color:#fff;border:none;border-radius:var(--r6);padding:4px 10px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700">تفاصيل</button>
             </td>
           </tr>`;
         }).join("")}
       </tbody>
     </table>
     </div>
-  </div>`:""}
-
-  <!-- Recent Activity -->
-  ${recentLogs.length>0?`
-  <div class="card">
-    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">🕒</span>آخر الأنشطة</p>
-    ${recentLogs.map(e=>`
-    <div class="log-entry">
-      <div class="log-dot" style="background:${sc(e.stageIdx||0)}"></div>
-      <div style="flex:1">
-        <span class="log-label">${e.stageLabel}</span>
-        <span class="log-meta"> · ${e.subject} · ${fmt(e.ts)}</span>
-        <span class="log-meta"> — ${e.user}</span>
-      </div>
-    </div>`).join("")}
-  </div>`:""}`;
-}
-
-function renderPrincipalReport(el) {
-  const total = state.bundles.length;
-  const done  = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
-  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
-
-  // By grade
-  const gradeMap = {};
-  state.bundles.forEach(b=>{
-    const g = b.grade||"غير محدد";
-    if(!gradeMap[g]) gradeMap[g]={total:0,done:0,inProg:0,papers:0};
-    gradeMap[g].total++;
-    gradeMap[g].papers += b.count;
-    if(b.stage===state.stages.length-1) gradeMap[g].done++;
-    else if(b.stage>=0) gradeMap[g].inProg++;
-  });
-
-  // By teacher (correctors)
-  const teacherMap = {};
-  state.bundles.forEach(b=>{
-    [b.corrector, b.corrector2].filter(Boolean).forEach(tid=>{
-      const t = state.teachers.find(x=>x.id===tid);
-      if(!t) return;
-      if(!teacherMap[t.name]) teacherMap[t.name]={bundles:0,papers:0,done:0};
-      teacherMap[t.name].bundles++;
-      teacherMap[t.name].papers += b.count;
-      if(b.stage>=5) teacherMap[t.name].done++;
-    });
-  });
-
-  el.innerHTML=`
-  <div class="card" style="margin-bottom:16px">
-    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📊</span>ملخص تنفيذي</p>
-    <div class="info-grid">
-      <div class="info-cell"><p class="k">إجمالي المظاريف</p><p class="v">${total}</p></div>
-      <div class="info-cell"><p class="k">إجمالي الأوراق</p><p class="v">${totalPapers}</p></div>
-      <div class="info-cell"><p class="k">مكتملة تماماً</p><p class="v" style="color:var(--green)">${done}</p></div>
-      <div class="info-cell"><p class="k">نسبة الإنجاز</p><p class="v">${total>0?Math.round((done/total)*100):0}%</p></div>
-    </div>
-    <button class="btn btn-navy btn-full" style="margin-top:8px" onclick="generatePrincipalPDF()">📄 تصدير تقرير مدير المدرسة PDF</button>
   </div>
 
-  <!-- By Grade -->
+  <!-- By grade -->
   ${Object.keys(gradeMap).length>0?`
-  <div class="card" style="margin-bottom:16px">
-    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">🎓</span>الإنجاز حسب الصف</p>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      ${Object.entries(gradeMap).map(([grade,d])=>{
-        const p=d.total>0?Math.round((d.done/d.total)*100):0;
-        const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
-        return `<div style="background:var(--bg);border-radius:10px;padding:12px 14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">🎓</span>الإنجاز حسب الصف</p>
+    ${Object.entries(gradeMap).map(([grade,d])=>{
+      const p=d.total>0?Math.round((d.done/d.total)*100):0;
+      const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
             <span style="font-weight:700;color:var(--navy)">${grade}</span>
-            <span style="font-size:12px;color:var(--muted)">${d.papers} ورقة</span>
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-            <span style="font-size:11px;background:var(--greenBg);color:var(--green);padding:2px 8px;border-radius:99px;font-weight:700">✅ ${d.done}</span>
-            <span style="font-size:11px;background:var(--amberBg);color:var(--amber);padding:2px 8px;border-radius:99px;font-weight:700">⏳ ${d.inProg}</span>
-            <span style="font-size:11px;font-weight:700;color:${c}">${p}%</span>
+            <span style="font-size:11px;color:var(--muted)">${d.papers} ورقة</span>
           </div>
           <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden">
             <div style="height:100%;width:${p}%;background:${c};border-radius:99px;transition:width .5s"></div>
           </div>
-        </div>`;
-      }).join("")}
-    </div>
+        </div>
+        <div style="text-align:center;min-width:50px">
+          <p style="font-size:18px;font-weight:900;color:${c}">${p}%</p>
+          <p style="font-size:10px;color:var(--muted)">${d.done}/${d.total}</p>
+        </div>
+      </div>`;
+    }).join("")}
   </div>`:""}
 
-  <!-- By Teacher (Correctors) -->
-  ${Object.keys(teacherMap).length>0?`
+  <!-- Teachers workload -->
+  ${Object.keys(tMap).length>0?`
   <div class="card">
-    <p class="card-title"><span class="ct-icon" style="background:#EDE9FE">👨‍🏫</span>أداء المصححين</p>
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">👨‍🏫</span>أعباء المعلمين</p>
     <div style="overflow-x:auto">
     <table class="data-table">
       <thead><tr>
-        <th>المعلم</th><th style="text-align:center">المظاريف</th>
-        <th style="text-align:center">الأوراق</th><th style="text-align:center">منجزة</th>
+        <th>المعلم</th>
+        <th style="text-align:center">المظاريف المعيّنة</th>
+        <th style="text-align:center">إجمالي الأوراق</th>
       </tr></thead>
       <tbody>
-        ${Object.entries(teacherMap).sort((a,b)=>b[1].bundles-a[1].bundles).map(([name,d])=>`
+        ${Object.entries(tMap).sort((a,b)=>b[1].papers-a[1].papers).map(([name,d])=>`
         <tr>
           <td style="font-weight:700;color:var(--navy)">${name}</td>
           <td style="text-align:center">${d.bundles}</td>
           <td style="text-align:center;color:var(--mid)">${d.papers}</td>
-          <td style="text-align:center"><span style="background:var(--greenBg);color:var(--green);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.done}</span></td>
         </tr>`).join("")}
       </tbody>
     </table>
@@ -2873,64 +3268,100 @@ function renderPrincipalReport(el) {
 }
 
 function generatePrincipalPDF() {
-  const total = state.bundles.length;
-  const done  = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
-  const inProg= state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
-  const newB  = state.bundles.filter(b=>b.stage<0).length;
-  const totalPapers = state.bundles.reduce((a,b)=>a+b.count,0);
-  const pct = total>0?Math.round((done/total)*100):0;
-  const printDate = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+  const total      = state.bundles.length;
+  const done       = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
+  const inProg     = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB       = state.bundles.filter(b=>b.stage<0).length;
+  const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
+  const pct        = total>0?Math.round((done/total)*100):0;
+  const printDate  = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
 
-  const subjectRows = {};
+  const subjectRows={};
   state.bundles.forEach(b=>{
-    if(!subjectRows[b.subject]) subjectRows[b.subject]={total:0,done:0,papers:0};
-    subjectRows[b.subject].total++;
-    subjectRows[b.subject].papers+=b.count;
+    if(!subjectRows[b.subject]) subjectRows[b.subject]={total:0,done:0,inProg:0,papers:0};
+    subjectRows[b.subject].total++; subjectRows[b.subject].papers+=b.count;
     if(b.stage===state.stages.length-1) subjectRows[b.subject].done++;
+    else if(b.stage>=0) subjectRows[b.subject].inProg++;
   });
 
-  const win=window.open("","_blank","width=900,height=700");
+  const bundleRows = state.bundles.map((b,i)=>{
+    const corrT = state.teachers.find(t=>t.id===b.corrector);
+    const sName = b.stage<0?"جديد":state.stages[b.stage]||"—";
+    const lastLog = b.log[b.log.length-1];
+    return `<tr style="background:${i%2===0?"#fff":"#f8fafc"}">
+      <td style="font-family:monospace;font-size:11px">${b.barcode}</td>
+      <td style="font-weight:700">${b.subject}</td>
+      <td>${b.grade||"—"}</td>
+      <td style="text-align:center">${b.count}</td>
+      <td>${corrT?corrT.name:"—"}</td>
+      <td style="font-weight:700;color:${b.stage===state.stages.length-1?"#059669":"#0D1F3C"}">${sName}</td>
+      <td style="font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA"):"—"}</td>
+    </tr>`;
+  }).join("");
+
+  const win=window.open("","_blank","width=1050,height=800");
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
   <title>تقرير مدير المدرسة</title>
   <style>
-    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;padding:30px;font-size:13px}
-    h1{font-size:22px;font-weight:900;margin-bottom:4px}
-    .sub{font-size:13px;color:#64748b;margin-bottom:20px}
-    .kpi-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
-    .kpi{flex:1;min-width:100px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
-    .kpi .val{font-size:26px;font-weight:900;color:#0D1F3C}
-    .kpi .lbl{font-size:11px;color:#64748b}
-    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
-    th{background:#0D1F3C;color:#fff;padding:9px 10px;text-align:right}
-    td{padding:8px 10px;border-bottom:1px solid #e5e7eb}
-    .prog-bg{background:#e5e7eb;border-radius:4px;height:8px}
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;font-size:13px;line-height:1.5}
+    .page{padding:28px 32px}
+    .header{border-bottom:3px solid #0D1F3C;padding-bottom:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start}
+    .header h1{font-size:20px;font-weight:900}
+    .header .sub{font-size:12px;color:#64748b;margin-top:3px}
+    .kpi-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:90px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;text-align:center}
+    .kpi .val{font-size:24px;font-weight:900}
+    .kpi .lbl{font-size:10px;color:#64748b;margin-top:2px}
+    h3{font-size:14px;font-weight:800;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid #e5e7eb}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+    th{background:#0D1F3C;color:#fff;padding:8px 10px;text-align:right;font-weight:700}
+    td{padding:7px 10px;border-bottom:1px solid #e5e7eb}
+    .prog{background:#e5e7eb;border-radius:4px;height:6px;margin-top:3px}
     .prog-fill{height:100%;border-radius:4px}
-    h3{font-size:15px;font-weight:800;margin:18px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
-    @media print{button{display:none}}
+    .footer{margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    .no-print{margin-top:16px;display:flex;gap:8px}
+    @media print{.no-print{display:none}body{font-size:11px}.page{padding:16px 20px}}
   </style></head><body>
-  <h1>${state.schoolName}</h1>
-  <p class="sub">تقرير الإنجاز — مدير المدرسة · ${printDate}</p>
-  <div class="kpi-row">
-    <div class="kpi"><div class="val">${total}</div><div class="lbl">إجمالي المظاريف</div></div>
-    <div class="kpi"><div class="val">${totalPapers}</div><div class="lbl">إجمالي الأوراق</div></div>
-    <div class="kpi"><div class="val" style="color:#059669">${done}</div><div class="lbl">مكتملة</div></div>
-    <div class="kpi"><div class="val" style="color:#D97706">${inProg}</div><div class="lbl">قيد التنفيذ</div></div>
-    <div class="kpi"><div class="val">${pct}%</div><div class="lbl">نسبة الإنجاز</div></div>
-  </div>
-  <h3>📚 الإنجاز حسب المادة</h3>
-  <table>
-    <thead><tr><th>المادة</th><th>المظاريف</th><th>الأوراق</th><th>مكتمل</th><th>نسبة الإنجاز</th></tr></thead>
-    <tbody>
-    ${Object.entries(subjectRows).map(([s,d])=>{
-      const p=d.total>0?Math.round((d.done/d.total)*100):0;
-      return `<tr><td style="font-weight:700">${s}</td><td>${d.total}</td><td>${d.papers}</td>
-      <td>${d.done}/${d.total}</td><td>${p}%</td></tr>`;
-    }).join("")}
-    </tbody>
-  </table>
-  <div style="margin-top:20px;display:flex;gap:10px">
-    <button onclick="window.print()" style="padding:10px 24px;background:#0D1F3C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">🖨️ طباعة / PDF</button>
-    <button onclick="window.close()" style="padding:10px 18px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit">إغلاق</button>
+  <div class="page">
+    <div class="header">
+      <div><h1>${state.schoolName}</h1><p class="sub">تقرير مدير المدرسة — ${printDate}</p></div>
+      <div style="background:#0D1F3C;color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700">${total} مظروف</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val">${total}</div><div class="lbl">إجمالي المظاريف</div></div>
+      <div class="kpi"><div class="val">${totalPapers}</div><div class="lbl">إجمالي الأوراق</div></div>
+      <div class="kpi"><div class="val" style="color:#059669">${done}</div><div class="lbl">مكتملة</div></div>
+      <div class="kpi"><div class="val" style="color:#D97706">${inProg}</div><div class="lbl">جارية</div></div>
+      <div class="kpi"><div class="val" style="color:#64748b">${newB}</div><div class="lbl">جديدة</div></div>
+      <div class="kpi"><div class="val" style="color:${pct>=80?"#059669":pct>=50?"#D97706":"#2563EB"}">${pct}%</div><div class="lbl">نسبة الإنجاز</div></div>
+    </div>
+    <h3>📚 ملخص المواد</h3>
+    <table>
+      <thead><tr><th>المادة</th><th>المظاريف</th><th>الأوراق</th><th>مكتمل</th><th>جارٍ</th><th>نسبة الإنجاز</th></tr></thead>
+      <tbody>
+      ${Object.entries(subjectRows).map(([s,d])=>{
+        const p=d.total>0?Math.round((d.done/d.total)*100):0;
+        return `<tr><td style="font-weight:700">${s}</td><td>${d.total}</td><td>${d.papers}</td>
+        <td style="color:#059669;font-weight:700">${d.done}</td><td style="color:#D97706">${d.inProg}</td>
+        <td><div class="prog"><div class="prog-fill" style="width:${p}%;background:${p>=80?"#059669":p>=50?"#F59E0B":"#3B82F6"}"></div></div>${p}%</td></tr>`;
+      }).join("")}
+      </tbody>
+    </table>
+    <h3>📦 تفاصيل جميع المظاريف</h3>
+    <table>
+      <thead><tr><th>الباركود</th><th>المادة</th><th>الصف</th><th>الأوراق</th><th>المصحح</th><th>المرحلة الحالية</th><th>آخر تحديث</th></tr></thead>
+      <tbody>${bundleRows}</tbody>
+    </table>
+    <div class="footer">
+      <span>${state.schoolName} — نظام تتبع مظاريف الاختبارات</span>
+      <span>طُبع بواسطة مدير المدرسة — ${printDate}</span>
+    </div>
+    <div class="no-print">
+      <button onclick="window.print()" style="padding:9px 22px;background:#0D1F3C;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة / PDF</button>
+      <button onclick="window.close()" style="padding:9px 16px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+    </div>
   </div>
   </body></html>`);
   win.document.close();
