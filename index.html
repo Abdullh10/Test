@@ -856,7 +856,7 @@ function quickLogin(username, password) {
     if(allUsers[i].username===username && allUsers[i].password===password){ found=allUsers[i]; break; }
   }
   if(!found){ toast("حساب غير موجود","err"); return; }
-  try{ var sData=JSON.stringify({username:found.username,lastPage:null}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
+  try{ var sData=JSON.stringify({username:found.username,role:found.role,lastPage:null}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
   enterShell(found);
 }
 
@@ -867,6 +867,7 @@ function doLogin() {
   const errEl = document.getElementById("loginErr");
   if(found) {
     currentUser = found; errEl.style.display="none";
+    try{ sessionStorage.removeItem("examSession"); localStorage.removeItem("examSession_backup"); }catch(e){}
     document.getElementById("loginScreen").style.display="none";
     const shell = document.getElementById("appShell");
     shell.style.display="flex";
@@ -910,6 +911,7 @@ function enterShell(found, page) {
 
 function doLogout() {
   currentUser=null; currentPage="";
+  try{ sessionStorage.removeItem("examSession"); localStorage.removeItem("examSession_backup"); }catch(e){}
   document.getElementById("loginScreen").style.display="flex";
   document.getElementById("appShell").style.display="none";
   document.getElementById("loginUser").value="";
@@ -2664,11 +2666,6 @@ function renderPrincipalDashboard(el) {
   const inProg     = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
   const newB       = state.bundles.filter(b=>b.stage<0).length;
   const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
-  const totalSubjects = Object.keys(subjectMap).length;
-  const doneSubjects = Object.values(subjectMap).filter(d=>d.done===d.total&&d.total>0).length;
-  const pct        = totalSubjects>0?Math.round((doneSubjects/totalSubjects)*100):0;
-  const gaugeColor = pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6";
-  const circumf    = Math.round(2*3.14159*38);
 
   // Build subject map with full stage breakdown
   const subjectMap = {};
@@ -2680,6 +2677,12 @@ function renderPrincipalDashboard(el) {
     else if(b.stage>=0)                            subjectMap[b.subject].inProg++;
     else                                           subjectMap[b.subject].newB++;
   });
+
+  const totalSubjects = Object.keys(subjectMap).length;
+  const doneSubjects = Object.values(subjectMap).filter(d=>d.done===d.total&&d.total>0).length;
+  const pct        = totalSubjects>0?Math.round((doneSubjects/totalSubjects)*100):0;
+  const gaugeColor = pct>=80?"#10B981":pct>=50?"#F59E0B":"#3B82F6";
+  const circumf    = Math.round(2*3.14159*38);
 
   // Recent activity
   const allLogs=[];
@@ -3141,85 +3144,123 @@ function renderPrincipalReport(el) {
   const total      = state.bundles.length;
   const done       = state.bundles.filter(b=>b.stage===state.stages.length-1).length;
   const inProg     = state.bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length;
+  const newB       = state.bundles.filter(b=>b.stage<0).length;
+  const incomplete = state.bundles.filter(b=>b.stage<state.stages.length-1).length;
   const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
   const pct        = total>0?Math.round((done/total)*100):0;
+  if(!state.principalNotes) state.principalNotes="";
 
-  // By grade
   const gradeMap={};
   state.bundles.forEach(b=>{
     const g=b.grade||"غير محدد";
-    if(!gradeMap[g]) gradeMap[g]={total:0,done:0,inProg:0,newB:0,papers:0};
+    if(!gradeMap[g]) gradeMap[g]={total:0,done:0,inProg:0,papers:0};
     gradeMap[g].total++; gradeMap[g].papers+=b.count;
     if(b.stage===state.stages.length-1) gradeMap[g].done++;
-    else if(b.stage>=0)                 gradeMap[g].inProg++;
-    else                                gradeMap[g].newB++;
+    else if(b.stage>=0) gradeMap[g].inProg++;
   });
 
-  // By subject
   const subjectMap={};
   state.bundles.forEach(b=>{
-    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,papers:0};
+    if(!subjectMap[b.subject]) subjectMap[b.subject]={total:0,done:0,inProg:0,papers:0};
     subjectMap[b.subject].total++; subjectMap[b.subject].papers+=b.count;
     if(b.stage===state.stages.length-1) subjectMap[b.subject].done++;
+    else if(b.stage>=0) subjectMap[b.subject].inProg++;
   });
 
-  // Teachers workload
   const tMap={};
   state.bundles.forEach(b=>{
     [b.corrector,b.corrector2,b.reviewer,b.reviewer2,b.auditor,b.auditor2].filter(Boolean).forEach(tid=>{
       const t=state.teachers.find(x=>x.id===tid);
       if(!t) return;
-      if(!tMap[t.name]) tMap[t.name]={bundles:0,papers:0};
-      tMap[t.name].bundles++; tMap[t.name].papers+=b.count;
+      if(!tMap[t.id]) tMap[t.id]={name:t.name,bundles:0,papers:0,done:0};
+      tMap[t.id].bundles++; tMap[t.id].papers+=b.count;
+      if(b.stage===state.stages.length-1) tMap[t.id].done++;
     });
   });
 
+  const incompleteBundles=state.bundles.filter(b=>b.stage<state.stages.length-1);
+
   el.innerHTML=`
-  <!-- Summary card -->
-  <div class="card" style="margin-bottom:14px">
-    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📊</span>الملخص التنفيذي</p>
-    <div class="info-grid">
-      <div class="info-cell"><p class="k">إجمالي المظاريف</p><p class="v">${total}</p></div>
-      <div class="info-cell"><p class="k">إجمالي الأوراق</p><p class="v">${totalPapers}</p></div>
-      <div class="info-cell"><p class="k">مكتملة تماماً</p><p class="v" style="color:var(--green)">${done}</p></div>
-      <div class="info-cell"><p class="k">نسبة الإنجاز الكلية</p><p class="v" style="color:${pct>=80?"var(--green)":pct>=50?"var(--amber)":"var(--blue)"}">${pct}%</p></div>
-    </div>
-    <button class="btn btn-navy btn-full" style="margin-top:10px" onclick="generatePrincipalPDF()">📄 تصدير تقرير مدير المدرسة PDF</button>
+  <!-- Buttons -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn btn-navy" style="flex:1" onclick="generatePrincipalPDF()">📄 تقرير PDF شامل</button>
+    <button class="btn" style="flex:1;background:linear-gradient(135deg,#991B1B,var(--red))" onclick="generateIncompletePDF()">⚠️ تقرير المتأخرات</button>
   </div>
 
-  <!-- By subject table -->
+  <!-- KPIs -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📊</span>الملخص التنفيذي</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div style="background:#DBEAFE;border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:#1E40AF">${total}</p>
+        <p style="font-size:10px;color:#1E40AF;font-weight:600">إجمالي المظاريف</p>
+      </div>
+      <div style="background:#D1FAE5;border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:#065F46">${done}</p>
+        <p style="font-size:10px;color:#065F46;font-weight:600">✅ مكتملة</p>
+      </div>
+      <div style="background:${pct>=80?"#D1FAE5":pct>=50?"#FEF3C7":"#DBEAFE"};border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:${pct>=80?"#065F46":pct>=50?"#92400E":"#1E40AF"}">${pct}%</p>
+        <p style="font-size:10px;color:var(--mid);font-weight:600">نسبة الإنجاز</p>
+      </div>
+      <div style="background:#FEF3C7;border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:#92400E">${inProg}</p>
+        <p style="font-size:10px;color:#92400E;font-weight:600">⏳ جارية</p>
+      </div>
+      <div style="background:#FEE2E2;border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:#991B1B">${incomplete}</p>
+        <p style="font-size:10px;color:#991B1B;font-weight:600">⚠️ غير مكتملة</p>
+      </div>
+      <div style="background:var(--bg);border-radius:var(--r10);padding:10px;text-align:center">
+        <p style="font-size:22px;font-weight:900;color:var(--navy)">${totalPapers}</p>
+        <p style="font-size:10px;color:var(--muted);font-weight:600">📄 الأوراق</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Principal Notes -->
+  <div class="card" style="margin-bottom:14px;border:2px solid var(--gold)">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📝</span>ملاحظات وتوجيهات مدير المدرسة</p>
+    <textarea id="principalNotesArea" class="inp" rows="4"
+      placeholder="اكتب ملاحظاتك وتوجيهاتك للكنترول أو مسؤول التنبيهات هنا..."
+      style="margin-bottom:10px">${state.principalNotes||""}</textarea>
+    <button class="btn btn-gold btn-full" onclick="
+      state.principalNotes=document.getElementById('principalNotesArea').value;
+      saveState();saveToCloud();toast('تم حفظ الملاحظات ✅')">💾 حفظ الملاحظات</button>
+  </div>
+
+  <!-- Incomplete alert -->
+  ${incompleteBundles.length>0?`
+  <div class="card" style="margin-bottom:14px;border:2px solid var(--red)">
+    <p class="card-title"><span class="ct-icon" style="background:#FEE2E2">⚠️</span>المظاريف غير المكتملة (${incompleteBundles.length})</p>
+    ${incompleteBundles.slice(0,6).map(b=>{
+      const sn=b.stage<0?"جديد - لم تبدأ":state.stages[b.stage]||"—";
+      const ct=state.teachers.find(t=>t.id===b.corrector);
+      return "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #FEE2E2'>"
+        +"<div style='width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0'></div>"
+        +"<div style='flex:1'><p style='font-size:13px;font-weight:700;color:var(--navy)'>"+b.subject+" — "+(b.grade||"—")+"</p>"
+        +"<p style='font-size:11px;color:var(--muted)'>"+sn+(ct?" | "+ct.name:"")+"</p></div>"
+        +"<span style='font-size:10px;font-family:monospace;color:var(--muted)'>"+b.barcode+"</span></div>";
+    }).join("")}
+    ${incompleteBundles.length>6?"<p style='font-size:12px;color:var(--muted);text-align:center;margin-top:8px'>... و "+(incompleteBundles.length-6)+" مظروف آخر في تقرير المتأخرات PDF</p>":""}
+  </div>`:"<div class='card' style='margin-bottom:14px;border:2px solid #10B981;background:#F0FDF4'><p style='text-align:center;color:#065F46;font-weight:700;font-size:14px;padding:10px'>✅ جميع المظاريف مكتملة</p></div>"}
+
+  <!-- By subject -->
   <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📚</span>الإنجاز حسب المادة</p>
     <div style="overflow-x:auto">
     <table class="data-table">
-      <thead><tr>
-        <th>المادة</th><th style="text-align:center">المظاريف</th>
-        <th style="text-align:center">الأوراق</th>
-        <th style="text-align:center">مكتمل</th><th>نسبة الإنجاز</th>
-        <th></th>
-      </tr></thead>
+      <thead><tr><th>المادة</th><th style="text-align:center">المظاريف</th><th style="text-align:center">✅ مكتمل</th><th style="text-align:center">⏳ جارٍ</th><th>نسبة الإنجاز</th><th></th></tr></thead>
       <tbody>
         ${Object.entries(subjectMap).map(([subj,d])=>{
           const p=d.total>0?Math.round((d.done/d.total)*100):0;
           const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
-          return `<tr>
-            <td style="font-weight:700;color:var(--navy)">${subj}</td>
-            <td style="text-align:center">${d.total}</td>
-            <td style="text-align:center;color:var(--mid)">${d.papers}</td>
-            <td style="text-align:center"><span style="background:${c}20;color:${c};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.done}/${d.total}</span></td>
-            <td>
-              <div style="display:flex;align-items:center;gap:6px">
-                <div style="flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden;min-width:50px">
-                  <div style="height:100%;width:${p}%;background:${c};border-radius:99px"></div>
-                </div>
-                <span style="font-size:11px;font-weight:700;color:${c}">${p}%</span>
-              </div>
-            </td>
-            <td>
-              <button onclick="_prinView='subject';_prinSubject='${subj.replace(/'/g,"\\'")}';_prinGradeFilter='';navigateTo('principal_dashboard')"
-                style="background:var(--navy);color:#fff;border:none;border-radius:var(--r6);padding:4px 10px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700">تفاصيل</button>
-            </td>
-          </tr>`;
+          return "<tr><td style='font-weight:700;color:var(--navy)'>"+subj+"</td>"
+            +"<td style='text-align:center'>"+d.total+"</td>"
+            +"<td style='text-align:center'><span style='color:#059669;font-weight:700'>"+d.done+"</span></td>"
+            +"<td style='text-align:center'><span style='color:#D97706;font-weight:700'>"+d.inProg+"</span></td>"
+            +"<td><div style='display:flex;align-items:center;gap:5px'><div style='flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden;min-width:45px'><div style='height:100%;width:"+p+"%;background:"+c+";border-radius:99px'></div></div><span style='font-size:11px;font-weight:700;color:"+c+"'>"+p+"%</span></div></td>"
+            +"<td><button onclick='_prinView=&quot;subject&quot;;_prinSubject=&quot;"+subj+"&quot;;_prinGradeFilter=&quot;&quot;;navigateTo(&quot;principal_dashboard&quot;)' style='background:var(--navy);color:#fff;border:none;border-radius:var(--r6);padding:4px 9px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700'>تفاصيل</button></td></tr>";
         }).join("")}
       </tbody>
     </table>
@@ -3233,46 +3274,53 @@ function renderPrincipalReport(el) {
     ${Object.entries(gradeMap).map(([grade,d])=>{
       const p=d.total>0?Math.round((d.done/d.total)*100):0;
       const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
-      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-            <span style="font-weight:700;color:var(--navy)">${grade}</span>
-            <span style="font-size:11px;color:var(--muted)">${d.papers} ورقة</span>
-          </div>
-          <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden">
-            <div style="height:100%;width:${p}%;background:${c};border-radius:99px;transition:width .5s"></div>
-          </div>
-        </div>
-        <div style="text-align:center;min-width:50px">
-          <p style="font-size:18px;font-weight:900;color:${c}">${p}%</p>
-          <p style="font-size:10px;color:var(--muted)">${d.done}/${d.total}</p>
-        </div>
-      </div>`;
+      return "<div style='display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)'>"
+        +"<div style='flex:1'><div style='display:flex;justify-content:space-between;margin-bottom:5px'>"
+        +"<span style='font-weight:700;color:var(--navy)'>"+grade+"</span>"
+        +"<span style='font-size:11px;color:var(--muted)'>"+d.papers+" ورقة | ✅"+d.done+" ⏳"+d.inProg+"</span></div>"
+        +"<div style='height:7px;background:var(--border);border-radius:99px;overflow:hidden'>"
+        +"<div style='height:100%;width:"+p+"%;background:"+c+";border-radius:99px;transition:width .5s'></div></div></div>"
+        +"<div style='text-align:center;min-width:48px'><p style='font-size:18px;font-weight:900;color:"+c+"'>"+p+"%</p>"
+        +"<p style='font-size:10px;color:var(--muted)'>"+d.done+"/"+d.total+"</p></div></div>";
     }).join("")}
   </div>`:""}
 
-  <!-- Teachers workload -->
+  <!-- Teachers performance -->
   ${Object.keys(tMap).length>0?`
   <div class="card">
-    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">👨‍🏫</span>أعباء المعلمين</p>
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">👨‍🏫</span>أداء المعلمين</p>
     <div style="overflow-x:auto">
     <table class="data-table">
-      <thead><tr>
-        <th>المعلم</th>
-        <th style="text-align:center">المظاريف المعيّنة</th>
-        <th style="text-align:center">إجمالي الأوراق</th>
-      </tr></thead>
+      <thead><tr><th>المعلم</th><th style="text-align:center">المظاريف</th><th style="text-align:center">الأوراق</th><th style="text-align:center">✅ منجز</th><th>نسبة الإنجاز</th></tr></thead>
       <tbody>
-        ${Object.entries(tMap).sort((a,b)=>b[1].papers-a[1].papers).map(([name,d])=>`
-        <tr>
-          <td style="font-weight:700;color:var(--navy)">${name}</td>
-          <td style="text-align:center">${d.bundles}</td>
-          <td style="text-align:center;color:var(--mid)">${d.papers}</td>
-        </tr>`).join("")}
+        ${Object.values(tMap).sort((a,b)=>b.papers-a.papers).map(d=>{
+          const p=d.bundles>0?Math.round((d.done/d.bundles)*100):0;
+          const c=p>=80?"#10B981":p>=50?"#F59E0B":"#3B82F6";
+          return "<tr><td style='font-weight:700;color:var(--navy);font-size:12px'>"+d.name+"</td>"
+            +"<td style='text-align:center'>"+d.bundles+"</td>"
+            +"<td style='text-align:center;color:var(--mid)'>"+d.papers+"</td>"
+            +"<td style='text-align:center'><span style='color:#059669;font-weight:700'>"+d.done+"</span></td>"
+            +"<td><div style='display:flex;align-items:center;gap:5px'><div style='flex:1;height:5px;background:var(--border);border-radius:99px;overflow:hidden;min-width:40px'><div style='height:100%;width:"+p+"%;background:"+c+";border-radius:99px'></div></div><span style='font-size:11px;font-weight:700;color:"+c+"'>"+p+"%</span></div></td></tr>";
+        }).join("")}
       </tbody>
     </table>
     </div>
   </div>`:""}`;
+}
+
+function generateIncompletePDF() {
+  const incompleteBundles=state.bundles.filter(b=>b.stage<state.stages.length-1);
+  const printDate=new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+  if(incompleteBundles.length===0){toast("لا توجد مظاريف غير مكتملة ✅","ok");return;}
+  const rows=incompleteBundles.map((b,i)=>{
+    const ct=state.teachers.find(t=>t.id===b.corrector);
+    const sn=b.stage<0?"جديد - لم تبدأ":state.stages[b.stage]||"—";
+    return "<tr style='background:"+(i%2===0?"#fff":"#fff7f7")+"'><td style='font-family:monospace;font-size:10px'>"+b.barcode+"</td><td style='font-weight:700'>"+b.subject+"</td><td>"+(b.grade||"—")+"</td><td style='text-align:center'>"+b.count+"</td><td>"+(ct?ct.name:"—")+"</td><td style='color:#991B1B;font-weight:700'>"+sn+"</td></tr>";
+  }).join("");
+  const win=window.open("","_blank","width=1050,height=800");
+  win.document.write("<!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='UTF-8'/><title>تقرير المتأخرات</title><style>@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;font-size:12px;line-height:1.5}.page{padding:18px 22px}.header{border-bottom:3px solid #991B1B;padding-bottom:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}h1{font-size:17px;font-weight:900;color:#991B1B}.alert{background:#FEF2F2;border:2px solid #FECACA;border-radius:8px;padding:9px 13px;margin-bottom:12px;display:flex;align-items:center;gap:9px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#991B1B;color:#fff;padding:7px 9px;text-align:right;font-weight:700}td{padding:6px 9px;border-bottom:1px solid #fee2e2}.notes{background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;padding:9px 13px;margin-bottom:12px}.footer{margin-top:12px;padding-top:9px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}.no-print{margin-top:12px;display:flex;gap:8px}@media print{.no-print{display:none}}</style></head><body><div class='page'><div class='header'><div><h1>تقرير المظاريف غير المكتملة</h1><p style='font-size:11px;color:#64748b;margin-top:2px'>"+state.schoolName+" — "+printDate+"</p></div><div style='background:#991B1B;color:#fff;padding:5px 13px;border-radius:7px;font-size:13px;font-weight:700'>"+incompleteBundles.length+" مظروف</div></div><div class='alert'><span style='font-size:22px'>⚠️</span><div><p style='font-weight:700;color:#991B1B'>يوجد "+incompleteBundles.length+" مظروف غير مكتمل من أصل "+state.bundles.length+" مظروف</p><p style='color:#64748b;font-size:10px;margin-top:2px'>يرجى متابعة المسؤولين لإنهاء هذه المظاريف</p></div></div>"+(state.principalNotes?"<div class='notes'><p style='font-weight:700;margin-bottom:4px;color:#92400E'>📝 توجيهات مدير المدرسة:</p><p>"+state.principalNotes+"</p></div>":"")+"<table><thead><tr><th>الباركود</th><th>المادة</th><th>الصف</th><th>الأوراق</th><th>المصحح</th><th>المرحلة الحالية</th></tr></thead><tbody>"+rows+"</tbody></table><div class='footer'><span>"+state.schoolName+"</span><span>طُبع بواسطة مدير المدرسة — "+printDate+"</span></div><div class='no-print'><button onclick='window.print()' style='padding:8px 20px;background:#991B1B;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700'>طباعة / PDF</button><button onclick='window.close()' style='padding:8px 14px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit'>إغلاق</button></div></div></body></html>");
+  win.document.close();
+  toast("تم فتح تقرير المتأخرات ✅");
 }
 
 function generatePrincipalPDF() {
