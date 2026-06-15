@@ -122,14 +122,14 @@ body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;background:var(--bg);co
 }
 #appNav::-webkit-scrollbar{height:0}
 .nav-btn{
-  padding:14px 16px;border:none;border-bottom:3px solid transparent;
+  padding:10px 14px;border:none;border-bottom:3px solid transparent;
   background:none;cursor:pointer;color:var(--muted);font-weight:500;
-  font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap;
-  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+  font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;white-space:nowrap;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;min-width:64px;
 }
 .nav-btn:hover{color:var(--navy);background:rgba(11,29,58,.04)}
 .nav-btn.active{color:var(--navy);font-weight:700;border-bottom-color:var(--gold)}
-.nav-icon{font-size:16px}
+.nav-icon{font-size:22px}
 
 /* MAIN */
 #appMain{flex:1;padding:24px;overflow-y:auto;background:linear-gradient(180deg,var(--bg) 0%,#E5E9F4 100%);min-height:calc(100vh - 116px)}
@@ -856,7 +856,7 @@ function quickLogin(username, password) {
     if(allUsers[i].username===username && allUsers[i].password===password){ found=allUsers[i]; break; }
   }
   if(!found){ toast("حساب غير موجود","err"); return; }
-  try{ sessionStorage.setItem("examSession",JSON.stringify({username:found.username})); }catch(e){}
+  try{ var sData=JSON.stringify({username:found.username,lastPage:null}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
   enterShell(found);
 }
 
@@ -925,8 +925,8 @@ function renderNav() {
   nav.innerHTML = "";
   (PAGES[currentUser.role]||[]).forEach(p=>{
     const btn = document.createElement("button");
-    btn.className = "navBtn" + (currentPage===p.k?" active":"");
-    btn.innerHTML = `${p.icon} ${p.label}`;
+    btn.className = "nav-btn" + (currentPage===p.k?" active":"");
+    btn.innerHTML = `<span style="font-size:24px;line-height:1">${p.icon}</span><span style="font-size:11px">${p.label}</span>`;
     btn.onclick = () => navigateTo(p.k);
     nav.appendChild(btn);
   });
@@ -934,6 +934,11 @@ function renderNav() {
 
 function navigateTo(page) {
   currentPage = page;
+  // Save current page in session for restore after refresh
+  try {
+    var raw = sessionStorage.getItem("examSession") || localStorage.getItem("examSession_backup");
+    if(raw){ var s=JSON.parse(raw); s.lastPage=page; var j=JSON.stringify(s); sessionStorage.setItem("examSession",j); localStorage.setItem("examSession_backup",j); }
+  } catch(e){}
   renderNav();
   const el = document.getElementById("pageContent");
   // reset scroll
@@ -3398,6 +3403,7 @@ renderLoginDemos();
   // 3) Restore session
   try {
     var raw = sessionStorage.getItem("examSession");
+    if(!raw) raw = localStorage.getItem("examSession_backup");
     if(raw) {
       var sess = JSON.parse(raw);
       var allU = (state.users && state.users.length) ? state.users : [
@@ -3408,7 +3414,7 @@ renderLoginDemos();
       ];
       var found = null;
       for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
-      if(found) enterShell(found);
+      if(found) enterShell(found, sess.lastPage||null);
     }
   } catch(e){}
 })();
