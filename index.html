@@ -132,8 +132,8 @@ body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;background:var(--bg);co
 .nav-icon{font-size:22px}
 
 /* MAIN */
-#appMain{flex:1;padding:24px;overflow-y:auto;background:linear-gradient(180deg,var(--bg) 0%,#E5E9F4 100%);min-height:calc(100vh - 116px)}
-.page-wrap{max-width:740px;margin:0 auto;animation:fadeIn .25s ease}
+#appMain{flex:1;padding:20px 16px;overflow-y:auto;background:linear-gradient(180deg,var(--bg) 0%,#E5E9F4 100%);min-height:calc(100vh - 116px)}
+.page-wrap{max-width:960px;margin:0 auto;animation:fadeIn .25s ease}
 
 /* ── CARDS ───────────────────────────────────── */
 .card{
@@ -451,7 +451,10 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 .banner{border-radius:var(--r10);padding:13px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .banner-icon{font-size:22px;flex-shrink:0}
 
-/* ── PRINT ───────────────────────────────────── */
+/* ── MESSAGING ───────────────────────────────── */
+.msg-type-btn{flex:1;min-width:110px;transition:all .18s}
+.msg-type-btn.active-type{transform:translateY(-1px);box-shadow:var(--sh2)}
+#bellBtn:hover{background:rgba(255,255,255,.2)!important}
 @media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:fixed;top:0;left:0;right:0;text-align:center;padding:40px}}
 
 /* ── RESPONSIVE ──────────────────────────────── */
@@ -460,7 +463,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
   .info-grid{grid-template-columns:1fr}
   .login-card{padding:32px 22px}
   .card{padding:16px}
-  #appMain{padding:14px}
+  #appMain{padding:12px 8px}
   #appHeader{padding:0 14px}
 }
 </style>
@@ -533,6 +536,9 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     <span class="h-title" id="hSchool"></span>
     <span class="h-role" id="hRole"></span>
     <span class="h-user" id="hUser"></span>
+    <button id="bellBtn" onclick="navigateTo('inbox')" style="display:none;position:relative;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:20px;line-height:1;flex-shrink:0;transition:all .15s" title="التنبيهات">
+      🔔<span id="bellBadge" style="display:none;position:absolute;top:-4px;left:-4px;background:#EF4444;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--navy);font-family:'IBM Plex Sans Arabic',sans-serif"></span>
+    </button>
     <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
   <nav id="appNav"></nav>
@@ -604,7 +610,7 @@ async function saveToCloud() {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
-    users:state.users, examSchedule:state.examSchedule||[]
+    users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[]
   };
   await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
   // Also save to localStorage as backup
@@ -630,7 +636,7 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule"].forEach(function(k){
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
     }
@@ -741,9 +747,9 @@ const NOTIFY_TYPES = [
 ];
 const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
-  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
-  notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
-  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"} ],
+  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
+  notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
+  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -922,16 +928,45 @@ function doLogout() {
 // ═══════════════════════════════════════════════
 // NAV
 // ═══════════════════════════════════════════════
+function getUnreadCount() {
+  if(!currentUser) return 0;
+  const inbox = (state.inbox||[]).filter(m=>m.to===currentUser.role && !m.read);
+  return inbox.length;
+}
+
+function updateBell() {
+  const btn = document.getElementById("bellBtn");
+  const badge = document.getElementById("bellBadge");
+  if(!btn||!badge) return;
+  const roles = ["controller","notifier"];
+  if(currentUser && roles.includes(currentUser.role)) {
+    btn.style.display = "flex";
+    btn.style.alignItems = "center";
+    btn.style.justifyContent = "center";
+    const cnt = getUnreadCount();
+    if(cnt>0) {
+      badge.style.display = "flex";
+      badge.textContent = cnt>9?"9+":cnt;
+    } else {
+      badge.style.display = "none";
+    }
+  } else {
+    btn.style.display = "none";
+  }
+}
+
 function renderNav() {
   const nav = document.getElementById("appNav");
   nav.innerHTML = "";
   (PAGES[currentUser.role]||[]).forEach(p=>{
     const btn = document.createElement("button");
+    const unread = (p.k==="inbox") ? getUnreadCount() : 0;
     btn.className = "nav-btn" + (currentPage===p.k?" active":"");
-    btn.innerHTML = `<span style="font-size:24px;line-height:1">${p.icon}</span><span style="font-size:11px">${p.label}</span>`;
+    btn.innerHTML = `<span style="position:relative;display:inline-block;font-size:24px;line-height:1">${p.icon}${unread>0?`<span style="position:absolute;top:-4px;left:-4px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 3px">${unread>9?"9+":unread}</span>`:""}</span><span style="font-size:11px">${p.label}</span>`;
     btn.onclick = () => navigateTo(p.k);
     nav.appendChild(btn);
   });
+  updateBell();
 }
 
 function navigateTo(page) {
@@ -952,12 +987,16 @@ function navigateTo(page) {
     case "settings":    renderSettings(el);    break;
     case "ctrl_scan":   renderCtrlScan(el);    break;
     case "ctrl_list":   renderCtrlList(el);    break;
+    case "ctrl_minutes": renderCtrlMinutes(el); break;
     case "notif_send":  renderNotifSend(el);   break;
     case "notif_log":    renderNotifLog(el);      break;
     case "ctrl_schedule":renderCtrlSchedule(el);  break;
     case "ctrl_report":  renderCtrlReport(el);    break;
     case "principal_dashboard": renderPrincipalDashboard(el); break;
     case "principal_report":    renderPrincipalReport(el);    break;
+    case "principal_compose":   renderPrincipalCompose(el);   break;
+    case "principal_sent":      renderPrincipalSent(el);      break;
+    case "inbox":               renderInbox(el);              break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
   }
 }
@@ -2228,39 +2267,187 @@ function printSchedule() {
 // ═══════════════════════════════════════════════
 function renderCtrlReport(el) {
   const subjects = [...new Set(state.bundles.map(b=>b.subject))].sort();
+  const archive = state.minutesArchive||[];
+
+  // Build archive section HTML
+  const archiveHtml = archive.length===0
+    ? `<p style="color:var(--muted);font-size:13px;padding:10px 0">لا توجد محاضر محفوظة بعد — احفظ محضراً من صفحة "محضر فتح المظاريف"</p>`
+    : archive.map((a,i)=>{
+        const dateStr = `${a.hijriDay||""} ${a.hijriDayNum?toArabicNum(a.hijriDayNum):""}/${a.hijriMonth||""}/${a.hijriYear||""}هـ`;
+        const savedDate = new Date(a.savedAt).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"});
+        const rowCount = (a.rows||[]).filter(r=>r.subject).length;
+        return `
+        <div style="background:var(--bg);border-radius:10px;padding:13px 16px;margin-bottom:8px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="width:40px;height:40px;background:linear-gradient(135deg,var(--navy),var(--navy3));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📝</div>
+          <div style="flex:1;min-width:160px">
+            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${a.label}</p>
+            <p style="font-size:11px;color:var(--muted)">${dateStr} · ${rowCount} مادة</p>
+            <p style="font-size:10px;color:var(--faint)">حُفظ: ${savedDate}</p>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <button class="btn btn-navy btn-sm" onclick="printArchivedMinutes(${i})">🖨️ طباعة PDF</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="if(confirm('حذف هذه النسخة؟')){state.minutesArchive.splice(${i},1);saveState();saveToCloud();renderCtrlReport(document.getElementById('pageContent'));toast('تم الحذف')}">✕ حذف</button>
+          </div>
+        </div>`;
+      }).join("");
+
   el.innerHTML=`
-  <div class="card">
-    <p class="card-title">📄 تقارير PDF للكنترول</p>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">اختر المادة لإنشاء تقرير تفصيلي كامل قابل للطباعة</p>
-    ${state.bundles.length===0?`<p class="empty">لا توجد مظاريف لإنشاء تقارير</p>`:`
-    <!-- All subjects report -->
-    <div style="background:var(--bg);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
-      <span style="font-size:28px">📋</span>
-      <div style="flex:1">
-        <p style="font-weight:800;color:var(--navy);font-size:14px">تقرير شامل — جميع المواد</p>
-        <p style="font-size:12px;color:var(--muted)">${state.bundles.length} مظروف · جميع المراحل</p>
+  <div class="page-wrap">
+
+    <!-- أرشيف المحاضر المحفوظة -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title"><span class="ct-icon">📝</span>محاضر فتح المظاريف المحفوظة
+        <span style="margin-right:auto;font-size:11px;color:var(--muted);font-weight:400">${archive.length} نسخة</span>
       </div>
-      <button class="btn btn-navy" onclick="generatePDF('ALL')">📄 إنشاء PDF</button>
+      ${archiveHtml}
     </div>
-    <!-- Per subject -->
-    <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:10px">تقارير حسب المادة:</p>
-    ${subjects.map(subj=>{
-      const bs=state.bundles.filter(b=>b.subject===subj);
-      const doneCount=bs.filter(b=>b.stage===state.stages.length-1).length;
-      const lastStages=[...new Set(bs.map(b=>b.stage<0?"جديد":state.stages[b.stage]||"—"))];
-      return `
-      <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <div style="flex:1;min-width:150px">
-          <p style="font-weight:800;color:var(--navy);font-size:13px">${subj}</p>
-          <p style="font-size:11px;color:var(--muted)">${bs.length} مظروف · ${bs.reduce((a,b)=>a+b.count,0)} ورقة · مكتمل: ${doneCount}</p>
+
+    <!-- تقارير المظاريف -->
+    <div class="card">
+      <p class="card-title">📄 تقارير PDF للكنترول</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">اختر المادة لإنشاء تقرير تفصيلي كامل قابل للطباعة</p>
+      ${state.bundles.length===0?`<p class="empty">لا توجد مظاريف لإنشاء تقارير</p>`:`
+      <div style="background:var(--bg);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">📋</span>
+        <div style="flex:1">
+          <p style="font-weight:800;color:var(--navy);font-size:14px">تقرير شامل — جميع المواد</p>
+          <p style="font-size:12px;color:var(--muted)">${state.bundles.length} مظروف · جميع المراحل</p>
         </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1">
-          ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${b.barcode}</span>`;}).join("")}
-        </div>
-        <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
-      </div>`;
-    }).join("")}`}
+        <button class="btn btn-navy" onclick="generatePDF('ALL')">📄 إنشاء PDF</button>
+      </div>
+      <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:10px">تقارير حسب المادة:</p>
+      ${subjects.map(subj=>{
+        const bs=state.bundles.filter(b=>b.subject===subj);
+        const doneCount=bs.filter(b=>b.stage===state.stages.length-1).length;
+        return `
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:150px">
+            <p style="font-weight:800;color:var(--navy);font-size:13px">${subj}</p>
+            <p style="font-size:11px;color:var(--muted)">${bs.length} مظروف · ${bs.reduce((a,b)=>a+b.count,0)} ورقة · مكتمل: ${doneCount}</p>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1">
+            ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${b.barcode}</span>`;}).join("")}
+          </div>
+          <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
+        </div>`;
+      }).join("")}`}
+    </div>
   </div>`;
+}
+
+function printArchivedMinutes(archiveIdx) {
+  const archive = state.minutesArchive||[];
+  const a = archive[archiveIdx];
+  if(!a){ toast("النسخة غير موجودة","err"); return; }
+
+  const rows=(a.rows||[]).map((r,i)=>{
+    const sigImg=r.sig?`<img src="${r.sig}" style="max-width:120px;max-height:48px;display:block;margin:auto"/>`:
+      `<div style="width:120px;height:48px;border-bottom:1px solid #bbb;margin:auto"></div>`;
+    return `<tr>
+      <td style="text-align:center;padding:8px 5px">${i+1}</td>
+      <td style="padding:8px 7px;font-weight:700">${r.subject||"—"}</td>
+      <td style="padding:8px 7px">${r.grade||"—"}</td>
+      <td style="padding:8px 7px;direction:ltr;text-align:center">${r.time||":"}</td>
+      <td style="padding:8px 7px">${r.teacherName||"—"}</td>
+      <td style="padding:8px 7px">${r.notes||""}</td>
+      <td style="padding:5px;text-align:center">${sigImg}</td>
+    </tr>`;
+  }).join("");
+
+  const committee=(a.committee||[]).map((c,i)=>{
+    const sigImg=c.sig?`<img src="${c.sig}" style="max-width:140px;max-height:52px;display:block;margin:auto"/>`:
+      `<div style="width:140px;height:52px;border-bottom:1px solid #bbb;margin:auto"></div>`;
+    return `<tr>
+      <td style="text-align:center;padding:8px 5px">${i+1}</td>
+      <td style="padding:8px 10px;font-weight:700">${c.name||"—"}</td>
+      <td style="padding:5px;text-align:center">${sigImg}</td>
+    </tr>`;
+  }).join("");
+
+  const dateStr=`${a.hijriDay||""} الموافق ${a.hijriDayNum?toArabicNum(a.hijriDayNum):".."}/${a.hijriMonth||".........."}/${a.hijriYear||"...."}`;
+  const savedDate=new Date(a.savedAt).toLocaleString("ar-SA",{dateStyle:"long",timeStyle:"short"});
+  const schoolName=state.schoolName||"مدرسة العلا الثانوية";
+
+  const win=window.open("","_blank","width=960,height=780");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>${a.label}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:28px 36px;color:#0B1D3A;font-size:13px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .logo{width:90px;height:90px;object-fit:contain}
+  .center-head{text-align:center;flex:1;padding:0 10px}
+  .center-head h1{font-size:17px;font-weight:800;margin-bottom:3px}
+  .center-head h2{font-size:13px;color:#444;font-weight:600}
+  .badge{display:inline-block;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;margin-top:6px}
+  .intro-box{border:1.5px solid #0B1D3A;border-radius:7px;padding:12px 16px;margin:14px 0;font-size:13px;line-height:2;text-align:justify}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:12px}
+  th{background:#0B1D3A;color:#fff;padding:9px 7px;text-align:right;font-weight:700}
+  td{padding:7px 7px;border:1px solid #ccd;vertical-align:middle}
+  tr:nth-child(even) td{background:#f6f7fb}
+  .footer-sig{margin-top:24px;text-align:center;font-size:13.5px;font-weight:600;line-height:2}
+  @media print{.no-print{display:none}body{padding:18px 24px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
+  <div class="center-head">
+    <h1>${a.label}</h1>
+    <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
+    <h2 style="margin-top:2px">${schoolName}</h2>
+    <span class="badge">📁 نسخة محفوظة — ${savedDate}</span>
+  </div>
+  <img src="${LOGO_SRC}" class="logo" alt="" style="opacity:0.1"/>
+</div>
+
+<div class="intro-box">
+  إنه في يوم <strong>${a.hijriDay||"الأربعاء"}</strong> الموافق <strong>${a.hijriDayNum?toArabicNum(a.hijriDayNum):".."}/${a.hijriMonth||".........."}/${a.hijriYear||"...."}هـ</strong>، تم فتح مظاريف المواد المسجلة أدناه وقد وجدت المظاريف سليمة ومغلقة ومختومة بختم المدرسة.
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:34px;text-align:center">م</th>
+      <th>المادة</th>
+      <th style="min-width:90px">الصف</th>
+      <th style="min-width:55px;text-align:center">الوقت</th>
+      <th>اسم المعلم</th>
+      <th style="min-width:80px">ملاحظات</th>
+      <th style="min-width:130px;text-align:center">التوقيع</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<table style="max-width:480px;margin:0 auto 22px">
+  <thead>
+    <tr>
+      <th style="width:34px;text-align:center">م</th>
+      <th>أعضاء اللجنة</th>
+      <th style="min-width:160px;text-align:center">التوقيع</th>
+    </tr>
+  </thead>
+  <tbody>${committee}</tbody>
+</table>
+
+<div class="footer-sig">
+  <p>والله الموفق،،،</p>
+  <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
+  <p style="margin-top:3px">${a.principal||""}</p>
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#0B1D3A;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">🖨️ طباعة / حفظ PDF</button>
+  &nbsp;
+  <button onclick="window.close()" style="padding:10px 18px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+  toast("تم فتح النسخة المحفوظة ✅");
 }
 
 function generatePDF(subjectFilter) {
@@ -3426,6 +3613,1022 @@ function generatePrincipalPDF() {
 }
 
 // ═══════════════════════════════════════════════
+// CONTROLLER — محضر فتح المظاريف (نسخة محسّنة)
+// ═══════════════════════════════════════════════
+
+// أسماء المعلمين مرتبة أبجدياً (مستخرجة من ملف البيانات)
+const TEACHERS_LIST = [
+  "إبراهيم بن ثواب بن معيض الجامعي السلمي",
+  "إبراهيم علي محمد القحطاني",
+  "أحمد يحيى محمد أبو ملحة",
+  "اسامة بن عبدالله بن جارالله الحارثي",
+  "اسعيد بن علي محمد السهيمي",
+  "ايمن صالح حسين الغامدي",
+  "بدر بن دخيل الله بن دغيم الفريدي الحربي",
+  "بندر بن أحمد بن غرم الله الطفيلي الزهراني",
+  "جمعان محمد عبدالرحمن الزهراني",
+  "حسين بن مانع بن حسين القحطاني",
+  "خالد بن عبدالله بن ابراهيم الباز",
+  "خالد بن علي محمد القحطاني",
+  "سعد بن صياح بن ثامر الرشيدي",
+  "صقر بن محيسن بن شريده العبدلي العنزي",
+  "عبدالرحمن بن عبدالله بن علي الغامدي",
+  "عبدالرحمن بن محمد بن علي العمري",
+  "عبدالرحمن حمد بن عبدالعزيز الجابر",
+  "عبدالعزيز بن عايض بن خثيل السويداني القحطاني",
+  "عبدالله بن سالم عيسى المسيليم",
+  "عبدالله بن جهيم بن عبيد الفدعاني العنزي",
+  "عبدالله بن محمد بن علي حمدي",
+  "عبدالله بن محمد علي الشهري",
+  "عبدالملك بن عبدالله بن محمد الصقعبي",
+  "علي بن محمد بن علي آل فايع",
+  "فارس سعيد حسين الغامدي",
+  "فهد بن ابراهيم بن علي الهزيم المحبوب",
+  "فهد بن عبدالرحمن أحمد السقوفي",
+  "فهد بن محمد بن حمد العودة",
+  "فهد مشعي بريكان الدوسري",
+  "فيصل بن سلطان بن قطيم المطيري",
+  "فيصل بن محمد عبدالله الغفيلي",
+  "محمد احمد ديهان العميري",
+  "محمد بن خلف الله بن زايد الزايدي",
+  "محمد بن عبد العزيز بن محمد السدحان",
+  "محمد جبران فرحان عياشي",
+  "محمد حسين عبدالله العلي",
+  "محمد علي صالح ال عقيل",
+  "معيض بن جبران بن محمد آل قاسم القحطاني",
+  "ناصر بن جمعان عيضه المالكي",
+  "نايف بن عبدالله بن محمد الحواس"
+];
+
+// الأيام بالعربي
+const HIJRI_DAYS = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+
+// توليد أيام الأسبوع (ما عدا الجمعة والسبت) للاختيار
+const WEEK_DAYS_OPTIONS = HIJRI_DAYS.map(d=>`<option value="${d}">${d}</option>`).join("");
+
+// توليد قائمة السنوات الهجرية
+function getHijriYears() {
+  return ["١٤٤٦","١٤٤٧","١٤٤٨","١٤٤٩","١٤٥٠"];
+}
+function getHijriMonths() {
+  return ["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+}
+function getHijriDays() {
+  return Array.from({length:30},(_,i)=>String(i+1));
+}
+// تحويل أرقام إلى عربية
+function toArabicNum(n){
+  return String(n).replace(/\d/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);
+}
+
+// حالة المحضر الافتراضية
+function defaultMinutesData() {
+  return {
+    hijriDay: "",
+    hijriDayNum: "",
+    hijriMonth: "",
+    hijriYear: "١٤٤٧",
+    forms: [
+      {
+        id: "f" + Date.now(),
+        label: "المحضر الأول",
+        rows: [{subject:"",grade:"",time:"",teacherName:"",notes:"",sig:""}],
+        committee: [{name:"",sig:""},{name:"",sig:""}],
+      }
+    ],
+    activeFormIdx: 0,
+    principal: "محمد بن طراد الرفدي",
+    committeeChief: "رئيس لجنة الاختبارات"
+  };
+}
+
+if(!state.minutesData || !state.minutesData.forms) {
+  // ترقية البيانات القديمة
+  if(state.minutesData && state.minutesData.rows) {
+    const old = state.minutesData;
+    state.minutesData = defaultMinutesData();
+    state.minutesData.forms[0].rows = old.rows || state.minutesData.forms[0].rows;
+    state.minutesData.forms[0].committee = old.committee || state.minutesData.forms[0].committee;
+    state.minutesData.principal = old.principal || state.minutesData.principal;
+    if(old.hijriDate) state.minutesData.hijriYear = "١٤٤٧";
+  } else {
+    state.minutesData = defaultMinutesData();
+  }
+}
+
+function saveMinutes() { saveState(); }
+
+function getHijriDateStr() {
+  const md = state.minutesData;
+  const day = md.hijriDayNum ? toArabicNum(md.hijriDayNum) : "..";
+  const month = md.hijriMonth || "..........";
+  const year = md.hijriYear || "....";
+  return `${day}/${month}/${year}هـ`;
+}
+
+// — Signature Canvas Logic —
+function initSigCanvas(canvasId, clearBtnId, saveBtnId, rowType, rowIdx, formIdx) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.strokeStyle = "#1a1a2e";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const fIdx = (formIdx !== undefined) ? formIdx : state.minutesData.activeFormIdx;
+  const form = state.minutesData.forms[fIdx];
+
+  function restoreSig(existing) {
+    if(existing) {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const img=new Image();
+      img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      img.src=existing;
+    }
+  }
+
+  if(rowType==="row" && form && form.rows[rowIdx]) restoreSig(form.rows[rowIdx].sig);
+  if(rowType==="committee" && form && form.committee[rowIdx]) restoreSig(form.committee[rowIdx].sig);
+
+  let drawing=false;
+  function getPos(e) {
+    const r=canvas.getBoundingClientRect();
+    const scaleX=canvas.width/r.width, scaleY=canvas.height/r.height;
+    if(e.touches) return {x:(e.touches[0].clientX-r.left)*scaleX, y:(e.touches[0].clientY-r.top)*scaleY};
+    return {x:(e.clientX-r.left)*scaleX, y:(e.clientY-r.top)*scaleY};
+  }
+  function startDraw(e){e.preventDefault();drawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);}
+  function draw(e){e.preventDefault();if(!drawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();}
+  function endDraw(e){e.preventDefault();drawing=false;}
+  canvas.addEventListener("mousedown",startDraw);
+  canvas.addEventListener("mousemove",draw);
+  canvas.addEventListener("mouseup",endDraw);
+  canvas.addEventListener("mouseleave",endDraw);
+  canvas.addEventListener("touchstart",startDraw,{passive:false});
+  canvas.addEventListener("touchmove",draw,{passive:false});
+  canvas.addEventListener("touchend",endDraw,{passive:false});
+
+  const clearBtn=document.getElementById(clearBtnId);
+  if(clearBtn) clearBtn.onclick=function(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const f=state.minutesData.forms[fIdx];
+    if(rowType==="row"&&f.rows[rowIdx]) f.rows[rowIdx].sig="";
+    if(rowType==="committee"&&f.committee[rowIdx]) f.committee[rowIdx].sig="";
+    saveMinutes();
+  };
+
+  const saveBtn=document.getElementById(saveBtnId);
+  if(saveBtn) saveBtn.onclick=function(){
+    const dataURL=canvas.toDataURL("image/png");
+    const f=state.minutesData.forms[fIdx];
+    if(rowType==="row"&&f.rows[rowIdx]) f.rows[rowIdx].sig=dataURL;
+    if(rowType==="committee"&&f.committee[rowIdx]) f.committee[rowIdx].sig=dataURL;
+    saveMinutes();
+    toast("✅ تم حفظ التوقيع");
+  };
+}
+
+function renderCtrlMinutes(el) {
+  if(!state.minutesData||!state.minutesData.forms) state.minutesData=defaultMinutesData();
+  const md=state.minutesData;
+  if(md.activeFormIdx===undefined) md.activeFormIdx=0;
+  if(md.activeFormIdx>=md.forms.length) md.activeFormIdx=0;
+  const fi=md.activeFormIdx;
+  const form=md.forms[fi];
+
+  // Options for dropdowns
+  const subjectOpts=state.subjects.map(s=>`<option value="${s}"${""===s?"":""}">${s}</option>`).join("");
+  const gradeOpts=state.grades.map(g=>`<option value="${g}">${g}</option>`).join("");
+  const teacherOpts=TEACHERS_LIST.map(t=>`<option value="${t}">${t}</option>`).join("");
+  const dayOpts=HIJRI_DAYS.map(d=>`<option value="${d}"${md.hijriDay===d?" selected":""}>${d}</option>`).join("");
+  const dayNumOpts=getHijriDays().map(d=>`<option value="${d}"${md.hijriDayNum===String(d)?" selected":""}>${toArabicNum(d)}</option>`).join("");
+  const monthOpts=getHijriMonths().map((m,i)=>`<option value="${m}"${md.hijriMonth===m?" selected":""}>${m}</option>`).join("");
+  const yearOpts=getHijriYears().map(y=>`<option value="${y}"${md.hijriYear===y?" selected":""}>${y}</option>`).join("");
+
+  // Forms tabs
+  const formTabs=md.forms.map((f,i)=>`
+    <button class="s-tab${i===fi?" active":""}" onclick="state.minutesData.activeFormIdx=${i};saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))" title="${f.label}">
+      ${f.label}
+    </button>
+  `).join("");
+
+  // Subject rows
+  const rowsHtml=form.rows.map((r,i)=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 6px;text-align:center;color:var(--muted);font-weight:700;background:var(--bg);width:36px">${i+1}</td>
+      <td style="padding:5px 4px;min-width:140px">
+        <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${i}].subject=this.value;saveMinutes()">
+          <option value="">-- اختر المادة --</option>${subjectOpts}
+        </select>
+      </td>
+      <td style="padding:5px 4px;min-width:120px">
+        <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${i}].grade=this.value;saveMinutes()">
+          <option value="">-- الصف --</option>${gradeOpts}
+        </select>
+      </td>
+      <td style="padding:5px 4px;min-width:90px">
+        <input type="time" class="inp" style="font-size:12px;padding:5px 7px;direction:ltr" value="${r.time||""}" onchange="state.minutesData.forms[${fi}].rows[${i}].time=this.value;saveMinutes()"/>
+      </td>
+      <td style="padding:5px 4px;min-width:220px">
+        <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${i}].teacherName=this.value;saveMinutes()">
+          <option value="">-- اختر المعلم --</option>${teacherOpts}
+        </select>
+      </td>
+      <td style="padding:5px 4px;min-width:110px">
+        <input class="inp" style="font-size:12px;padding:5px 7px" placeholder="ملاحظات" value="${r.notes||""}" oninput="state.minutesData.forms[${fi}].rows[${i}].notes=this.value;saveMinutes()"/>
+      </td>
+      <td style="padding:5px 4px;text-align:center;min-width:170px">
+        <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;background:#fff;margin-bottom:4px">
+          <canvas id="sigRow${i}" width="190" height="58" style="display:block;cursor:crosshair;touch-action:none;width:100%;max-width:190px"></canvas>
+        </div>
+        <div style="display:flex;gap:4px;justify-content:center">
+          <button id="sigRowClear${i}" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 7px">مسح</button>
+          <button id="sigRowSave${i}" class="btn btn-navy btn-sm" style="font-size:10px;padding:3px 7px">حفظ ✓</button>
+        </div>
+      </td>
+      <td style="padding:5px 4px;text-align:center;width:36px">
+        ${form.rows.length>1?`<button class="del-btn" title="حذف" onclick="state.minutesData.forms[${fi}].rows.splice(${i},1);saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))">✕</button>`:""}
+      </td>
+    </tr>
+  `).join("");
+
+  // Committee rows
+  const committeeHtml=form.committee.map((c,i)=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 6px;text-align:center;color:var(--muted);font-weight:700;background:var(--bg);width:36px">${i+1}</td>
+      <td style="padding:5px 8px;min-width:220px">
+        <select class="inp" style="font-size:13px;padding:6px 8px" onchange="state.minutesData.forms[${fi}].committee[${i}].name=this.value;saveMinutes()">
+          <option value="">-- اختر العضو --</option>${teacherOpts}
+        </select>
+      </td>
+      <td style="padding:5px 8px;text-align:center;min-width:190px">
+        <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;background:#fff;margin-bottom:4px">
+          <canvas id="sigCom${i}" width="190" height="58" style="display:block;cursor:crosshair;touch-action:none;width:100%;max-width:190px"></canvas>
+        </div>
+        <div style="display:flex;gap:4px;justify-content:center">
+          <button id="sigComClear${i}" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 7px">مسح</button>
+          <button id="sigComSave${i}" class="btn btn-navy btn-sm" style="font-size:10px;padding:3px 7px">حفظ ✓</button>
+        </div>
+      </td>
+      <td style="padding:5px 4px;text-align:center;width:36px">
+        ${form.committee.length>1?`<button class="del-btn" title="حذف" onclick="state.minutesData.forms[${fi}].committee.splice(${i},1);saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))">✕</button>`:""}
+      </td>
+    </tr>
+  `).join("");
+
+  el.innerHTML=`
+  <div style="max-width:900px;margin:0 auto">
+
+    <!-- تبويب النماذج -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="s-tabs" style="flex:1;min-width:0">${formTabs}</div>
+      <button class="btn btn-gold btn-sm" onclick="
+        var lbl=prompt('اسم المحضر الجديد:','المحضر '+(state.minutesData.forms.length+1));
+        if(!lbl)return;
+        state.minutesData.forms.push({id:'f'+Date.now(),label:lbl,rows:[{subject:'',grade:'',time:'',teacherName:'',notes:'',sig:''}],committee:[{name:'',sig:''},{name:'',sig:''}]});
+        state.minutesData.activeFormIdx=state.minutesData.forms.length-1;
+        saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))
+      ">+ محضر جديد</button>
+      ${md.forms.length>1?`<button class="btn btn-red btn-sm" onclick="if(confirm('حذف هذا المحضر؟')){state.minutesData.forms.splice(${fi},1);state.minutesData.activeFormIdx=Math.max(0,${fi}-1);saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))}">🗑️ حذف</button>`:""}
+    </div>
+
+    <!-- اسم النموذج -->
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:700;color:var(--navy);font-size:14px;flex-shrink:0">اسم المحضر:</span>
+        <input class="inp" style="flex:1;min-width:180px;font-size:13px" value="${form.label||""}" oninput="state.minutesData.forms[${fi}].label=this.value;saveMinutes();document.querySelectorAll('.s-tab.active')[0].textContent=this.value"/>
+      </div>
+    </div>
+
+    <!-- بيانات المحضر الأساسية -->
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:12px"><span class="ct-icon">📅</span>بيانات المحضر</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:10px">
+        <div>
+          <label class="lbl">اليوم</label>
+          <select class="inp" onchange="state.minutesData.hijriDay=this.value;saveMinutes()">
+            <option value="">-- اختر اليوم --</option>${dayOpts}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">رقم اليوم (هجري)</label>
+          <select class="inp" onchange="state.minutesData.hijriDayNum=this.value;saveMinutes()">
+            <option value="">-- اليوم --</option>${dayNumOpts}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">الشهر الهجري</label>
+          <select class="inp" onchange="state.minutesData.hijriMonth=this.value;saveMinutes()">
+            <option value="">-- الشهر --</option>${monthOpts}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">السنة الهجرية</label>
+          <select class="inp" onchange="state.minutesData.hijriYear=this.value;saveMinutes()">
+            ${yearOpts}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="lbl">اسم مدير المدرسة / رئيس لجنة الاختبارات</label>
+        <input class="inp" style="max-width:400px" placeholder="الاسم كاملاً" value="${md.principal||""}" oninput="state.minutesData.principal=this.value;saveMinutes()"/>
+      </div>
+    </div>
+
+    <!-- جدول المواد -->
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:10px"><span class="ct-icon">📋</span>المواد المسجّلة</div>
+      <div style="overflow-x:auto;margin-bottom:10px">
+        <table style="width:100%;border-collapse:collapse;min-width:750px">
+          <thead>
+            <tr style="background:var(--navy);color:#fff">
+              <th style="padding:10px 6px;text-align:center;width:36px">م</th>
+              <th style="padding:10px 8px;text-align:right">المادة</th>
+              <th style="padding:10px 8px;text-align:right">الصف</th>
+              <th style="padding:10px 8px;text-align:right">الوقت</th>
+              <th style="padding:10px 8px;text-align:right">المعلم</th>
+              <th style="padding:10px 8px;text-align:right">ملاحظات</th>
+              <th style="padding:10px 8px;text-align:center">التوقيع</th>
+              <th style="padding:10px 4px;width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="minutesRowsBody">${rowsHtml}</tbody>
+        </table>
+      </div>
+      <button class="btn btn-gold btn-sm" id="addRowBtn" onclick="addMinutesRow(${fi})">+ إضافة مادة</button>
+    </div>
+
+    <!-- جدول أعضاء اللجنة -->
+    <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:10px"><span class="ct-icon">👥</span>أعضاء اللجنة</div>
+      <div style="overflow-x:auto;margin-bottom:10px">
+        <table style="width:100%;border-collapse:collapse;min-width:500px">
+          <thead>
+            <tr style="background:var(--navy3);color:#fff">
+              <th style="padding:10px 6px;text-align:center;width:36px">م</th>
+              <th style="padding:10px 8px;text-align:right">اسم العضو</th>
+              <th style="padding:10px 8px;text-align:center">التوقيع</th>
+              <th style="padding:10px 4px;width:36px"></th>
+            </tr>
+          </thead>
+          <tbody>${committeeHtml}</tbody>
+        </table>
+      </div>
+      <button class="btn btn-gold btn-sm" onclick="state.minutesData.forms[${fi}].committee.push({name:'',sig:''});saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))">+ إضافة عضو</button>
+    </div>
+
+    <!-- أزرار التصدير -->
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-navy" onclick="printMinutes(${fi})">🖨️ طباعة / حفظ PDF</button>
+        <button class="btn btn-green" onclick="archiveMinutes(${fi})">💾 حفظ نسخة في التقارير</button>
+        <button class="btn btn-mid btn-sm" onclick="
+          if(confirm('مسح بيانات هذا المحضر؟')){
+            state.minutesData.forms[${fi}]={id:state.minutesData.forms[${fi}].id,label:state.minutesData.forms[${fi}].label,rows:[{subject:'',grade:'',time:'',teacherName:'',notes:'',sig:''}],committee:[{name:'',sig:''},{name:'',sig:''}]};
+            saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'));toast('تم مسح المحضر')
+          }">🗑️ مسح هذا المحضر</button>
+        <span style="font-size:11px;color:var(--muted)">يُحفظ تلقائياً</span>
+      </div>
+    </div>
+  </div>`;
+
+  // Init canvases with delay for DOM
+  setTimeout(()=>{
+    form.rows.forEach((_,i)=>{
+      initSigCanvas(`sigRow${i}`,`sigRowClear${i}`,`sigRowSave${i}`,"row",i,fi);
+    });
+    form.committee.forEach((_,i)=>{
+      initSigCanvas(`sigCom${i}`,`sigComClear${i}`,`sigComSave${i}`,"committee",i,fi);
+    });
+    // Restore select values
+    const rowTrs=document.querySelectorAll("tbody:first-of-type tr");
+    form.rows.forEach((r,i)=>{
+      const sels=document.querySelectorAll(`#pageContent tr:nth-of-type(${i+1}) select`);
+      if(r.subject){ sels.forEach(s=>{ if([...s.options].some(o=>o.value===r.subject)){s.value=r.subject;} }); }
+      if(r.grade){ sels.forEach(s=>{ if([...s.options].some(o=>o.value===r.grade)){s.value=r.grade;} }); }
+      if(r.teacherName){ sels.forEach(s=>{ if([...s.options].some(o=>o.value===r.teacherName)){s.value=r.teacherName;} }); }
+    });
+    form.committee.forEach((c,i)=>{
+      const comSels=document.querySelectorAll(`[id^="sigCom${i}"]`);
+      // find the select in the committee table row
+    });
+    // Restore all selects via ID matching
+    restoreAllMinutesSelects(fi);
+  },80);
+}
+
+function addMinutesRow(fi) {
+  const form = state.minutesData.forms[fi];
+  const newIdx = form.rows.length;
+  form.rows.push({subject:'', grade:'', time:'', teacherName:'', notes:'', sig:''});
+  saveMinutes();
+
+  const subjectOpts = state.subjects.map(s=>`<option value="${s}">${s}</option>`).join("");
+  const gradeOpts   = state.grades.map(g=>`<option value="${g}">${g}</option>`).join("");
+  const teacherOpts = TEACHERS_LIST.map(t=>`<option value="${t}">${t}</option>`).join("");
+
+  const tbody = document.querySelector("#minutesRowsBody");
+  if(!tbody){ renderCtrlMinutes(document.getElementById('pageContent')); return; }
+
+  const tr = document.createElement("tr");
+  tr.style.borderBottom = "1px solid var(--border)";
+  tr.id = `minutesRow${newIdx}`;
+  tr.innerHTML = `
+    <td style="padding:8px 6px;text-align:center;color:var(--muted);font-weight:700;background:var(--bg);width:36px">${newIdx+1}</td>
+    <td style="padding:5px 4px;min-width:140px">
+      <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${newIdx}].subject=this.value;saveMinutes()">
+        <option value="">-- اختر المادة --</option>${subjectOpts}
+      </select>
+    </td>
+    <td style="padding:5px 4px;min-width:120px">
+      <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${newIdx}].grade=this.value;saveMinutes()">
+        <option value="">-- الصف --</option>${gradeOpts}
+      </select>
+    </td>
+    <td style="padding:5px 4px;min-width:90px">
+      <input type="time" class="inp" style="font-size:12px;padding:5px 7px;direction:ltr" onchange="state.minutesData.forms[${fi}].rows[${newIdx}].time=this.value;saveMinutes()"/>
+    </td>
+    <td style="padding:5px 4px;min-width:220px">
+      <select class="inp" style="font-size:12px;padding:5px 8px" onchange="state.minutesData.forms[${fi}].rows[${newIdx}].teacherName=this.value;saveMinutes()">
+        <option value="">-- اختر المعلم --</option>${teacherOpts}
+      </select>
+    </td>
+    <td style="padding:5px 4px;min-width:110px">
+      <input class="inp" style="font-size:12px;padding:5px 7px" placeholder="ملاحظات" oninput="state.minutesData.forms[${fi}].rows[${newIdx}].notes=this.value;saveMinutes()"/>
+    </td>
+    <td style="padding:5px 4px;text-align:center;min-width:170px">
+      <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;background:#fff;margin-bottom:4px">
+        <canvas id="sigRow${newIdx}" width="190" height="58" style="display:block;cursor:crosshair;touch-action:none;width:100%;max-width:190px"></canvas>
+      </div>
+      <div style="display:flex;gap:4px;justify-content:center">
+        <button id="sigRowClear${newIdx}" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 7px">مسح</button>
+        <button id="sigRowSave${newIdx}" class="btn btn-navy btn-sm" style="font-size:10px;padding:3px 7px">حفظ ✓</button>
+      </div>
+    </td>
+    <td style="padding:5px 4px;text-align:center;width:36px">
+      <button class="del-btn" title="حذف" onclick="
+        state.minutesData.forms[${fi}].rows.splice(${newIdx},1);
+        saveMinutes();
+        renderCtrlMinutes(document.getElementById('pageContent'))
+      ">✕</button>
+    </td>`;
+  tbody.appendChild(tr);
+
+  // Init the new canvas immediately
+  setTimeout(()=>{
+    initSigCanvas(`sigRow${newIdx}`,`sigRowClear${newIdx}`,`sigRowSave${newIdx}`,"row",newIdx,fi);
+    // scroll new row into view
+    tr.scrollIntoView({behavior:"smooth", block:"center"});
+  }, 40);
+}
+
+function archiveMinutes(fi) {
+  if(fi===undefined) fi = state.minutesData.activeFormIdx||0;
+  const md = state.minutesData;
+  const form = md.forms[fi];
+  if(!form){ toast("لا يوجد محضر للحفظ","err"); return; }
+
+  if(!state.minutesArchive) state.minutesArchive=[];
+
+  // Build snapshot — deep copy without canvas data (keep sig URLs)
+  const snapshot = {
+    id: "arc_" + Date.now(),
+    savedAt: new Date().toISOString(),
+    hijriDay: md.hijriDay||"",
+    hijriDayNum: md.hijriDayNum||"",
+    hijriMonth: md.hijriMonth||"",
+    hijriYear: md.hijriYear||"١٤٤٧",
+    principal: md.principal||"",
+    label: form.label||"محضر",
+    rows: form.rows.map(r=>({...r})),
+    committee: form.committee.map(c=>({...c})),
+  };
+
+  state.minutesArchive.unshift(snapshot); // newest first
+  saveMinutes();
+  saveToCloud();
+  toast("✅ تم حفظ نسخة في التقارير");
+}
+
+function restoreAllMinutesSelects(fi) {
+  const form = state.minutesData.forms[fi];
+  // rows: each tr has 3 selects (subject, grade, teacher)
+  const allTrs = document.querySelectorAll("#pageContent tbody tr");
+  let rowCount=0, comCount=0;
+  // We use canvas IDs to find which table each row belongs to
+  form.rows.forEach((r,i)=>{
+    const subSel = document.querySelector(`#pageContent [onchange*="forms[${fi}].rows[${i}].subject"]`);
+    const grSel  = document.querySelector(`#pageContent [onchange*="forms[${fi}].rows[${i}].grade"]`);
+    const tSel   = document.querySelector(`#pageContent [onchange*="forms[${fi}].rows[${i}].teacherName"]`);
+    if(subSel && r.subject) subSel.value=r.subject;
+    if(grSel  && r.grade)   grSel.value=r.grade;
+    if(tSel   && r.teacherName) tSel.value=r.teacherName;
+  });
+  form.committee.forEach((c,i)=>{
+    const cSel = document.querySelector(`#pageContent [onchange*="forms[${fi}].committee[${i}].name"]`);
+    if(cSel && c.name) cSel.value=c.name;
+  });
+}
+
+function printMinutes(fi) {
+  if(fi===undefined) fi=state.minutesData.activeFormIdx||0;
+  const md=state.minutesData||{};
+  const form=md.forms[fi];
+  if(!form){toast("لا يوجد محضر","err");return;}
+
+  const hijriDate=`${md.hijriDay||""} الموافق ${md.hijriDayNum?toArabicNum(md.hijriDayNum):".."}/${md.hijriMonth||".........."}/${md.hijriYear||"...."}`;
+
+  const rows=form.rows.map((r,i)=>{
+    const sigImg=r.sig?`<img src="${r.sig}" style="max-width:120px;max-height:48px;display:block;margin:auto"/>`:
+      `<div style="width:120px;height:48px;border-bottom:1px solid #bbb;margin:auto"></div>`;
+    const timeStr=r.time||":";
+    return `<tr>
+      <td style="text-align:center;padding:8px 5px">${i+1}</td>
+      <td style="padding:8px 7px;font-weight:700">${r.subject||"—"}</td>
+      <td style="padding:8px 7px">${r.grade||"—"}</td>
+      <td style="padding:8px 7px;direction:ltr;text-align:center">${timeStr}</td>
+      <td style="padding:8px 7px">${r.teacherName||"—"}</td>
+      <td style="padding:8px 7px">${r.notes||""}</td>
+      <td style="padding:5px;text-align:center">${sigImg}</td>
+    </tr>`;
+  }).join("");
+
+  const committee=form.committee.map((c,i)=>{
+    const sigImg=c.sig?`<img src="${c.sig}" style="max-width:140px;max-height:52px;display:block;margin:auto"/>`:
+      `<div style="width:140px;height:52px;border-bottom:1px solid #bbb;margin:auto"></div>`;
+    return `<tr>
+      <td style="text-align:center;padding:8px 5px">${i+1}</td>
+      <td style="padding:8px 10px;font-weight:700">${c.name||"—"}</td>
+      <td style="padding:5px;text-align:center">${sigImg}</td>
+    </tr>`;
+  }).join("");
+
+  const principal=md.principal||"..........................";
+  const schoolName=state.schoolName||"مدرسة العلا الثانوية";
+  const formLabel=form.label||"محضر فتح مظاريف الأسئلة";
+
+  const win=window.open("","_blank","width=960,height=780");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>${formLabel}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:28px 36px;color:#0B1D3A;font-size:13px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .logo{width:90px;height:90px;object-fit:contain}
+  .center-head{text-align:center;flex:1;padding:0 10px}
+  .center-head h1{font-size:17px;font-weight:800;margin-bottom:3px}
+  .center-head h2{font-size:13px;color:#444;font-weight:600}
+  .rclogo{opacity:0.08;width:90px}
+  .intro-box{border:1.5px solid #0B1D3A;border-radius:7px;padding:12px 16px;margin:14px 0;font-size:13px;line-height:2;text-align:justify}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:12px}
+  th{background:#0B1D3A;color:#fff;padding:9px 7px;text-align:right;font-weight:700}
+  td{padding:7px 7px;border:1px solid #ccd;vertical-align:middle}
+  tr:nth-child(even) td{background:#f6f7fb}
+  .footer-sig{margin-top:24px;text-align:center;font-size:13.5px;font-weight:600;line-height:2}
+  @media print{.no-print{display:none}body{padding:18px 24px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
+  <div class="center-head">
+    <h1>${formLabel}</h1>
+    <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
+    <h2 style="margin-top:2px">${schoolName}</h2>
+  </div>
+  <img src="${LOGO_SRC}" class="logo" alt="شعار" style="opacity:0.12"/>
+</div>
+
+<div class="intro-box">
+  إنه في يوم <strong>${md.hijriDay||"الأربعاء"}</strong> الموافق <strong>${md.hijriDayNum?toArabicNum(md.hijriDayNum):".."}/${md.hijriMonth||".........."}/${md.hijriYear||"...."}هـ</strong>، تم فتح مظاريف المواد المسجلة أدناه وقد وجدت المظاريف سليمة ومغلقة ومختومة بختم المدرسة.
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:34px;text-align:center">م</th>
+      <th>المادة</th>
+      <th style="min-width:90px">الصف</th>
+      <th style="min-width:55px;text-align:center">الوقت</th>
+      <th>اسم المعلم</th>
+      <th style="min-width:80px">ملاحظات</th>
+      <th style="min-width:130px;text-align:center">التوقيع</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<table style="max-width:480px;margin:0 auto 22px">
+  <thead>
+    <tr>
+      <th style="width:34px;text-align:center">م</th>
+      <th>أعضاء اللجنة</th>
+      <th style="min-width:160px;text-align:center">التوقيع</th>
+    </tr>
+  </thead>
+  <tbody>${committee}</tbody>
+</table>
+
+<div class="footer-sig">
+  <p>والله الموفق،،،</p>
+  <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
+  <p style="margin-top:3px">${principal}</p>
+</div>
+
+<br/>
+<div class="no-print" style="text-align:center;margin-top:16px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#0B1D3A;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">🖨️ طباعة / حفظ PDF</button>
+  &nbsp;
+  <button onclick="window.close()" style="padding:10px 18px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+  toast("تم فتح نافذة الطباعة ✅");
+}
+
+
+
+// ═══════════════════════════════════════════════
+// MESSAGING SYSTEM — نظام الرسائل الداخلية مع الرد
+// ═══════════════════════════════════════════════
+
+const MSG_TYPES = [
+  { key:"urgent",   label:"عاجل جداً",  icon:"🚨", color:"#DC2626", bg:"#FEE2E2" },
+  { key:"important",label:"مهم",         icon:"⚠️", color:"#D97706", bg:"#FEF3C7" },
+  { key:"normal",   label:"عادي",        icon:"💬", color:"#2563EB", bg:"#DBEAFE" },
+  { key:"info",     label:"للعلم",       icon:"ℹ️", color:"#059669", bg:"#D1FAE5" },
+];
+const MSG_TARGETS = [
+  { role:"controller", label:"الكنترول",         icon:"📋" },
+  { role:"notifier",   label:"مسؤول التنبيهات",  icon:"📲" },
+];
+
+let _msgType    = "normal";
+let _msgTargets = [];
+
+function _mtOf(key){ return MSG_TYPES.find(t=>t.key===key)||MSG_TYPES[2]; }
+
+// ─── compose (principal) ────────────────────────
+function renderPrincipalCompose(el){
+  if(!state.principalMessages) state.principalMessages=[];
+  if(!state.inbox) state.inbox=[];
+
+  const typeHtml = MSG_TYPES.map(t=>`
+    <button onclick="_msgType='${t.key}';
+      document.querySelectorAll('.msg-type-btn').forEach(b=>{
+        const active=b.dataset.key==='${t.key}';
+        b.style.border='2px solid '+(active?'${t.color}':'var(--border)');
+        b.style.background=active?'${t.bg}':'#fff';
+        b.style.color=active?'${t.color}':'var(--mid)';
+        b.style.fontWeight=active?'700':'500';
+      });updateMsgPreview()"
+      data-key="${t.key}" class="msg-type-btn"
+      style="display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:10px;
+             border:2px solid ${_msgType===t.key?t.color:'var(--border)'};
+             background:${_msgType===t.key?t.bg:'#fff'};cursor:pointer;
+             font-family:'IBM Plex Sans Arabic',sans-serif;
+             font-weight:${_msgType===t.key?'700':'500'};
+             color:${_msgType===t.key?t.color:'var(--mid)'};
+             font-size:12px;flex:1;min-width:110px;transition:all .18s">
+      <span style="font-size:18px">${t.icon}</span>${t.label}
+    </button>`).join("");
+
+  const targetHtml = MSG_TARGETS.map(t=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;
+                  border:2px solid ${_msgTargets.includes(t.role)?'var(--navy)':'var(--border)'};
+                  background:${_msgTargets.includes(t.role)?'rgba(11,29,58,.06)':'#fff'};
+                  cursor:pointer;transition:all .18s;font-family:'IBM Plex Sans Arabic',sans-serif;
+                  flex:1;min-width:160px">
+      <input type="checkbox" ${_msgTargets.includes(t.role)?'checked':''}
+        onchange="if(this.checked){if(!_msgTargets.includes('${t.role}'))_msgTargets.push('${t.role}');}
+                  else{_msgTargets=_msgTargets.filter(r=>r!=='${t.role}');}
+                  updateMsgPreview();
+                  this.closest('label').style.border='2px solid '+(this.checked?'var(--navy)':'var(--border)');
+                  this.closest('label').style.background=this.checked?'rgba(11,29,58,.06)':'#fff';"
+        style="width:18px;height:18px;accent-color:var(--navy);flex-shrink:0"/>
+      <span style="font-size:20px">${t.icon}</span>
+      <span style="font-weight:600;color:var(--navy);font-size:13px">${t.label}</span>
+    </label>`).join("");
+
+  el.innerHTML=`
+  <div class="page-wrap">
+    <div class="card">
+      <div class="card-title"><span class="ct-icon">✉️</span>إرسال رسالة داخلية</div>
+      <div style="margin-bottom:18px">
+        <label class="lbl" style="margin-bottom:8px">تصنيف الرسالة</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${typeHtml}</div>
+      </div>
+      <div style="margin-bottom:18px">
+        <label class="lbl" style="margin-bottom:8px">إرسال إلى</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">${targetHtml}</div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="lbl">عنوان الرسالة</label>
+        <input id="msgTitle" class="inp" placeholder="عنوان موضوع الرسالة..." oninput="updateMsgPreview()" style="font-size:14px"/>
+      </div>
+      <div style="margin-bottom:18px">
+        <label class="lbl">نص الرسالة</label>
+        <textarea id="msgBody" class="inp" rows="5" placeholder="اكتب نص الرسالة هنا..." oninput="updateMsgPreview()" style="font-size:13px;line-height:1.7;resize:vertical"></textarea>
+      </div>
+      <div id="msgPreview" style="margin-bottom:18px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-navy" onclick="sendPrincipalMsg()" style="font-size:14px;padding:12px 24px">📤 إرسال الرسالة</button>
+        <button class="btn btn-outline" onclick="_msgTargets=[];_msgType='normal';renderPrincipalCompose(document.getElementById('pageContent'))">🗑️ مسح</button>
+      </div>
+    </div>
+  </div>`;
+  setTimeout(updateMsgPreview, 30);
+}
+
+function updateMsgPreview(){
+  const title=(document.getElementById("msgTitle")||{}).value||"";
+  const body=(document.getElementById("msgBody")||{}).value||"";
+  const prev=document.getElementById("msgPreview");
+  if(!prev) return;
+  if(!title&&!body){prev.innerHTML="";return;}
+  const mt=_mtOf(_msgType);
+  const targets=MSG_TARGETS.filter(t=>_msgTargets.includes(t.role));
+  const toStr=targets.length>0?targets.map(t=>t.label).join(" و "):"لم يُحدَّد مستلم";
+  prev.innerHTML=`
+  <div style="border-radius:12px;border:2px solid ${mt.color}40;overflow:hidden">
+    <div style="background:${mt.bg};padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid ${mt.color}30">
+      <span style="font-size:20px">${mt.icon}</span>
+      <span style="font-weight:800;color:${mt.color};font-size:13px">${mt.label}</span>
+      <span style="margin-right:auto;font-size:11px;color:var(--muted)">إلى: ${toStr}</span>
+    </div>
+    <div style="padding:13px 16px;background:#fff">
+      ${title?`<p style="font-weight:800;color:var(--navy);font-size:14px;margin-bottom:6px">${title}</p>`:""}
+      <p style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${body}</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">من: ${currentUser?currentUser.name:""} · الآن</p>
+    </div>
+  </div>`;
+}
+
+function sendPrincipalMsg(){
+  const title=(document.getElementById("msgTitle")||{}).value.trim();
+  const body=(document.getElementById("msgBody")||{}).value.trim();
+  if(!title){toast("أدخل عنوان الرسالة","err");return;}
+  if(!body){toast("أدخل نص الرسالة","err");return;}
+  if(_msgTargets.length===0){toast("اختر مستلماً على الأقل","err");return;}
+  const mt=_mtOf(_msgType);
+  const msgId="msg_"+Date.now();
+  const ts=nowISO();
+  if(!state.principalMessages) state.principalMessages=[];
+  if(!state.inbox) state.inbox=[];
+
+  state.principalMessages.unshift({
+    id:msgId, ts, title, body,
+    type:_msgType, typeLabel:mt.label, typeIcon:mt.icon, typeColor:mt.color,
+    targets:[..._msgTargets],
+    targetLabels:MSG_TARGETS.filter(t=>_msgTargets.includes(t.role)).map(t=>t.label),
+    from:currentUser.name, fromRole:currentUser.role,
+    replies:[],
+  });
+
+  _msgTargets.forEach(role=>{
+    state.inbox.unshift({
+      id:"inb_"+Date.now()+"_"+role, msgId, ts,
+      title, body,
+      type:_msgType, typeLabel:mt.label, typeIcon:mt.icon, typeColor:mt.color,
+      from:currentUser.name, fromRole:currentUser.role,
+      to:role, read:false, replies:[],
+    });
+  });
+
+  saveState(); saveToCloud();
+  const toLabel=_msgTargets.length===2?"الجميع":MSG_TARGETS.find(t=>t.role===_msgTargets[0])?.label||"";
+  toast(`✅ تم إرسال الرسالة إلى ${toLabel}`);
+  _msgTargets=[]; _msgType="normal";
+  renderPrincipalCompose(document.getElementById("pageContent"));
+}
+
+// ─── sent box (principal) ────────────────────────
+function renderPrincipalSent(el){
+  const msgs=(state.principalMessages||[]);
+  const newReplies=msgs.filter(m=>(m.replies||[]).some(r=>!r.readByPrincipal)).length;
+  el.innerHTML=`
+  <div class="page-wrap">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:4px">
+        <span class="ct-icon">📤</span>الرسائل المُرسَلة
+        ${newReplies>0?`<span style="background:#059669;color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:99px;margin-right:8px">${newReplies} رد جديد</span>`:""}
+        <span style="margin-right:auto;font-size:11px;color:var(--muted);font-weight:400">${msgs.length} رسالة</span>
+      </div>
+      ${msgs.length===0
+        ?`<div class="empty"><span class="empty-icon">📭</span>لا توجد رسائل مُرسَلة بعد</div>`
+        :`<div style="display:flex;flex-direction:column;gap:12px">
+          ${msgs.map((m,mi)=>_renderMsgCard(m,mi,"sent")).join("")}
+        </div>`}
+    </div>
+  </div>`;
+  // mark principal replies as read
+  msgs.forEach(m=>(m.replies||[]).forEach(r=>r.readByPrincipal=true));
+  saveState();
+}
+
+// ─── inbox (controller / notifier / principal replies) ──
+function renderInbox(el){
+  if(!state.inbox) state.inbox=[];
+  const myMsgs=state.inbox.filter(m=>m.to===currentUser.role)
+                           .sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const unread=myMsgs.filter(m=>!m.read).length;
+  state.inbox.forEach(m=>{if(m.to===currentUser.role) m.read=true;});
+  saveState(); saveToCloud();
+  setTimeout(()=>updateBell(),50);
+
+  el.innerHTML=`
+  <div class="page-wrap">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:4px">
+        <span class="ct-icon">🔔</span>التنبيهات والرسائل الواردة
+        ${unread>0?`<span style="background:#EF4444;color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:99px;margin-right:8px">${unread} جديد</span>`:""}
+        <span style="margin-right:auto;font-size:11px;color:var(--muted);font-weight:400">${myMsgs.length} رسالة</span>
+      </div>
+      ${myMsgs.length===0
+        ?`<div class="empty"><span class="empty-icon">📭</span>لا توجد رسائل واردة</div>`
+        :`<div style="display:flex;flex-direction:column;gap:12px">
+          ${myMsgs.map((m,mi)=>_renderMsgCard(m,mi,"inbox")).join("")}
+        </div>`}
+      ${myMsgs.length>0?`<div style="margin-top:14px;text-align:left">
+        <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)"
+          onclick="if(confirm('حذف جميع الرسائل الواردة؟')){state.inbox=state.inbox.filter(m=>m.to!=='${currentUser.role}');saveState();saveToCloud();renderInbox(document.getElementById('pageContent'));toast('تم مسح صندوق الوارد')}">🗑️ مسح الكل</button>
+      </div>`:""}
+    </div>
+  </div>`;
+}
+
+// ─── unified message card with reply thread ──────
+function _renderMsgCard(m, mi, view){
+  const mt=_mtOf(m.type);
+  const replies=m.replies||[];
+  const newReplies=view==="sent"?replies.filter(r=>!r.readByPrincipal).length:0;
+  const isInbox=(view==="inbox");
+  const toStr=(m.targetLabels||[]).join(" و ");
+  const replyBoxId=`replyBox_${view}_${mi}`;
+  const taBtnId=`replyToggle_${view}_${mi}`;
+  const taId=`replyTA_${view}_${mi}`;
+
+  // build reply thread
+  const threadHtml=replies.length===0?"":replies.map(r=>{
+    const isMine=(isInbox&&r.fromRole===currentUser.role)||(!isInbox&&r.fromRole==="principal");
+    return `
+    <div style="display:flex;gap:0;${isMine?'justify-content:flex-start;flex-direction:row-reverse':''}">
+      <div style="width:24px;flex-shrink:0;display:flex;justify-content:center;padding-top:4px">
+        <div style="width:2px;background:${mt.color}25;min-height:100%"></div>
+      </div>
+      <div style="flex:1;background:${isMine?'#f0f4ff':'#f8f9fc'};border-radius:10px;padding:9px 13px;margin-bottom:5px;border:1px solid ${isMine?'#c7d4ff':'var(--border)'}">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-weight:800;color:var(--navy);font-size:12px">${r.from}</span>
+          ${isMine?`<span style="background:#DBEAFE;color:#1E40AF;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">أنت</span>`:`<span style="background:#D1FAE5;color:#059669;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">رد وارد ↩️</span>`}
+          <span style="margin-right:auto;font-size:10px;color:var(--muted)">${fmt(r.ts)}</span>
+        </div>
+        <p style="font-size:13px;color:var(--text);line-height:1.65;white-space:pre-wrap;margin:0">${r.body}</p>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div id="msgCard_${view}_${mi}" style="border-radius:13px;border:2px solid ${mt.color}30;overflow:hidden;transition:box-shadow .2s" onmouseover="this.style.boxShadow='var(--sh2)'" onmouseout="this.style.boxShadow='none'">
+
+    <!-- ── header ── -->
+    <div style="background:${mt.bg};padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid ${mt.color}20">
+      <span style="font-size:20px">${mt.icon}</span>
+      <span style="font-weight:800;color:${mt.color};font-size:13px">${mt.label}</span>
+      ${isInbox
+        ?`<span style="font-size:11px;color:var(--mid)">من: <b>${m.from}</b></span>`
+        :`<span style="background:rgba(0,0,0,.07);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;color:var(--mid)">إلى: ${toStr}</span>`}
+      ${replies.length>0?`<span style="background:${mt.color}20;color:${mt.color};border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;border:1px solid ${mt.color}40">${replies.length} ${replies.length===1?'رد':'ردود'}</span>`:""}
+      ${newReplies>0?`<span style="background:#059669;color:#fff;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:800">↩️ رد جديد</span>`:""}
+      <span style="margin-right:auto;font-size:11px;color:var(--muted)">${fmt(m.ts)}</span>
+      ${!isInbox?`<button class="del-btn" title="حذف" onclick="if(confirm('حذف هذه الرسالة؟')){state.principalMessages.splice(${mi},1);saveState();saveToCloud();renderPrincipalSent(document.getElementById('pageContent'))}">✕</button>`:""}
+    </div>
+
+    <!-- ── original message body ── -->
+    <div style="padding:13px 16px;background:#fff;border-bottom:${replies.length?'1px solid var(--border)':'none'}">
+      <p style="font-weight:800;color:var(--navy);font-size:15px;margin-bottom:7px">${m.title}</p>
+      <p style="font-size:13px;color:var(--text);line-height:1.75;white-space:pre-wrap">${m.body}</p>
+    </div>
+
+    <!-- ── reply thread ── -->
+    ${replies.length>0?`<div style="padding:10px 16px 4px;background:#fafbfd">${threadHtml}</div>`:""}
+
+    <!-- ── reply action bar ── -->
+    <div style="padding:10px 14px;background:#f4f6fb;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+      <div id="${replyBoxId}" style="display:none">
+        <textarea id="${taId}" class="inp" rows="3"
+          placeholder="اكتب ردك هنا..." style="font-size:13px;line-height:1.65;resize:vertical;margin-bottom:8px"></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-navy btn-sm" onclick="_submitReply('${m.id||""}','${view}',${mi})">↩️ إرسال الرد</button>
+          <button class="btn btn-outline btn-sm" onclick="
+            document.getElementById('${replyBoxId}').style.display='none';
+            document.getElementById('${taBtnId}').style.display='flex';
+          ">إلغاء</button>
+        </div>
+      </div>
+      <button id="${taBtnId}" class="btn btn-outline btn-sm" style="align-self:flex-start;display:flex;align-items:center;gap:6px"
+        onclick="
+          document.getElementById('${replyBoxId}').style.display='block';
+          this.style.display='none';
+          setTimeout(()=>document.getElementById('${taId}').focus(),40);
+        ">
+        ↩️ رد على الرسالة
+      </button>
+    </div>
+  </div>`;
+}
+
+// ─── submit a reply ──────────────────────────────
+function _submitReply(msgId, view, mi){
+  const ta=document.getElementById(`replyTA_${view}_${mi}`);
+  if(!ta) return;
+  const body=ta.value.trim();
+  if(!body){toast("اكتب نص الرد","err");return;}
+
+  const reply={
+    id:"rep_"+Date.now(),
+    ts:nowISO(),
+    body,
+    from:currentUser.name,
+    fromRole:currentUser.role,
+    readByPrincipal:(view==="sent"), // sent = principal replying = auto-read
+  };
+
+  if(!state.principalMessages) state.principalMessages=[];
+  if(!state.inbox) state.inbox=[];
+
+  // Add to principalMessages entry
+  const pm=state.principalMessages.find(m=>m.id===msgId);
+  if(pm){ if(!pm.replies) pm.replies=[]; pm.replies.push(reply); }
+
+  // Add to inbox entry
+  const inb=state.inbox.find(m=>(m.msgId===msgId||m.id===msgId) && m.to===currentUser.role);
+  if(inb){ if(!inb.replies) inb.replies=[]; inb.replies.push(reply); }
+
+  // If replying from inbox → create notification for principal
+  if(view==="inbox"){
+    state.inbox.unshift({
+      id:"inb_rep_"+Date.now(),
+      msgId,
+      ts:nowISO(),
+      title:"↩️ رد على: "+((pm&&pm.title)||"رسالتك"),
+      body,
+      type:"info", typeLabel:"رد وارد", typeIcon:"↩️", typeColor:"#059669",
+      from:currentUser.name, fromRole:currentUser.role,
+      to:"principal", read:false, isReply:true, replies:[],
+    });
+  }
+
+  saveState(); saveToCloud();
+  ta.value="";
+  document.getElementById(`replyBox_${view}_${mi}`).style.display="none";
+  const btn=document.getElementById(`replyToggle_${view}_${mi}`);
+  if(btn) btn.style.display="flex";
+  toast("✅ تم إرسال الرد");
+
+  // Re-render the card in place
+  const cardEl=document.getElementById(`msgCard_${view}_${mi}`);
+  if(cardEl){
+    const src=(view==="sent")?(state.principalMessages||[])
+              :(state.inbox||[]).filter(m=>m.to===currentUser.role).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    const msg=src[mi];
+    if(msg) cardEl.outerHTML=_renderMsgCard(msg,mi,view);
+  }
+}
+
+// ─── bell ────────────────────────────────────────
+function getUnreadCount(){
+  if(!currentUser) return 0;
+  return (state.inbox||[]).filter(m=>m.to===currentUser.role && !m.read).length;
+}
+
+function updateBell(){
+  const btn=document.getElementById("bellBtn");
+  const badge=document.getElementById("bellBadge");
+  if(!btn||!badge) return;
+  if(currentUser && ["controller","notifier","principal"].includes(currentUser.role)){
+    btn.style.display="flex";
+    btn.style.alignItems="center";
+    btn.style.justifyContent="center";
+    const cnt=getUnreadCount();
+    if(cnt>0){
+      badge.style.display="flex";
+      badge.textContent=cnt>9?"9+":cnt;
+    } else {
+      badge.style.display="none";
+    }
+  } else {
+    btn.style.display="none";
+  }
+}
+
+function refreshBellAfterLoad(){
+  if(currentUser){renderNav();updateBell();}
+}
+
 // INIT
 // ═══════════════════════════════════════════════
 // ── INIT ─────────────────────────────────────────
@@ -3442,6 +4645,7 @@ renderLoginDemos();
     if(ldg){ ldg.style.display="none"; }
     // After cloud load, also persist to localStorage so next refresh is instant
     saveState();
+    refreshBellAfterLoad();
   } catch(e) {
     var ldg = document.getElementById("loadingMsg");
     if(ldg) ldg.style.display="none";
