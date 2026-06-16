@@ -604,9 +604,7 @@ async function saveToCloud() {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
-    users:state.users, examSchedule:state.examSchedule||[],
-    principalNotes:state.principalNotes||"",
-    principalMessages:state.principalMessages||[]
+    users:state.users, examSchedule:state.examSchedule||[]
   };
   await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
   // Also save to localStorage as backup
@@ -632,7 +630,7 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","principalNotes","principalMessages"].forEach(function(k){
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
     }
@@ -725,7 +723,6 @@ let state = {
   ],
   bundles: [],
   notifLog: [],
-  principalMessages: [],
   examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
 };
 
@@ -743,10 +740,10 @@ const NOTIFY_TYPES = [
   { key:"info",       label:"إشعار عام",    icon:"◌", color:"#2563EB" },
 ];
 const PAGES = {
-  admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"}, {k:"inbox",icon:"📨",label:"رسائل المدير"} ],
-  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"inbox",icon:"📨",label:"رسائل المدير"} ],
-  notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"📨",label:"رسائل المدير"} ],
-  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_messages",icon:"✉️",label:"الرسائل"} ],
+  admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
+  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"} ],
+  notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"} ],
+  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -931,10 +928,7 @@ function renderNav() {
   (PAGES[currentUser.role]||[]).forEach(p=>{
     const btn = document.createElement("button");
     btn.className = "nav-btn" + (currentPage===p.k?" active":"");
-    const unread = (p.k==='inbox') ? getUnreadCount() : 0;
-    const badge = unread>0 ? `<span style="position:absolute;top:2px;right:2px;background:#EF4444;color:#fff;border-radius:99px;font-size:9px;font-weight:900;padding:1px 5px;min-width:16px;text-align:center">${unread}</span>` : '';
-    btn.style.position='relative';
-    btn.innerHTML = `<span style="font-size:24px;line-height:1">${p.icon}</span><span style="font-size:11px">${p.label}</span>${badge}`;
+    btn.innerHTML = `<span style="font-size:24px;line-height:1">${p.icon}</span><span style="font-size:11px">${p.label}</span>`;
     btn.onclick = () => navigateTo(p.k);
     nav.appendChild(btn);
   });
@@ -964,8 +958,6 @@ function navigateTo(page) {
     case "ctrl_report":  renderCtrlReport(el);    break;
     case "principal_dashboard": renderPrincipalDashboard(el); break;
     case "principal_report":    renderPrincipalReport(el);    break;
-    case "principal_messages": renderPrincipalMessages(el); break;
-    case "inbox":              renderInbox(el);              break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
   }
 }
@@ -3473,234 +3465,6 @@ renderLoginDemos();
       if(found) enterShell(found, sess.lastPage||null);
     }
   } catch(e){}
-
-// ═══════════════════════════════════════════════════
-// MESSAGING SYSTEM
-// ═══════════════════════════════════════════════════
-
-function genMsgId() {
-  return 'MSG' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2,4).toUpperCase();
-}
-
-// ── مدير المدرسة: صفحة إرسال الرسائل ──────────────
-function renderPrincipalMessages(el) {
-  if(!state.principalMessages) state.principalMessages = [];
-  const sent = state.principalMessages;
-  const roles = [
-    {id:'admin',      label:'مدير النظام'},
-    {id:'controller', label:'الكنترول'},
-    {id:'notifier',   label:'مسؤول التنبيهات'},
-  ];
-
-  el.innerHTML = `
-  <!-- إرسال رسالة جديدة -->
-  <div class="card" style="margin-bottom:14px;border:2px solid var(--navy)">
-    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">✉️</span>إرسال رسالة جديدة</p>
-    <div style="margin-bottom:10px">
-      <label class="lbl">الجهة المُرسَل إليها</label>
-      <select id="msgTo" class="inp">
-        ${roles.map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}
-      </select>
-    </div>
-    <div style="margin-bottom:10px">
-      <label class="lbl">تصنيف الرسالة</label>
-      <div style="display:flex;gap:8px">
-        <label style="flex:1;display:flex;align-items:center;gap:6px;background:#FEE2E2;border-radius:var(--r8);padding:10px;cursor:pointer">
-          <input type="radio" name="msgUrgency" value="urgent" checked> <span style="font-weight:700;color:#991B1B">🚨 عاجلة</span>
-        </label>
-        <label style="flex:1;display:flex;align-items:center;gap:6px;background:#F0FDF4;border-radius:var(--r8);padding:10px;cursor:pointer">
-          <input type="radio" name="msgUrgency" value="normal"> <span style="font-weight:700;color:#065F46">📋 غير عاجلة</span>
-        </label>
-      </div>
-    </div>
-    <div style="margin-bottom:10px">
-      <label class="lbl">نص الرسالة</label>
-      <textarea id="msgBody" class="inp" rows="4" placeholder="اكتب رسالتك هنا..."></textarea>
-    </div>
-    <button class="btn btn-navy btn-full" onclick="sendPrincipalMessage()">📤 إرسال الرسالة</button>
-  </div>
-
-  <!-- الرسائل المُرسَلة -->
-  <div class="card">
-    <p class="card-title"><span class="ct-icon" style="background:#F0FDF4">📬</span>الرسائل المُرسَلة (${sent.length})</p>
-    ${sent.length===0
-      ? `<p style="text-align:center;color:var(--muted);padding:20px">لا توجد رسائل مرسلة بعد</p>`
-      : sent.slice().reverse().map(m=>{
-          const roleLabel = roles.find(r=>r.id===m.to)?.label || m.to;
-          const urgColor  = m.urgency==='urgent' ? '#991B1B' : '#065F46';
-          const urgBg     = m.urgency==='urgent' ? '#FEE2E2' : '#D1FAE5';
-          const urgLabel  = m.urgency==='urgent' ? '🚨 عاجلة' : '📋 غير عاجلة';
-          const replyCount = (m.replies||[]).length;
-          const ts = new Date(m.ts).toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'});
-          return `<div style="border:1px solid var(--border);border-radius:var(--r10);padding:12px;margin-bottom:10px;background:var(--surface)">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <span style="background:${urgBg};color:${urgColor};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${urgLabel}</span>
-                <span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">إلى: ${roleLabel}</span>
-                ${replyCount>0?`<span style="background:#EDE9FE;color:#5B21B6;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">💬 ${replyCount} رد</span>`:''}
-              </div>
-              <span style="font-size:10px;color:var(--muted)">${ts}</span>
-            </div>
-            <p style="font-size:13px;color:var(--navy);line-height:1.6;margin-bottom:${replyCount>0?'10px':'0'}">${m.body}</p>
-            ${replyCount>0?`
-              <div style="border-top:1px solid var(--border);padding-top:8px">
-                <p style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">الردود:</p>
-                ${(m.replies||[]).map(r=>{
-                  const rts = new Date(r.ts).toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'});
-                  const rLabel = roles.find(x=>x.id===r.role)?.label || r.role;
-                  return `<div style="background:#F8FAFC;border-radius:var(--r8);padding:8px;margin-bottom:6px;border-right:3px solid var(--navy)">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                      <span style="font-size:11px;font-weight:700;color:var(--navy)">${rLabel}</span>
-                      <span style="font-size:10px;color:var(--muted)">${rts}</span>
-                    </div>
-                    <p style="font-size:12px;color:var(--text)">${r.body}</p>
-                  </div>`;
-                }).join('')}
-              </div>`:''}
-          </div>`;
-        }).join('')
-    }
-  </div>`;
-}
-
-async function sendPrincipalMessage() {
-  const to      = document.getElementById('msgTo').value;
-  const urgency = document.querySelector('input[name="msgUrgency"]:checked')?.value || 'normal';
-  const body    = document.getElementById('msgBody').value.trim();
-  if(!body){ toast('اكتب نص الرسالة أولاً ⚠️'); return; }
-  if(!state.principalMessages) state.principalMessages = [];
-  const msg = {
-    id: genMsgId(),
-    to, urgency, body,
-    ts: new Date().toISOString(),
-    replies: [],
-    readBy: []
-  };
-  state.principalMessages.push(msg);
-  await saveToCloud();
-  toast('تم إرسال الرسالة ✅');
-  renderPrincipalMessages(document.getElementById('pageContent'));
-}
-
-// ── الحسابات الأخرى: صندوق الرسائل (inbox) ─────────
-function renderInbox(el) {
-  if(!state.principalMessages) state.principalMessages = [];
-  const myRole = currentUser.role;
-  const myMsgs = state.principalMessages.filter(m=>m.to===myRole);
-  const roles = [
-    {id:'admin',      label:'مدير النظام'},
-    {id:'controller', label:'الكنترول'},
-    {id:'notifier',   label:'مسؤول التنبيهات'},
-    {id:'principal',  label:'مدير المدرسة'},
-  ];
-
-  // Mark as read
-  let changed = false;
-  myMsgs.forEach(m=>{
-    if(!(m.readBy||[]).includes(myRole)){ 
-      if(!m.readBy) m.readBy=[];
-      m.readBy.push(myRole); 
-      changed=true; 
-    }
-  });
-  if(changed) saveToCloud();
-
-  const urgent = myMsgs.filter(m=>m.urgency==='urgent');
-  const normal = myMsgs.filter(m=>m.urgency!=='urgent');
-
-  function msgCard(m) {
-    const urgColor = m.urgency==='urgent'?'#991B1B':'#065F46';
-    const urgBg    = m.urgency==='urgent'?'#FEE2E2':'#D1FAE5';
-    const urgLabel = m.urgency==='urgent'?'🚨 عاجلة':'📋 غير عاجلة';
-    const ts = new Date(m.ts).toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'});
-    const hasReplied = (m.replies||[]).some(r=>r.role===myRole);
-    return `<div style="border:1px solid ${m.urgency==='urgent'?'#FCA5A5':'var(--border)'};border-radius:var(--r10);padding:12px;margin-bottom:10px;background:${m.urgency==='urgent'?'#FFF5F5':'var(--surface)'}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-        <span style="background:${urgBg};color:${urgColor};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${urgLabel}</span>
-        <span style="font-size:10px;color:var(--muted)">${ts}</span>
-      </div>
-      <p style="font-size:13px;color:var(--navy);line-height:1.6;margin-bottom:10px">${m.body}</p>
-      ${(m.replies||[]).length>0?`
-        <div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:10px">
-          <p style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">الردود السابقة:</p>
-          ${(m.replies||[]).map(r=>{
-            const rts = new Date(r.ts).toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'});
-            const rLabel = roles.find(x=>x.id===r.role)?.label||r.role;
-            return `<div style="background:#F8FAFC;border-radius:var(--r8);padding:8px;margin-bottom:6px;border-right:3px solid ${r.role===myRole?'#3B82F6':'#10B981'}">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <span style="font-size:11px;font-weight:700;color:var(--navy)">${rLabel}</span>
-                <span style="font-size:10px;color:var(--muted)">${rts}</span>
-              </div>
-              <p style="font-size:12px;color:var(--text)">${r.body}</p>
-            </div>`;
-          }).join('')}
-        </div>`:''}
-      ${!hasReplied?`
-        <div style="display:flex;gap:8px">
-          <textarea id="reply_${m.id}" class="inp" rows="2" placeholder="اكتب ردك هنا..." style="flex:1;margin-bottom:0"></textarea>
-          <button class="btn btn-navy" style="align-self:flex-end;white-space:nowrap" onclick="sendReply('${m.id}')">↩️ رد</button>
-        </div>`
-        :`<p style="font-size:11px;color:#059669;font-weight:700">✅ تم الرد على هذه الرسالة</p>`}
-    </div>`;
-  }
-
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--navy),#1E40AF);color:#fff">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <p style="font-weight:900;font-size:16px;margin-bottom:4px">📨 رسائل مدير المدرسة</p>
-          <p style="font-size:12px;opacity:.8">${myMsgs.length} رسالة | ${urgent.length} عاجلة</p>
-        </div>
-        <button onclick="loadFromCloud().then(()=>renderInbox(document.getElementById('pageContent')))" 
-          style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:var(--r8);padding:8px 14px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700">🔄 تحديث</button>
-      </div>
-    </div>
-
-    ${myMsgs.length===0
-      ? `<div class="card"><p style="text-align:center;color:var(--muted);padding:30px;font-size:14px">📭 لا توجد رسائل بعد</p></div>`
-      : `${urgent.length>0?`
-          <div style="margin-bottom:6px">
-            <p style="font-size:12px;font-weight:700;color:#991B1B;margin-bottom:8px">🚨 الرسائل العاجلة (${urgent.length})</p>
-            ${urgent.map(msgCard).join('')}
-          </div>`:''}
-        ${normal.length>0?`
-          <div>
-            <p style="font-size:12px;font-weight:700;color:#065F46;margin-bottom:8px">📋 الرسائل العادية (${normal.length})</p>
-            ${normal.map(msgCard).join('')}
-          </div>`:''}
-        `}
-  `;
-}
-
-async function sendReply(msgId) {
-  const textarea = document.getElementById('reply_' + msgId);
-  if(!textarea){ toast('حدث خطأ ⚠️'); return; }
-  const body = textarea.value.trim();
-  if(!body){ toast('اكتب نص الرد أولاً ⚠️'); return; }
-  const msg = state.principalMessages.find(m=>m.id===msgId);
-  if(!msg){ toast('الرسالة غير موجودة ⚠️'); return; }
-  if(!msg.replies) msg.replies = [];
-  msg.replies.push({
-    role: currentUser.role,
-    body,
-    ts: new Date().toISOString()
-  });
-  await saveToCloud();
-  toast('تم إرسال الرد ✅');
-  renderInbox(document.getElementById('pageContent'));
-}
-
-// ── Badge: عدد الرسائل غير المقروءة ────────────────
-function getUnreadCount() {
-  if(!state.principalMessages || !currentUser) return 0;
-  const myRole = currentUser.role;
-  if(myRole==='principal') return 0;
-  return state.principalMessages.filter(m=>
-    m.to===myRole && !(m.readBy||[]).includes(myRole)
-  ).length;
-}
-
-
 })();
 
 // ── Set logo images ───────────────────────────────────────────────────
@@ -3712,4 +3476,3 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 </body>
 </html>
-
