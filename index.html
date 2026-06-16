@@ -610,7 +610,8 @@ async function saveToCloud() {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
-    users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[]
+    users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
+    monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[]
   };
   await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
   // Also save to localStorage as backup
@@ -636,10 +637,21 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages"].forEach(function(k){
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
     }
+    // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود)
+    var defaultUsers = [
+      { id:"U1", name:"مدير النظام",        username:"admin",     password:"admin123", role:"admin"      },
+      { id:"U2", name:"الكنترول",           username:"ctrl",      password:"ctrl123",  role:"controller" },
+      { id:"U5", name:"مراقب اللجان",       username:"monitor",   password:"mon123",   role:"monitor"    },
+      { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    password:"1234",     role:"notifier"   },
+      { id:"U4", name:"مدير المدرسة",       username:"principal", password:"prin123",  role:"principal"  },
+    ];
+    defaultUsers.forEach(function(du){
+      if(!state.users.find(function(u){ return u.id===du.id; })) state.users.push(du);
+    });
     // Load bundles
     var brows = await sbGet("bundles");
     if(brows && brows.length) {
@@ -724,19 +736,22 @@ let state = {
   users: [
     { id:"U1", name:"مدير النظام",        username:"admin",     password:"admin123", role:"admin"      },
     { id:"U2", name:"الكنترول",           username:"ctrl",      password:"ctrl123",  role:"controller" },
+    { id:"U5", name:"مراقب اللجان",       username:"monitor",   password:"mon123",   role:"monitor"    },
     { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    password:"1234",     role:"notifier"   },
     { id:"U4", name:"مدير المدرسة",       username:"principal", password:"prin123",  role:"principal"  },
   ],
   bundles: [],
   notifLog: [],
   examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
+  monitorReports: [], // [{id,type,subject,grade,hall,date,monitorName,count,notes,sig,savedAt}]
+  monitorNotes: [],   // [{id,subject,grade,hall,date,note,savedAt,user}]
 };
 
 let currentUser = null;
 let currentPage = "";
 
-const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات", principal:"مدير المدرسة" };
-const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"], principal:["#065F46","#D1FAE5"] };
+const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات", principal:"مدير المدرسة", monitor:"مراقب اللجان" };
+const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"], principal:["#065F46","#D1FAE5"], monitor:["#9D174D","#FCE7F3"] };
 const TEACHER_ROLE_LABEL = { corrector:"مصحح 1", corrector2:"مصحح 2", reviewer:"مراجع 1", reviewer2:"مراجع 2", auditor:"مدقق 1", auditor2:"مدقق 2" };
 const NOTIFY_TYPES = [
   { key:"correction", label:"طلب تصحيح",    icon:"✎", color:"#EF4444" },
@@ -749,7 +764,8 @@ const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
   controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
-  principal:  [ {k:"principal_dashboard",icon:"📊",label:"لوحة المتابعة"}, {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
+  principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
+  monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -757,7 +773,52 @@ const PAGES = {
 // ═══════════════════════════════════════════════
 function uid()    { return Math.random().toString(36).slice(2,8).toUpperCase(); }
 function nowISO() { return new Date().toISOString(); }
-function fmt(iso) { try { return new Date(iso).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"}); } catch(e){ return iso; } }
+function fmt(iso) { try { return new Date(iso).toLocaleString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"short",timeStyle:"short"}); } catch(e){ return iso; } }
+
+// ── منظومة التاريخ الهجري ──────────────────────────
+const HIJRI_MONTHS = ["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الثانية","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
+function _arNum(s){ return parseInt(String(s).replace(/[٠-٩]/g,d=>d.charCodeAt(0)-1632))||0; }
+function currentHijriParts(){
+  const n=new Date();
+  return { d:_arNum(n.toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{day:"numeric"})),
+           m:_arNum(n.toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{month:"numeric"})),
+           y:_arNum(n.toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{year:"numeric"})) };
+}
+// أنشئ منتقي هجري (ثلاثة قوائم: يوم / شهر / سنة)
+function hijriPicker(id, existingVal){
+  const cur = currentHijriParts();
+  let sel = {d:cur.d, m:cur.m, y:cur.y};
+  if(existingVal && existingVal.includes("هـ")){
+    const p = existingVal.replace("هـ","").split("-");
+    if(p.length===3){ sel={y:parseInt(p[0]),m:parseInt(p[1]),d:parseInt(p[2])}; }
+  }
+  const days  = Array.from({length:30},(_,i)=>i+1).map(n=>`<option value="${n}"${n===sel.d?" selected":""}>${n}</option>`).join("");
+  const months= HIJRI_MONTHS.map((mn,i)=>`<option value="${i+1}"${(i+1)===sel.m?" selected":""}>${mn}</option>`).join("");
+  const years = Array.from({length:12},(_,i)=>cur.y-1+i).map(yr=>`<option value="${yr}"${yr===sel.y?" selected":""}>${yr}هـ</option>`).join("");
+  return `<div style="display:flex;gap:4px;flex-wrap:nowrap">
+    <select class="inp" id="${id}_d" style="flex:0 0 60px;min-width:0;padding-right:4px;padding-left:4px">${days}</select>
+    <select class="inp" id="${id}_m" style="flex:1;min-width:0">${months}</select>
+    <select class="inp" id="${id}_y" style="flex:0 0 85px;min-width:0;padding-right:4px;padding-left:4px">${years}</select>
+  </div>`;
+}
+// اقرأ قيمة المنتقي كـ "YYYY-MM-DDهـ" (قابلة للفرز)
+function hijriVal(id){
+  const d=String((document.getElementById(id+"_d")||{}).value||"").padStart(2,"0");
+  const m=String((document.getElementById(id+"_m")||{}).value||"").padStart(2,"0");
+  const y=(document.getElementById(id+"_y")||{}).value||"";
+  return (d!=="00"&&m!=="00"&&y)?`${y}-${m}-${d}هـ`:"";
+}
+// حوّل "YYYY-MM-DDهـ" أو ISO إلى نص هجري للعرض
+function inputDateToHijri(val){
+  if(!val) return "";
+  if(val.includes("هـ")){
+    const p=val.replace("هـ","").split("-");
+    if(p.length===3){ const mn=HIJRI_MONTHS[parseInt(p[1])-1]||""; return `${parseInt(p[2])} ${mn} ${p[0]}هـ`; }
+    return val;
+  }
+  try{ return new Date(val).toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{year:"numeric",month:"long",day:"numeric"}); }catch(e){ return val; }
+}
+function todayHijri(){ return inputDateToHijri(hijriVal("__dummy__")||(() => { const c=currentHijriParts(); return `${c.y}-${String(c.m).padStart(2,"0")}-${String(c.d).padStart(2,"0")}هـ`; })()); }
 
 let _toastTimer;
 function toast(msg, type="ok") {
@@ -805,6 +866,7 @@ const STORAGE_KEY = "examTrackerState_v1";
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    _saveDashData(); // ← تحديث الداشبورد عند كل حفظ
   } catch(e) { console.warn("saveState failed:", e); }
 }
 
@@ -854,6 +916,7 @@ function quickLogin(username, password) {
   var allUsers = (state.users && state.users.length > 0) ? state.users : [
     {id:"U1",name:"مدير النظام",      username:"admin",     password:"admin123", role:"admin"},
     {id:"U2",name:"الكنترول",         username:"ctrl",      password:"ctrl123",  role:"controller"},
+    {id:"U5",name:"مراقب اللجان",     username:"monitor",   password:"mon123",   role:"monitor"},
     {id:"U3",name:"مسؤول التنبيهات", username:"notify",    password:"1234",     role:"notifier"},
     {id:"U4",name:"مدير المدرسة",     username:"principal", password:"prin123",  role:"principal"},
   ];
@@ -902,9 +965,9 @@ function enterShell(found, page) {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("appShell").style.display    = "flex";
   document.getElementById("hSchool").textContent = state.schoolName || "متابعة سير الاختبارات الإلكتروني";
-  var ROLE_COLORS_L = {admin:["#92610A","#FEF3C7"],controller:["#1E40AF","#DBEAFE"],notifier:["#5B21B6","#EDE9FE"]};
-  var ROLE_LABELS_L = {admin:"مدير النظام",controller:"الكنترول",notifier:"مسؤول التنبيهات"};
-  var ROLE_ICONS_L  = {admin:"🔑",controller:"📋",notifier:"📲"};
+  var ROLE_COLORS_L = {admin:["#92610A","#FEF3C7"],controller:["#1E40AF","#DBEAFE"],notifier:["#5B21B6","#EDE9FE"],principal:["#065F46","#D1FAE5"],monitor:["#9D174D","#FCE7F3"]};
+  var ROLE_LABELS_L = {admin:"مدير النظام",controller:"الكنترول",notifier:"مسؤول التنبيهات",principal:"مدير المدرسة",monitor:"مراقب اللجان"};
+  var ROLE_ICONS_L  = {admin:"🔑",controller:"📋",notifier:"📲",principal:"🏫",monitor:"👁"};
   var colors = ROLE_COLORS_L[found.role]||["#888","#eee"];
   var hRole = document.getElementById("hRole");
   if(hRole){ hRole.textContent=(ROLE_ICONS_L[found.role]||"")+" "+(ROLE_LABELS_L[found.role]||found.role); hRole.style.cssText="background:"+colors[1]+";color:"+colors[0]+";padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700"; }
@@ -938,7 +1001,7 @@ function updateBell() {
   const btn = document.getElementById("bellBtn");
   const badge = document.getElementById("bellBadge");
   if(!btn||!badge) return;
-  const roles = ["controller","notifier"];
+  const roles = ["controller","notifier","monitor"];
   if(currentUser && roles.includes(currentUser.role)) {
     btn.style.display = "flex";
     btn.style.alignItems = "center";
@@ -992,11 +1055,14 @@ function navigateTo(page) {
     case "notif_log":    renderNotifLog(el);      break;
     case "ctrl_schedule":renderCtrlSchedule(el);  break;
     case "ctrl_report":  renderCtrlReport(el);    break;
-    case "principal_dashboard": renderPrincipalDashboard(el); break;
     case "principal_report":    renderPrincipalReport(el);    break;
     case "principal_compose":   renderPrincipalCompose(el);   break;
     case "principal_sent":      renderPrincipalSent(el);      break;
     case "inbox":               renderInbox(el);              break;
+    case "monitor_committees":  renderMonitorCommittees(el);  break;
+    case "monitor_papers":      renderMonitorPapers(el);      break;
+    case "monitor_pledge":      renderMonitorPledge(el);      break;
+    case "monitor_reports":     renderMonitorReports(el);     break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
   }
 }
@@ -1093,8 +1159,8 @@ function renderAdminNew(el) {
         </select>
       </div>
       <div>
-        <label class="lbl">تاريخ الاختبار</label>
-        <input class="inp" id="bf_examdate" type="date"/>
+        <label class="lbl">تاريخ الاختبار (هجري)</label>
+        ${hijriPicker("bf_examdate")}
       </div>
       <div>
         <label class="lbl">القاعة / اللجنة</label>
@@ -1127,7 +1193,7 @@ function submitNewBundle() {
   const auditor2   = document.getElementById("bf_auditor2").value;
   const note       = document.getElementById("bf_note").value;
   const examDay    = (document.getElementById("bf_day")||{value:""}).value||"";
-  const examDate   = (document.getElementById("bf_examdate")||{value:""}).value||"";
+  const examDate   = hijriVal("bf_examdate")||"";
   const examHall   = (document.getElementById("bf_hall")||{value:""}).value||"";
   const examStart  = (document.getElementById("bf_start")||{value:""}).value||"";
   const examEnd    = (document.getElementById("bf_end")||{value:""}).value||"";
@@ -1315,8 +1381,8 @@ function adminEditBundle(id) {
           <option ${b.examDay=='الأربعاء'?'selected':''}">الأربعاء</option>
           <option ${b.examDay=='الخميس'?'selected':''}">الخميس</option>
         </select></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ</label>
-        <input class="inp" id="eb_examdate" type="date" value="${b.examDate||''}" style="font-size:12px"/></div>
+      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ (هجري)</label>
+        ${hijriPicker("eb_examdate", b.examDate||"")}</div>
       <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">القاعة</label>
         <input class="inp" id="eb_hall" value="${b.examHall||''}" style="font-size:12px"/></div>
       <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت البدء</label>
@@ -1347,7 +1413,7 @@ function saveEditBundle(id) {
   b.auditor    = document.getElementById("eb_auditor").value;
   b.auditor2   = document.getElementById("eb_auditor2").value;
   b.examDay    = (document.getElementById("eb_day")||{value:""}).value||b.examDay||"";
-  b.examDate   = (document.getElementById("eb_examdate")||{value:""}).value||b.examDate||"";
+  b.examDate   = hijriVal("eb_examdate")||b.examDate||"";
   b.examHall   = (document.getElementById("eb_hall")||{value:""}).value||b.examHall||"";
   b.examStart  = (document.getElementById("eb_start")||{value:""}).value||b.examStart||"";
   b.examEnd    = (document.getElementById("eb_end")||{value:""}).value||b.examEnd||"";
@@ -1635,7 +1701,7 @@ function renderScanResult() {
       <div class="info-cell"><p class="k">🔏 مدقق 1</p><p class="v">${audT?audT.name:"—"}</p></div>
       ${audT2?`<div class="info-cell"><p class="k">🔏 مدقق 2</p><p class="v">${audT2.name}</p></div>`:""}
       ${b.note?`<div class="info-cell"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
-      ${b.examDate?`<div class="info-cell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
+      ${b.examDate?`<div class="info-cell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${inputDateToHijri(b.examDate)}</p></div>`:""}
       ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
       ${b.examHall?`<div class="info-cell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
     </div>
@@ -1704,6 +1770,8 @@ function doAdvance() {
   if(!b)return;
   b.stage=idx; b.log.push(entry);
   saveState();
+  saveBundleToCloud(b);   // ← مزامنة فورية مع السحابة
+  _saveDashData();        // ← تحديث الداشبورد فوراً
   _scanHit=b; _confirmStg=null;
   toast(`✅ ${state.stages[idx]}`);
   renderScanResult();
@@ -2150,6 +2218,7 @@ function renderSUsers(el) {
         <option value="principal">مدير المدرسة</option>
         <option value="controller">الكنترول</option>
         <option value="notifier">مسؤول التنبيهات</option>
+        <option value="monitor">مراقب اللجان</option>
       </select>
     </div>
     <button class="btn btn-navy btn-full" onclick="addUser()">إضافة الحساب</button>
@@ -2204,7 +2273,7 @@ function renderCtrlSchedule(el) {
             <td style="padding:9px 12px;font-weight:700;color:var(--navy)">${b.subject}</td>
             <td style="padding:9px 12px;color:var(--mid)">${b.grade||"—"}</td>
             <td style="padding:9px 12px;color:var(--mid)">${b.examDay||"—"}</td>
-            <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${b.examDate}</td>
+            <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${inputDateToHijri(b.examDate)}</td>
             <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${b.examStart||"—"}${b.examEnd?" — "+b.examEnd:""}</td>
             <td style="padding:9px 12px;color:var(--mid)">${b.examHall||"—"}</td>
             <td style="padding:9px 12px;text-align:center;font-weight:700;color:var(--navy)">${b.count}</td>
@@ -2229,7 +2298,7 @@ function printSchedule() {
       <td style="padding:8px 10px;font-weight:700">${b.subject}</td>
       <td style="padding:8px 10px">${b.grade||"—"}</td>
       <td style="padding:8px 10px">${b.examDay||"—"}</td>
-      <td style="padding:8px 10px;direction:ltr;text-align:right">${b.examDate}</td>
+      <td style="padding:8px 10px;direction:ltr;text-align:right">${inputDateToHijri(b.examDate)}</td>
       <td style="padding:8px 10px;direction:ltr;text-align:right">${b.examStart||"—"}${b.examEnd?" — "+b.examEnd:""}</td>
       <td style="padding:8px 10px">${b.examHall||"—"}</td>
       <td style="padding:8px 10px;text-align:center">${b.count}</td>
@@ -2248,7 +2317,7 @@ function printSchedule() {
   <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px">
     <img src="${LOGO_SRC}" alt="شعار" style="width:100px;height:100px;object-fit:contain"/>
     <div><h1>${state.schoolName}</h1>
-    <p class="sub">جدول الاختبارات — تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</p></div>
+    <p class="sub">جدول الاختبارات — تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura")}</p></div>
   </div>
   <table>
     <thead><tr>
@@ -2454,7 +2523,7 @@ function generatePDF(subjectFilter) {
   const bundles = subjectFilter==="ALL" ? state.bundles : state.bundles.filter(b=>b.subject===subjectFilter);
   if(bundles.length===0){toast("لا توجد بيانات","err");return;}
   const title = subjectFilter==="ALL" ? "تقرير شامل — جميع المواد" : `تقرير مادة ${subjectFilter}`;
-  const printDate = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+  const printDate = new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"full"});
 
   // Summary counts per stage
   const stageSummary = state.stages.map((s,i)=>{
@@ -2477,14 +2546,14 @@ function generatePDF(subjectFilter) {
       <td style="padding:8px 10px;font-weight:700">${b.subject}</td>
       <td style="padding:8px 10px">${b.grade||"—"}</td>
       <td style="padding:8px 10px;text-align:center">${b.count}</td>
-      <td style="padding:8px 10px">${b.examDay||""}${b.examDate?" "+b.examDate:""}</td>
+      <td style="padding:8px 10px">${b.examDay||""}${b.examDate?" "+inputDateToHijri(b.examDate):""}</td>
       <td style="padding:8px 10px">${b.examHall||"—"}</td>
       <td style="padding:8px 10px">${corrT?corrT.name:"—"}</td>
       <td style="padding:8px 10px">${revT?revT.name:"—"}</td>
       <td style="padding:8px 10px">${audT?audT.name:"—"}</td>
       <td style="padding:8px 10px;font-size:11px;font-weight:700;color:${b.stage<0?"#64748b":"#0D1F3C"}">${stageName}</td>
       <td style="padding:8px 10px;font-size:10px;font-family:monospace;direction:ltr;color:#64748b">${bar} ${pct}%</td>
-      <td style="padding:8px 10px;font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA"):"—"}</td>
+      <td style="padding:8px 10px;font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA-u-ca-islamic-umalqura"):"—"}</td>
     </tr>`;
   }).join("");
 
@@ -2493,7 +2562,7 @@ function generatePDF(subjectFilter) {
     <div style="margin-bottom:20px;page-break-inside:avoid">
       <h4 style="font-size:13px;color:#0D1F3C;margin-bottom:6px;border-right:3px solid #C8911F;padding-right:8px">
         ${b.barcode} — ${b.subject}${b.grade?" ("+b.grade+")":""} · ${b.count} ورقة
-        ${b.examDate?` · 📅 ${b.examDay||""} ${b.examDate}`:""}
+        ${b.examDate?` · 📅 ${b.examDay||""} ${inputDateToHijri(b.examDate)}`:""}
       </h4>
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:#f1f5f9">
@@ -2854,6 +2923,25 @@ function renderPrincipalDashboard(el) {
   const newB       = state.bundles.filter(b=>b.stage<0).length;
   const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
 
+  // ── زر الداشبورد للشاشة الخارجية ────────────────
+  const dashBtn = `
+  <div style="margin-bottom:16px">
+    <button onclick="openExternalDashboard()"
+      style="display:flex;align-items:center;gap:10px;padding:13px 22px;
+             background:linear-gradient(135deg,#0B1D3A,#1D3561);
+             color:#fff;border:none;border-radius:12px;cursor:pointer;
+             font-family:'IBM Plex Sans Arabic',sans-serif;font-size:14px;
+             font-weight:700;box-shadow:0 4px 18px rgba(11,29,58,.35);
+             transition:all .2s;width:100%">
+      <span style="font-size:26px">📺</span>
+      <div style="text-align:right;flex:1">
+        <div>عرض الداشبورد على الشاشة الخارجية</div>
+        <div style="font-size:11px;font-weight:400;opacity:.75;margin-top:2px">مواد اليوم · سير الأوراق · يتحدث تلقائياً كل 30 ثانية</div>
+      </div>
+      <span style="font-size:20px;opacity:.7">↗</span>
+    </button>
+  </div>`;
+
   // Build subject map with full stage breakdown
   const subjectMap = {};
   state.bundles.forEach(b=>{
@@ -2878,6 +2966,7 @@ function renderPrincipalDashboard(el) {
   const recentLogs=allLogs.slice(0,5);
 
   el.innerHTML=`
+  ${dashBtn}
   <!-- KPIs -->
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
     <div class="kpi-card" style="border-top-color:#3B82F6">
@@ -3236,7 +3325,7 @@ function renderPrinBundle(el) {
       <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
       <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
       <div class="info-cell"><p class="k">التقدم</p><p class="v" style="color:${color}">${pct}%</p></div>
-      ${b.examDate?`<div class="info-cell"><p class="k">📅 تاريخ الاختبار</p><p class="v">${b.examDay||""} ${b.examDate}</p></div>`:""}
+      ${b.examDate?`<div class="info-cell"><p class="k">📅 تاريخ الاختبار</p><p class="v">${b.examDay||""} ${inputDateToHijri(b.examDate)}</p></div>`:""}
       ${b.examHall?`<div class="info-cell"><p class="k">🏫 القاعة</p><p class="v">${b.examHall}</p></div>`:""}
       ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
       ${b.note?`<div class="info-cell" style="grid-column:span 2"><p class="k">ملاحظة</p><p class="v">${b.note}</p></div>`:""}
@@ -3447,7 +3536,7 @@ function renderPrincipalReport(el) {
             +"<td style='text-align:center'><span style='color:#059669;font-weight:700'>"+d.done+"</span></td>"
             +"<td style='text-align:center'><span style='color:#D97706;font-weight:700'>"+d.inProg+"</span></td>"
             +"<td><div style='display:flex;align-items:center;gap:5px'><div style='flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden;min-width:45px'><div style='height:100%;width:"+p+"%;background:"+c+";border-radius:99px'></div></div><span style='font-size:11px;font-weight:700;color:"+c+"'>"+p+"%</span></div></td>"
-            +"<td><button onclick='_prinView=&quot;subject&quot;;_prinSubject=&quot;"+subj+"&quot;;_prinGradeFilter=&quot;&quot;;navigateTo(&quot;principal_dashboard&quot;)' style='background:var(--navy);color:#fff;border:none;border-radius:var(--r6);padding:4px 9px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:700'>تفاصيل</button></td></tr>";
+            +"</tr>";
         }).join("")}
       </tbody>
     </table>
@@ -3497,7 +3586,7 @@ function renderPrincipalReport(el) {
 
 function generateIncompletePDF() {
   const incompleteBundles=state.bundles.filter(b=>b.stage<state.stages.length-1);
-  const printDate=new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+  const printDate=new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"full"});
   if(incompleteBundles.length===0){toast("لا توجد مظاريف غير مكتملة ✅","ok");return;}
   const rows=incompleteBundles.map((b,i)=>{
     const ct=state.teachers.find(t=>t.id===b.corrector);
@@ -3517,7 +3606,7 @@ function generatePrincipalPDF() {
   const newB       = state.bundles.filter(b=>b.stage<0).length;
   const totalPapers= state.bundles.reduce((a,b)=>a+b.count,0);
   const pct        = total>0?Math.round((done/total)*100):0;
-  const printDate  = new Date().toLocaleDateString("ar-SA",{dateStyle:"full"});
+  const printDate  = new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"full"});
 
   const subjectRows={};
   state.bundles.forEach(b=>{
@@ -3538,7 +3627,7 @@ function generatePrincipalPDF() {
       <td style="text-align:center">${b.count}</td>
       <td>${corrT?corrT.name:"—"}</td>
       <td style="font-weight:700;color:${b.stage===state.stages.length-1?"#059669":"#0D1F3C"}">${sName}</td>
-      <td style="font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA"):"—"}</td>
+      <td style="font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA-u-ca-islamic-umalqura"):"—"}</td>
     </tr>`;
   }).join("");
 
@@ -3610,6 +3699,814 @@ function generatePrincipalPDF() {
   </body></html>`);
   win.document.close();
   toast("تم فتح تقرير مدير المدرسة ✅");
+}
+
+// ═══════════════════════════════════════════════
+// مراقب اللجان
+// ═══════════════════════════════════════════════
+
+function renderMonitorCommittees(el) {
+  const notes = state.monitorNotes || [];
+  const schedule = (state.examSchedule || []).sort((a,b) => (a.date||"").localeCompare(b.date||""));
+
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title">👁 متابعة لجان الاختبارات</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">تابع سير الاختبارات وسجّل ملاحظاتك على كل لجنة وأبلغ الكنترول بها</p>
+
+      <!-- نموذج إضافة ملاحظة -->
+      <div style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid var(--border)">
+        <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:12px">➕ تسجيل ملاحظة جديدة</p>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">المادة</label>
+            <select class="inp" id="mnSubj">
+              <option value="">-- اختر --</option>
+              ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="lbl">الصف</label>
+            <select class="inp" id="mnGrade">
+              <option value="">-- اختر --</option>
+              ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">رقم القاعة / اللجنة</label>
+            <input class="inp" id="mnHall" placeholder="مثال: قاعة 1"/>
+          </div>
+          <div>
+            <label class="lbl">التاريخ</label>
+            ${hijriPicker("mnDate")}
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <label class="lbl">الملاحظة</label>
+          <textarea class="inp" id="mnNote" rows="3" placeholder="اكتب ملاحظتك هنا للكنترول..." style="resize:vertical"></textarea>
+        </div>
+        <button class="btn btn-green btn-full" onclick="saveMonitorNote()">💾 حفظ الملاحظة وإبلاغ الكنترول</button>
+      </div>
+
+      <!-- الجدول -->
+      ${schedule.length > 0 ? `
+      <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:10px">📅 جدول الاختبارات للمتابعة</p>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--navy);color:#fff">
+            <th style="padding:9px 10px;text-align:right">المادة</th>
+            <th style="padding:9px 10px;text-align:right">الصف</th>
+            <th style="padding:9px 10px;text-align:right">التاريخ</th>
+            <th style="padding:9px 10px;text-align:right">الوقت</th>
+            <th style="padding:9px 10px;text-align:right">القاعة</th>
+            <th style="padding:9px 10px;text-align:center">ملاحظات</th>
+          </tr></thead>
+          <tbody>
+            ${schedule.map((s,i) => {
+              const examNotes = notes.filter(n => n.subject===s.subject && n.grade===s.grade && n.date===s.date);
+              return `<tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
+                <td style="padding:9px 10px;font-weight:700;color:var(--navy)">${s.subject||"—"}</td>
+                <td style="padding:9px 10px;color:var(--mid)">${s.grade||"—"}</td>
+                <td style="padding:9px 10px;color:var(--mid)">${inputDateToHijri(s.date)||"—"}</td>
+                <td style="padding:9px 10px;color:var(--mid);direction:ltr;text-align:right">${s.startTime||""}${s.endTime?" — "+s.endTime:""}</td>
+                <td style="padding:9px 10px;color:var(--mid)">${s.hall||"—"}</td>
+                <td style="padding:9px 10px;text-align:center">
+                  ${examNotes.length > 0
+                    ? `<span style="background:#FEF3C720;color:#92610A;border:1px solid #F59E0B50;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${examNotes.length} ملاحظة</span>`
+                    : `<span style="color:var(--faint);font-size:11px">—</span>`}
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>` : `<p class="empty">لا يوجد جدول اختبارات محدد بعد</p>`}
+    </div>
+
+    <!-- الملاحظات المسجلة -->
+    <div class="card">
+      <p class="card-title">📋 الملاحظات المسجلة (${notes.length})</p>
+      ${notes.length === 0 ? `<p class="empty">لا توجد ملاحظات مسجلة بعد</p>` :
+        [...notes].reverse().map((n,i) => `
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;border-right:4px solid var(--blue);border:1px solid var(--border);border-right:4px solid #3B82F6">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-weight:800;color:var(--navy);font-size:13px">${n.subject||"—"} — ${n.grade||"—"}</span>
+            <span style="font-size:11px;color:var(--muted)">${n.hall||""}</span>
+            <span style="font-size:11px;color:var(--muted);margin-right:auto">${inputDateToHijri(n.date)||""}</span>
+          </div>
+          <p style="font-size:13px;color:var(--dark);margin-bottom:6px">${n.note}</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+            <span style="font-size:10px;color:var(--faint)">${fmt(n.savedAt)}</span>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteMonitorNote('${n.id}')">✕ حذف</button>
+          </div>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function saveMonitorNote() {
+  const subj = document.getElementById("mnSubj").value.trim();
+  const grade = document.getElementById("mnGrade").value.trim();
+  const hall = document.getElementById("mnHall").value.trim();
+  const date = hijriVal("mnDate");
+  const note = document.getElementById("mnNote").value.trim();
+  if (!note) { toast("اكتب الملاحظة أولاً","err"); return; }
+  if (!state.monitorNotes) state.monitorNotes = [];
+  state.monitorNotes.push({ id:uid(), subject:subj, grade:grade, hall:hall, date:date, note:note, savedAt:nowISO(), user:currentUser.name });
+  // إرسال إشعار للكنترول
+  if (!state.inbox) state.inbox = [];
+  const inboxSuffix = subj ? " ["+subj+(grade?" — "+grade:"")+"]" : "";
+  state.inbox.push({ id:uid(), to:"controller", from:"مراقب اللجان", type:"info", title:"ملاحظة من مراقب اللجان"+inboxSuffix, body:note, ts:nowISO(), read:false });
+  saveState(); saveToCloud();
+  toast("✅ تم حفظ الملاحظة وإبلاغ الكنترول");
+  renderMonitorCommittees(document.getElementById("pageContent"));
+}
+
+function deleteMonitorNote(id) {
+  state.monitorNotes = (state.monitorNotes||[]).filter(n=>n.id!==id);
+  saveState(); saveToCloud();
+  toast("تم الحذف");
+  renderMonitorCommittees(document.getElementById("pageContent"));
+}
+
+// ─────────────────────────────────────────────
+// عد الأوراق
+// ─────────────────────────────────────────────
+function renderMonitorPapers(el) {
+  const reports = (state.monitorReports||[]).filter(r=>r.type==="papers");
+
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title">📄 عد الأوراق والتحقق من سلامتها</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">سجّل عدد الأوراق المستلمة من الملاحظ وتحقق من سلامتها بعد انتهاء الاختبار</p>
+
+      <div style="background:var(--bg);border-radius:12px;padding:16px;border:1px solid var(--border)">
+        <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:12px">📝 نموذج استلام وعد الأوراق</p>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">المادة *</label>
+            <select class="inp" id="ppSubj">
+              <option value="">-- اختر --</option>
+              ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="lbl">الصف *</label>
+            <select class="inp" id="ppGrade">
+              <option value="">-- اختر --</option>
+              ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">رقم القاعة / اللجنة *</label>
+            <input class="inp" id="ppHall" placeholder="مثال: قاعة 1"/>
+          </div>
+          <div>
+            <label class="lbl">التاريخ</label>
+            ${hijriPicker("ppDate")}
+          </div>
+        </div>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">اسم الملاحظ المسلِّم</label>
+            <select class="inp" id="ppObserver">${teacherOptions()}</select>
+          </div>
+          <div>
+            <label class="lbl">عدد الطلاب الحاضرين</label>
+            <input class="inp" id="ppStudents" type="number" min="0" placeholder="0"/>
+          </div>
+        </div>
+        <div class="g2" style="margin-bottom:10px">
+          <div>
+            <label class="lbl">عدد أوراق الأسئلة المستلمة *</label>
+            <input class="inp" id="ppQCount" type="number" min="0" placeholder="0"/>
+          </div>
+          <div>
+            <label class="lbl">عدد أوراق الإجابة المستلمة *</label>
+            <input class="inp" id="ppACount" type="number" min="0" placeholder="0"/>
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <label class="lbl">حالة الأوراق</label>
+          <select class="inp" id="ppStatus">
+            <option value="سليمة">✅ سليمة — لا يوجد أي تلف أو نقص</option>
+            <option value="ناقصة">⚠️ ناقصة — يوجد نقص في عدد الأوراق</option>
+            <option value="تالفة">❌ تالفة — يوجد تلف في بعض الأوراق</option>
+            <option value="مشكوك فيها">🔍 مشكوك فيها — تحتاج مراجعة إضافية</option>
+          </select>
+        </div>
+        <div style="margin-bottom:14px">
+          <label class="lbl">ملاحظات إضافية</label>
+          <textarea class="inp" id="ppNotes" rows="2" placeholder="أي ملاحظات على حالة الأوراق..." style="resize:vertical"></textarea>
+        </div>
+
+        <!-- التوقيع الإلكتروني -->
+        <div style="margin-bottom:14px">
+          <label class="lbl">توقيع المراقب الإلكتروني *</label>
+          <div style="border:2px dashed var(--blue);border-radius:10px;overflow:hidden;background:#fff;touch-action:none">
+            <canvas id="sigCanvasPapers" width="600" height="120" style="width:100%;height:120px;cursor:crosshair;display:block"></canvas>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn btn-outline btn-sm" onclick="clearSigCanvas('sigCanvasPapers')">🗑️ مسح التوقيع</button>
+            <span style="font-size:11px;color:var(--muted);align-self:center">وقّع بإصبعك أو الماوس في المربع أعلاه</span>
+          </div>
+        </div>
+
+        <button class="btn btn-green btn-full" onclick="saveMonitorPapers()">💾 حفظ محضر الاستلام</button>
+      </div>
+    </div>
+
+    <!-- السجلات المحفوظة -->
+    <div class="card">
+      <p class="card-title">📚 محاضر الاستلام المحفوظة (${reports.length})</p>
+      ${reports.length === 0 ? `<p class="empty">لا توجد محاضر محفوظة بعد</p>` :
+        [...reports].reverse().map((r,i) => `
+        <div style="background:var(--bg);border-radius:10px;padding:13px 16px;margin-bottom:8px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="width:40px;height:40px;background:linear-gradient(135deg,#3B82F6,#1D4ED8);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📄</div>
+          <div style="flex:1;min-width:140px">
+            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${r.subject||"—"} — ${r.grade||"—"}</p>
+            <p style="font-size:11px;color:var(--muted)">${r.hall||""} · أسئلة: ${r.qCount||0} · إجابات: ${r.aCount||0}</p>
+            <p style="font-size:11px;color:${r.status==="سليمة"?"#059669":r.status==="ناقصة"?"#D97706":"#EF4444"};font-weight:700">${r.status||"—"}</p>
+            <p style="font-size:10px;color:var(--faint)">${fmt(r.savedAt)}</p>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-navy btn-sm" onclick="printMonitorReport('${r.id}')">🖨️ طباعة</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteMonitorReport('${r.id}')">✕</button>
+          </div>
+        </div>`).join("")}
+    </div>
+  </div>`;
+
+  initSigCanvas("sigCanvasPapers");
+}
+
+function saveMonitorPapers() {
+  const subj = document.getElementById("ppSubj").value.trim();
+  const grade = document.getElementById("ppGrade").value.trim();
+  const hall = document.getElementById("ppHall").value.trim();
+  const date = hijriVal("ppDate");
+  const observer = document.getElementById("ppObserver").value.trim();
+  const students = document.getElementById("ppStudents").value.trim();
+  const qCount = document.getElementById("ppQCount").value.trim();
+  const aCount = document.getElementById("ppACount").value.trim();
+  const status = document.getElementById("ppStatus").value;
+  const notes = document.getElementById("ppNotes").value.trim();
+  if (!subj) { toast("اختر المادة أولاً","err"); return; }
+  if (!hall) { toast("أدخل رقم القاعة","err"); return; }
+  const canvas = document.getElementById("sigCanvasPapers");
+  const sig = canvas ? canvas.toDataURL() : "";
+  if (!state.monitorReports) state.monitorReports = [];
+  state.monitorReports.push({
+    id:uid(), type:"papers", subject:subj, grade:grade, hall:hall, date:date,
+    observer:observer, students:students, qCount:parseInt(qCount)||0, aCount:parseInt(aCount)||0,
+    status:status, notes:notes, sig:sig, monitorName:currentUser.name, savedAt:nowISO()
+  });
+  saveState(); saveToCloud();
+  toast("✅ تم حفظ محضر الاستلام");
+  renderMonitorPapers(document.getElementById("pageContent"));
+}
+
+// ─────────────────────────────────────────────
+// التعهدات الإلكترونية
+// ─────────────────────────────────────────────
+// قائمة جميع نماذج التعهدات
+// قائمة المعلمين مرتبة أبجدياً لاستخدامها في النماذج
+function teacherOptions(addEmpty=true) {
+  const sorted = [...(state.teachers||[])].sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+  return (addEmpty?`<option value="">-- اختر الملاحظ --</option>`:"")+sorted.map(t=>`<option value="${t.name}">${t.name}</option>`).join("");
+}
+
+const PLEDGE_FORMS = [
+  {
+    key:"iqrar_general", icon:"📝", label:"إقرار", color:"#64748B", category:"إقرارات",
+    title:"إقرار",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بأني ${d.st_text||"..."}`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[{id:"st_text",label:"نص الإقرار",type:"textarea",placeholder:"اكتب نص الإقرار هنا..."}]
+  },
+  {
+    key:"absent_record", icon:"🚫", label:"محضر غياب طالب", color:"#DC2626", category:"غياب",
+    title:"محضر غياب طالب",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    hasStudentFields:true, hasStudentSig:false, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_observer1",label:"اسم الملاحظ الأول",type:"teacher_select"},
+      {id:"st_observer2",label:"اسم الملاحظ الثاني",type:"teacher_select"},
+      {id:"st_supervisor",label:"المسؤول عن لجنة التحكم والضبط",type:"teacher_select"},
+    ]
+  },
+  {
+    key:"no_shading", icon:"✏️", label:"تعهد بعدم التظليل بالقلم الجاف أو الحبر", color:"#7C3AED", category:"مخالفات الكتابة",
+    title:"تعهد بعدم التظليل بالقلم الجاف أو الحبر في ورقة الإجابة",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بأني قد استخدمت القلم الجاف أو الحبر في اختبار مادة ${d.subject||"..."} في تظليل الإجابة. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
+  },
+  {
+    key:"general_rules", icon:"📋", label:"تعهد بالالتزام بالنظام العام", color:"#1D4ED8", category:"إقرارات",
+    title:"تعهد بالالتزام بالنظام العام للاختبارات",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بالالتزام بالنظام العام للاختبارات، نتيجة ما حدث مني ${d.st_violation||"..."}`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[{id:"st_violation",label:"وصف ما حدث",type:"textarea",placeholder:"اذكر ما حدث بالتفصيل..."}]
+  },
+  {
+    key:"no_cheating", icon:"🚨", label:"تعهد بعدم الغش", color:"#DC2626", category:"مخالفات الغش",
+    title:"تعهد بعدم الغش",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: ()=>`بعدم الغش مرة أخرى، وإني أعلم جيداً أنه في حالة صدر مني ذلك مرة أخرى فسوف أكون عرضة لتطبيق ما ورد في دليل نظام وإجراءات الاختبارات. وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasMaterial:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
+  },
+  {
+    key:"late_under15", icon:"⏰", label:"تعهد بعدم التأخر (أقل من ١٥ دقيقة)", color:"#D97706", category:"غياب وتأخر",
+    title:"تعهد بعدم التأخر عن الاختبار ( لمدة لا تزيد عن ١٥ دقيقة )",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: ()=>`بعدم التأخر عن الموعد المحدد للاختبار مرة أخرى، وإني أعلم جيداً أنه في حالة تأخري مرة أخرى فسوف يتم تطبيق النظام المتبع للائحة الاختبارات، وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_arrtime",label:"وقت الحضور",type:"time"},
+      {id:"st_delay_rep",label:"تكرار التأخر",type:"select",options:["الأولى","الثانية"]},
+    ]
+  },
+  {
+    key:"cheat_paper_record", icon:"📄", label:"محضر تصحيح ورقة الطالب الغاش", color:"#991B1B", category:"مخالفات الغش",
+    title:"محضر تصحيح ورقة الطالب الغاش",
+    textTemplate: d=>`بعد الاطلاع على ورقة الطالب في مادة: ${d.subject||"..."} الصف: ${d.grade||"..."} والمرفقات التي ضبطت معه، تبين أثناء التصحيح أن الطالب استفاد من الأوراق في حل الفقرات التالية: ${d.st_paragraphs||"..."} فقط. وعليه فقد تم خصم الدرجات من هذه الفقرات، وهي (${d.st_deducted||"0"}) درجة.`,
+    hasStudentFields:true, hasStudentSig:false, hasMonitorSig:false,
+    extraFields:[
+      {id:"st_paragraphs",label:"الفقرات التي استفاد منها",type:"textarea",placeholder:"اذكر الفقرات..."},
+      {id:"st_deducted",label:"الدرجات المخصومة",placeholder:"0",type:"number"},
+      {id:"st_teacher",label:"معلم المادة",type:"teacher_select"},
+      {id:"st_supervisor",label:"منسق لجنة التحكم والضبط",type:"teacher_select"},
+    ]
+  },
+  {
+    key:"general_rules_v2", icon:"⚖️", label:"تعهد بالالتزام بالنظام مع وصف المخالفة", color:"#0F172A", category:"إقرارات",
+    title:"تعهد بالالتزام بالنظام العام للاختبارات",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بالالتزام بالنظام العام للاختبارات، نتيجة ما حدث مني ${d.st_violation||"..."}`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_violation",label:"وصف المخالفة",type:"textarea",placeholder:"اذكر المخالفة..."},
+      {id:"st_vtype",label:"نوع المخالفة",type:"select",options:["فردي","جماعي"]},
+      {id:"st_semester",label:"الفصل الدراسي",type:"select",options:["الأول","الثاني"]},
+      {id:"st_vrep",label:"تكرار المخالفة",type:"select",options:["الأولى","الثانية","الثالثة"]},
+      {id:"st_observer_name",label:"اسم ملاحظ اللجنة",type:"teacher_select"},
+    ]
+  },
+  {
+    key:"late_over15", icon:"⏱️", label:"تعهد بعدم التأخر (أكثر من ١٥ دقيقة)", color:"#C2410C", category:"غياب وتأخر",
+    title:"تعهد بعدم التأخر عن الاختبار ( لمدة تزيد عن ١٥ دقيقة )",
+    subTitle:"صورة لولي الأمر للعلم",
+    textTemplate: ()=>`بعدم التأخر عن الموعد المحدد للاختبار مرة أخرى، وإني أعلم جيداً أنه في حالة تأخري مرة أخرى فسوف يتم تطبيق النظام المتبع للائحة الاختبارات، وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_arrtime",label:"وقت الحضور",type:"time"},
+      {id:"st_starttime",label:"وقت بدأ الاختبار",type:"time"},
+      {id:"st_delay_reason",label:"سبب التأخر",type:"textarea",placeholder:"اذكر سبب التأخر..."},
+      {id:"st_delay_rep",label:"تكرار التأخر",type:"select",options:["الأولى","الثانية"]},
+      {id:"st_decision",label:"قرار لجنة التحكم والضبط",type:"select",options:["يحسم من الطالب درجة من درجات المواظبة","قبول عذر الطالب وتصحيح ورقة إجابته","عدم قبول عذر الطالب ولا تعتمد إجابته","إجراء آخر"]},
+    ]
+  },
+  {
+    key:"no_cheat_attempt", icon:"🚫", label:"تعهد بعدم محاولة الغش", color:"#9D174D", category:"مخالفات الغش",
+    title:"تعهد بعدم محاولة الغش",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: ()=>`بعدم تكرار ما بدر مني من محاولة للغش وفي حالة تكرار المحاولة مرة أخرى فسوف يتم تطبيق النظام المتبع للائحة الاختبارات، وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_vtype",label:"نوع المخالفة",type:"select",options:["فردي","جماعي"]},
+      {id:"st_semester",label:"الفصل الدراسي",type:"select",options:["الأول","الثاني"]},
+      {id:"st_vrep",label:"تكرار المخالفة",type:"select",options:["الأولى","الثانية","الثالثة"]},
+      {id:"st_observer_name",label:"اسم ملاحظ اللجنة",type:"teacher_select"},
+    ]
+  },
+  {
+    key:"leave_essay", icon:"📝", label:"إقرار بترك الإجابة عن السؤال المقالي", color:"#0369A1", category:"إقرارات",
+    title:"إقرار بترك الإجابة عن السؤال المقالي",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بأني اطلعت على الأسئلة المقالية كاملة وتم تركها دون حل بسبب: ${d.st_reason||"..."}`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[{id:"st_reason",label:"سبب ترك الإجابة",type:"textarea",placeholder:"اذكر السبب..."}]
+  },
+  {
+    key:"blue_pen", icon:"🖊️", label:"تعهد بالالتزام بالقلم الجاف الأزرق", color:"#1E40AF", category:"مخالفات الكتابة",
+    title:"تعهد بالالتزام بالكتابة بالقلم الجاف الأزرق",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>`بأني قد استخدمت قلماً غير القلم الجاف الأزرق في اختبار مادة ${d.subject||"..."}. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
+  },
+  {
+    key:"no_tamper_auto", icon:"🖥️", label:"تعهد بعدم العبث بورقة الإجابة (الرصد الآلي)", color:"#059669", category:"مخالفات الكتابة",
+    title:"تعهد بعدم العبث بورقة الإجابة ( الرصد الآلي )",
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: ()=>`بعدم العبث في ورقة الاجابة والمحافظة عليها والكتابة في المكان المخصص للإجابة فقط. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
+  },
+];
+
+function renderMonitorPledge(el) {
+  const categories = [...new Set(PLEDGE_FORMS.map(f=>f.category))];
+  const catColors = {"إقرارات":"#64748B","مخالفات الغش":"#DC2626","مخالفات الكتابة":"#7C3AED","غياب":"#D97706","غياب وتأخر":"#C2410C"};
+
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title">📋 التعهدات الإلكترونية للطلاب</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">اختر نموذج التعهد المناسب، أدخل بيانات الطالب، وقّع إلكترونياً ثم احفظه</p>
+
+      ${categories.map(cat=>{
+        const forms = PLEDGE_FORMS.filter(f=>f.category===cat);
+        const catColor = catColors[cat]||"#64748B";
+        return `
+        <div style="margin-bottom:14px">
+          <p style="font-size:11px;font-weight:800;color:${catColor};background:${catColor}15;border-right:3px solid ${catColor};padding:5px 10px;border-radius:0 6px 6px 0;margin-bottom:8px">${cat}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${forms.map(f=>`
+              <button onclick="showPledgeForm('${f.key}')" id="pledgeBtn_${f.key}"
+                style="flex:1;min-width:130px;max-width:200px;padding:10px 8px;border-radius:10px;border:2px solid ${f.color}30;background:${f.color}08;color:${f.color};font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center">
+                <span style="font-size:18px">${f.icon}</span>
+                <span>${f.label}</span>
+              </button>
+            `).join("")}
+          </div>
+        </div>`;
+      }).join("")}
+
+      <div id="pledgeFormContainer" style="margin-top:4px"></div>
+    </div>
+  </div>`;
+}
+
+function showPledgeForm(pledgeType) {
+  const f = PLEDGE_FORMS.find(x=>x.key===pledgeType);
+  if(!f) return;
+
+  // إبراز الزر المحدد
+  PLEDGE_FORMS.forEach(x=>{
+    const btn = document.getElementById("pledgeBtn_"+x.key);
+    if(btn) { btn.style.background=x.key===pledgeType?x.color+"25":x.color+"08"; btn.style.borderColor=x.key===pledgeType?x.color:x.color+"30"; }
+  });
+
+  const today = new Date().toISOString().slice(0,10);
+  const subjectOptions = state.subjects.map(s=>`<option>${s}</option>`).join("");
+  const gradeOptions = state.grades.map(g=>`<option>${g}</option>`).join("");
+
+  const buildField = field => {
+    if(field.type==="teacher_select") return `<div><label class="lbl">${field.label}</label><select class="inp" id="${field.id}">${teacherOptions()}</select></div>`;
+    if(field.type==="select") return `<div><label class="lbl">${field.label}</label><select class="inp" id="${field.id}"><option value="">-- اختر --</option>${(field.options||[]).map(o=>`<option>${o}</option>`).join("")}</select></div>`;
+    if(field.type==="textarea") return `<div style="grid-column:1/-1"><label class="lbl">${field.label}</label><textarea class="inp" id="${field.id}" rows="2" placeholder="${field.placeholder||""}" style="resize:vertical"></textarea></div>`;
+    if(field.type==="date") return `<div><label class="lbl">${field.label}</label>${hijriPicker(field.id)}</div>`;
+    if(field.type==="time") return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="time"/></div>`;
+    if(field.type==="number") return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="number" min="0" placeholder="${field.placeholder||"0"}"/></div>`;
+    return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" placeholder="${field.placeholder||""}"/></div>`;
+  };
+
+  document.getElementById("pledgeFormContainer").innerHTML = `
+    <div style="background:${f.color}08;border:2px solid ${f.color}40;border-radius:14px;padding:18px;margin-top:8px">
+      <p style="font-weight:900;color:${f.color};font-size:15px;margin-bottom:4px">${f.icon} ${f.title}</p>
+      ${f.subTitle?`<p style="font-size:11px;color:var(--muted);margin-bottom:14px">${f.subTitle}</p>`:""}
+
+      <!-- بيانات الطالب -->
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">📌 بيانات الطالب</p>
+      <div class="g2" style="margin-bottom:10px">
+        <div><label class="lbl">اسم الطالب *</label><input class="inp" id="st_name" placeholder="الاسم الكامل"/></div>
+        <div><label class="lbl">السجل المدني</label><input class="inp" id="st_civil" placeholder="رقم السجل المدني" dir="ltr"/></div>
+        <div><label class="lbl">رقم الجلوس</label><input class="inp" id="st_seat" placeholder="رقم الجلوس"/></div>
+        <div><label class="lbl">الصف</label><select class="inp" id="st_grade"><option value="">-- اختر --</option>${gradeOptions}</select></div>
+        ${f.hasMaterial||!f.extraFields.find(x=>x.id==="subject")?`<div><label class="lbl">المادة</label><select class="inp" id="subject"><option value="">-- اختر --</option>${subjectOptions}</select></div>`:""}
+        <div><label class="lbl">التاريخ</label>${hijriPicker("st_date")}</div>
+      </div>
+
+      <!-- الحقول الإضافية -->
+      ${f.extraFields && f.extraFields.length ? `
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">📋 تفاصيل النموذج</p>
+      <div class="g2" style="margin-bottom:10px">${f.extraFields.map(buildField).join("")}</div>` : ""}
+
+      <!-- نص التعهد -->
+      ${f.textTemplate?`
+      <div style="background:#fff;border-right:4px solid ${f.color};border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.9;color:var(--dark)">
+        <p style="font-weight:700;color:${f.color};margin-bottom:6px">نص التعهد / الإقرار:</p>
+        <p id="pledgeTextPreview">أتعهد أنا الطالب / ${f.title}</p>
+      </div>`:""}
+
+      <!-- توقيع الطالب -->
+      ${f.hasStudentSig?`
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px">✍️ توقيع الطالب الإلكتروني *</p>
+      <div style="border:2px dashed ${f.color};border-radius:10px;overflow:hidden;background:#fff;touch-action:none;margin-bottom:6px">
+        <canvas id="sigStudent" width="600" height="110" style="width:100%;height:110px;cursor:crosshair;display:block"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+        <button class="btn btn-outline btn-sm" onclick="clearSigCanvas('sigStudent')">🗑️ مسح</button>
+        <span style="font-size:11px;color:var(--muted)">توقيع الطالب بإصبعه أو الماوس</span>
+      </div>`:""}
+
+      <!-- توقيع المراقب -->
+      ${f.hasMonitorSig?`
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:4px">👁 توقيع مراقب اللجنة</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label class="lbl">اسم مراقب اللجنة</label><input class="inp" id="monitor_name" value="${currentUser.name}" placeholder="اسم المراقب"/></div>
+        <div><label class="lbl">&nbsp;</label>
+          <div style="border:2px dashed #64748B;border-radius:8px;overflow:hidden;background:#fff;touch-action:none">
+            <canvas id="sigMonitor" width="300" height="70" style="width:100%;height:70px;cursor:crosshair;display:block"></canvas>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <button class="btn btn-outline btn-sm" onclick="clearSigCanvas('sigMonitor')">🗑️ مسح توقيع المراقب</button>
+      </div>`:""}
+
+      <button class="btn btn-full" style="background:linear-gradient(135deg,${f.color},${f.color}bb);color:#fff;font-size:14px;font-weight:800;padding:13px"
+        onclick="saveMonitorPledge('${pledgeType}')">
+        💾 حفظ النموذج بالتوقيع الإلكتروني
+      </button>
+    </div>`;
+
+  if(f.hasStudentSig) initSigCanvas("sigStudent");
+  if(f.hasMonitorSig) initSigCanvas("sigMonitor");
+  document.getElementById("pledgeFormContainer").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function saveMonitorPledge(pledgeType) {
+  const f = PLEDGE_FORMS.find(x=>x.key===pledgeType);
+  if(!f) return;
+  const stName = (document.getElementById("st_name")||{}).value||"";
+  if(!stName.trim()) { toast("أدخل اسم الطالب أولاً","err"); return; }
+
+  if(f.hasStudentSig) {
+    const sc = document.getElementById("sigStudent");
+    if(sc){const ctx=sc.getContext("2d");if(!ctx.getImageData(0,0,sc.width,sc.height).data.some(x=>x!==0)){toast("الرجاء إضافة توقيع الطالب","err");return;}}
+  }
+
+  // جمع البيانات
+  const allIds = ["st_name","st_civil","st_seat","st_grade","subject","st_text","st_violation","st_vtype","st_semester","st_vrep","st_observer_name","st_observer1","st_observer2","st_supervisor","st_paragraphs","st_deducted","st_teacher","st_arrtime","st_starttime","st_delay_reason","st_delay_rep","st_decision","st_reason","monitor_name"];
+  const data = {};
+  allIds.forEach(id=>{ const el=document.getElementById(id); if(el) data[id]=el.value; });
+  data.st_date = hijriVal("st_date");
+
+  const sigStudent = f.hasStudentSig ? (document.getElementById("sigStudent")||{}).toDataURL?.() || "" : "";
+  const sigMonitor = f.hasMonitorSig ? (document.getElementById("sigMonitor")||{}).toDataURL?.() || "" : "";
+
+  if(!state.monitorReports) state.monitorReports=[];
+  state.monitorReports.push({
+    id:uid(), type:pledgeType, pledgeTitle:f.title,
+    studentName:data.st_name||"", studentCivil:data.st_civil||"", studentSeat:data.st_seat||"",
+    grade:data.st_grade||"", subject:data.subject||"", date:data.st_date||"",
+    monitorName:data.monitor_name||currentUser.name,
+    extraData:data, sigStudent:sigStudent, sigMonitor:sigMonitor,
+    savedAt:nowISO()
+  });
+  saveState(); saveToCloud();
+  toast("✅ تم حفظ النموذج بالتوقيعات الإلكترونية");
+  navigateTo("monitor_reports");
+}
+
+// ─────────────────────────────────────────────
+// تقارير المراقب
+// ─────────────────────────────────────────────
+function renderMonitorReports(el) {
+  const reports = state.monitorReports || [];
+
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title">🗂 تقارير المراقب المحفوظة (${reports.length})</p>
+      ${reports.length === 0 ? `<p class="empty">لا توجد تقارير محفوظة — انتقل إلى التعهدات لإنشاء نموذج جديد</p>` :
+        [...reports].reverse().map(r => {
+          const pf = PLEDGE_FORMS.find(x=>x.key===r.type);
+          const color = pf ? pf.color : (r.type==="papers"?"#F59E0B":"#64748b");
+          const icon = pf ? pf.icon : (r.type==="papers"?"📄":"📋");
+          const label = r.pledgeTitle || (pf?pf.label:r.type);
+          const stName = r.studentName || r.monitorName || "—";
+          return `
+          <div style="background:var(--bg);border-radius:12px;padding:13px 16px;margin-bottom:8px;border:1px solid var(--border);border-right:4px solid ${color}">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="width:40px;height:40px;background:${color}18;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:1px solid ${color}30">${icon}</div>
+              <div style="flex:1;min-width:130px">
+                <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${label}</p>
+                <p style="font-size:11px;color:var(--muted)">الطالب: ${stName}${r.grade?" · "+r.grade:""}${r.subject?" · "+r.subject:""}</p>
+                <p style="font-size:10px;color:var(--faint)">المراقب: ${r.monitorName||"—"} · ${fmt(r.savedAt)}</p>
+              </div>
+              ${r.sigStudent ? `<img src="${r.sigStudent}" style="height:36px;border:1px solid var(--border);border-radius:5px;object-fit:contain;background:#fff" title="توقيع الطالب"/>` : ""}
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-navy btn-sm" onclick="printMonitorReport('${r.id}')">🖨️ PDF</button>
+                <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteMonitorReport('${r.id}')">✕</button>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+    </div>
+  </div>`;
+}
+
+function deleteMonitorReport(id) {
+  if(!confirm("حذف هذا التقرير؟")) return;
+  state.monitorReports = (state.monitorReports||[]).filter(r=>r.id!==id);
+  saveState(); saveToCloud();
+  toast("تم الحذف");
+  renderMonitorReports(document.getElementById("pageContent"));
+}
+
+function printMonitorReport(id) {
+  const r = (state.monitorReports||[]).find(x=>x.id===id);
+  if(!r) { toast("التقرير غير موجود","err"); return; }
+
+  const pf = PLEDGE_FORMS.find(x=>x.key===r.type);
+  const title = r.pledgeTitle || (pf?pf.title:"تقرير مراقب اللجان");
+  const subTitle = pf && pf.subTitle ? pf.subTitle : "اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ";
+  const color = pf ? pf.color : "#0D1F3C";
+  const printDate = new Date(r.savedAt).toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{year:"numeric",month:"long",day:"numeric"});
+  const d = r.extraData || {};
+
+  // بناء نص التعهد
+  let pledgeText = "";
+  if(pf && pf.textTemplate) {
+    try { pledgeText = pf.textTemplate({...d, subject:r.subject||d.subject, grade:r.grade||d.grade}); } catch(e){}
+  }
+
+  // بيانات الطالب
+  const studentRows = [
+    r.studentName ? ["اسم الطالب", r.studentName] : null,
+    r.studentCivil ? ["السجل المدني", r.studentCivil] : null,
+    r.studentSeat ? ["رقم الجلوس", r.studentSeat] : null,
+    r.grade ? ["الصف", r.grade] : null,
+    r.subject ? ["المادة", r.subject] : null,
+    r.date ? ["التاريخ", inputDateToHijri(r.date)] : null,
+  ].filter(Boolean);
+
+  // بيانات إضافية حسب النموذج
+  const extraRows = [];
+  if(pf) pf.extraFields.forEach(ef=>{
+    if(d[ef.id]) extraRows.push([ef.label, d[ef.id]]);
+  });
+  // محضر الاستلام القديم
+  if(r.type==="papers") {
+    if(r.observer) extraRows.push(["اسم الملاحظ",r.observer]);
+    if(r.students) extraRows.push(["عدد الطلاب الحاضرين",r.students]);
+    extraRows.push(["عدد أوراق الأسئلة",r.qCount||0]);
+    extraRows.push(["عدد أوراق الإجابة",r.aCount||0]);
+    if(r.status) extraRows.push(["حالة الأوراق",r.status]);
+    if(r.notes) extraRows.push(["ملاحظات",r.notes]);
+  }
+
+  const sigStHtml = r.sigStudent
+    ? `<img src="${r.sigStudent}" style="max-width:180px;max-height:70px;display:block;margin:auto;border:1px solid #ddd;border-radius:4px"/>`
+    : `<div style="width:160px;height:55px;border-bottom:1.5px solid #333;margin:auto"></div>`;
+  const sigMonHtml = r.sigMonitor
+    ? `<img src="${r.sigMonitor}" style="max-width:180px;max-height:70px;display:block;margin:auto;border:1px solid #ddd;border-radius:4px"/>`
+    : (r.sig ? `<img src="${r.sig}" style="max-width:180px;max-height:70px;display:block;margin:auto;border:1px solid #ddd;border-radius:4px"/>` : `<div style="width:160px;height:55px;border-bottom:1.5px solid #333;margin:auto"></div>`);
+
+  const win = window.open("","_blank","width=900,height=700");
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
+  <title>${title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:28px 36px;color:#0D1F3C;font-size:13px;line-height:1.6}
+    .header{display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:3px solid ${color};margin-bottom:18px}
+    h1{font-size:19px;font-weight:900;margin-bottom:3px}
+    .sub{font-size:11px;color:#64748b}
+    .main-title{text-align:center;font-size:17px;font-weight:900;margin:0 0 6px;color:${color};text-decoration:underline}
+    .sub-title{text-align:center;font-size:12px;color:#64748b;margin-bottom:16px}
+    .pledge-box{background:#f8fafc;border-right:4px solid ${color};border-radius:6px;padding:12px 16px;margin:14px 0;font-size:13px;line-height:2;color:#334155}
+    table.dt{width:100%;border-collapse:collapse;margin-bottom:14px}
+    table.dt td{padding:8px 11px;border:1px solid #e2e8f0;font-size:12px}
+    table.dt td:first-child{font-weight:800;background:#f8fafc;width:32%;color:#0D1F3C}
+    .sig-row{display:flex;gap:16px;justify-content:space-between;margin-top:18px;flex-wrap:wrap}
+    .sig-box{flex:1;min-width:160px;text-align:center;padding:12px;border:1px solid #e2e8f0;border-radius:8px}
+    .sig-box .lbl{font-size:12px;font-weight:800;margin-bottom:6px;color:#0D1F3C}
+    .sig-box .name{font-size:11px;color:#64748b;margin-top:6px}
+    .footer{margin-top:20px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    .no-print{margin-top:16px;display:flex;gap:8px}
+    @media print{.no-print{display:none}body{padding:14px 18px}}
+  </style></head><body>
+  <div class="header">
+    <img src="${LOGO_SRC}" alt="" style="width:80px;height:80px;object-fit:contain;flex-shrink:0"/>
+    <div style="flex:1"><h1>${state.schoolName}</h1><p class="sub">مديرية التربية والتعليم</p></div>
+  </div>
+
+  <p class="main-title">${title}</p>
+  <p class="sub-title">${subTitle}</p>
+
+  <!-- بيانات الطالب -->
+  <table class="dt">
+    <tr style="background:${color};color:#fff">
+      ${studentRows.map(([k])=>`<th style="padding:7px 11px;text-align:right;font-weight:800">${k}</th>`).join("")}
+    </tr>
+    <tr>
+      ${studentRows.map(([,v])=>`<td style="font-weight:700">${v}</td>`).join("")}
+    </tr>
+  </table>
+
+  ${extraRows.length?`
+  <table class="dt">
+    ${extraRows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}
+  </table>`:""}
+
+  ${pledgeText?`
+  <div class="pledge-box">
+    <strong>أتعهد أنا الطالب / ${r.studentName||"..."}</strong><br/>
+    ${pledgeText}
+  </div>`:""}
+
+  <!-- التوقيعات -->
+  <div class="sig-row">
+    ${pf && pf.hasStudentSig ? `
+    <div class="sig-box">
+      <p class="lbl">توقيع الطالب</p>
+      ${sigStHtml}
+      <p class="name">${r.studentName||"—"}</p>
+      <p class="name">${inputDateToHijri(r.date)||""}</p>
+    </div>` : ""}
+    ${pf && pf.hasMonitorSig ? `
+    <div class="sig-box" style="border-color:${color}">
+      <p class="lbl" style="color:${color}">مراقب اللجنة</p>
+      ${sigMonHtml}
+      <p class="name">${r.monitorName||"—"}</p>
+    </div>` : ""}
+    ${d.st_observer_name ? `
+    <div class="sig-box">
+      <p class="lbl">ملاحظ اللجنة</p>
+      <div style="height:55px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
+      <p class="name">${d.st_observer_name}</p>
+    </div>` : ""}
+    ${d.st_observer1 ? `
+    <div class="sig-box">
+      <p class="lbl">الملاحظ الأول</p>
+      <div style="height:40px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
+      <p class="name">${d.st_observer1}</p>
+    </div>` : ""}
+    ${d.st_supervisor ? `
+    <div class="sig-box">
+      <p class="lbl">المسؤول عن لجنة التحكم والضبط</p>
+      <div style="height:40px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
+      <p class="name">${d.st_supervisor}</p>
+    </div>` : ""}
+  </div>
+
+  <div style="margin-top:18px;font-size:11px;color:#64748b">
+    <p>مدير المدرسة ورئيس لجنة الاختبارات</p>
+    <p style="margin-top:2px;font-weight:700">محمد بن طراد الرفدي</p>
+  </div>
+
+  <div class="footer">
+    <span>${state.schoolName} — نظام متابعة الاختبارات الإلكتروني</span>
+    <span>طُبع: ${new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura")} · المراقب: ${r.monitorName||"—"}</span>
+  </div>
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:9px 22px;background:${color};color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة / PDF</button>
+    <button onclick="window.close()" style="padding:9px 16px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+  </div>
+  </body></html>`);
+  win.document.close();
+  toast("تم فتح النموذج للطباعة ✅");
+}
+
+// ─────────────────────────────────────────────
+// مكتبة التوقيع الإلكتروني (canvas)
+// ─────────────────────────────────────────────
+function initSigCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.strokeStyle = "#0D1F3C";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if(e.touches) {
+      return [(e.touches[0].clientX - rect.left)*scaleX, (e.touches[0].clientY - rect.top)*scaleY];
+    }
+    return [(e.clientX - rect.left)*scaleX, (e.clientY - rect.top)*scaleY];
+  }
+
+  canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); drawing=true; [lastX,lastY]=getPos(e); };
+  canvas.onmousemove = canvas.ontouchmove = e => {
+    if(!drawing) return; e.preventDefault();
+    const [x,y] = getPos(e);
+    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke();
+    [lastX,lastY]=[x,y];
+  };
+  canvas.onmouseup = canvas.ontouchend = canvas.onmouseleave = () => { drawing=false; };
+}
+
+function clearSigCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
 // ═══════════════════════════════════════════════
@@ -4627,6 +5524,286 @@ function updateBell(){
 
 function refreshBellAfterLoad(){
   if(currentUser){renderNav();updateBell();}
+}
+
+
+// ═══════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════
+// EXTERNAL DASHBOARD — داشبورد الشاشة الخارجية
+// ═══════════════════════════════════════════════
+
+function _saveDashData() {
+  const payload = {
+    schoolName: state.schoolName||"متابعة سير الاختبارات",
+    bundles:    state.bundles||[],
+    stages:     state.stages||[],
+    savedAt:    Date.now(),
+  };
+  try { localStorage.setItem("__dashData", JSON.stringify(payload)); } catch(e){}
+}
+
+function _saveDashLogo() {
+  // الشعار يُحفظ مرة واحدة فقط (لا يتغير)
+  try {
+    if(!localStorage.getItem("__dashLogo")) {
+      localStorage.setItem("__dashLogo", LOGO_SRC);
+    }
+  } catch(e){}
+}
+
+function openExternalDashboard() {
+  _saveDashData();
+  _saveDashLogo(); // حفظ الشعار مرة واحدة
+  const win = window.open("","_blank","width=1920,height=1080");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>داشبورد متابعة الاختبارات</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#F2B830;
+  --glass:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.09);
+  --muted:rgba(255,255,255,.42);
+  --faint:rgba(255,255,255,.14);
+  --hdr-h:60px;
+  --stats-h:62px;
+  --prog-h:32px;
+  --ticker-h:30px;
+  --cols-h:calc(100vh - 60px - 62px - 32px - 30px);
+}
+html,body{width:100%;height:100vh;overflow:hidden;
+  background:radial-gradient(ellipse at 20% 50%,#0D2244 0%,#060D1A 65%);
+  font-family:'IBM Plex Sans Arabic',Arial,sans-serif;direction:rtl;color:#fff}
+.particles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.particle{position:absolute;border-radius:50%;animation:pfloat linear infinite;opacity:0}
+@keyframes pfloat{
+  0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.12}
+  90%{opacity:.06}100%{transform:translateY(-30px) scale(1.3);opacity:0}}
+.shell{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* header */
+.hdr{height:var(--hdr-h);flex-shrink:0;display:flex;align-items:center;gap:16px;
+  padding:0 24px;background:rgba(0,0,0,.45);border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}
+.hdr-logo{width:42px;height:42px;object-fit:contain;border-radius:9px;box-shadow:0 0 18px rgba(242,184,48,.22)}
+.hdr-school{flex:1;text-align:center}
+.hdr-school h1{font-size:19px;font-weight:900;
+  background:linear-gradient(90deg,#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr-school p{font-size:10px;color:var(--muted);margin-top:1px}
+.hdr-clock{min-width:150px;text-align:left}
+.hdr-time{font-size:30px;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1;
+  text-shadow:0 0 18px rgba(242,184,48,.35)}
+.hdr-date{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* stats */
+.stats-row{height:var(--stats-h);flex-shrink:0;display:flex;gap:8px;align-items:center;
+  padding:0 18px;background:rgba(0,0,0,.22);border-bottom:1px solid var(--border)}
+.stat{flex:1;display:flex;align-items:center;gap:8px;background:var(--glass);
+  border:1px solid var(--border);border-radius:11px;padding:7px 12px;height:44px}
+.stat-icon{font-size:17px;flex-shrink:0}
+.stat-val{font-size:19px;font-weight:900;line-height:1}
+.stat-lbl{font-size:9px;color:var(--muted);margin-top:1px}
+
+/* progress */
+.prog-wrap{height:var(--prog-h);flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:0 18px;background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)}
+.prog-lbl{font-size:11px;color:var(--muted);white-space:nowrap}
+.prog-track{flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#3B82F6,#8B5CF6,var(--gold));background-size:200%;
+  animation:gShift 3.5s linear infinite;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+@keyframes gShift{0%{background-position:0%}100%{background-position:200%}}
+.prog-pct{font-size:13px;font-weight:900;color:var(--gold);min-width:38px;text-align:left}
+
+/* cols */
+.cols{flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;height:var(--cols-h)}
+.panel{padding:10px 14px;overflow:hidden;border-left:1px solid var(--border);
+  display:flex;flex-direction:column}
+.panel-hdr{display:flex;align-items:center;gap:9px;padding-bottom:7px;margin-bottom:8px;
+  border-bottom:1px solid var(--border);flex-shrink:0}
+.panel-hdr h2{font-size:14px;font-weight:800}
+.panel-badge{margin-right:auto;background:var(--glass);border:1px solid var(--faint);
+  border-radius:99px;padding:2px 9px;font-size:10px;color:var(--muted)}
+.panel-body{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+
+/* today card */
+.today-card{background:var(--glass);border:1.5px solid var(--border);border-radius:12px;
+  padding:10px 13px;flex:1;min-height:0;border-right-width:5px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  animation:sIn .4s ease backwards}
+@keyframes sIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+.tc-subject{font-size:17px;font-weight:900;line-height:1.2}
+.tc-grade{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600}
+.tc-pct{font-size:22px;font-weight:900;line-height:1;flex-shrink:0}
+.tc-bar{height:5px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin-bottom:6px}
+.tc-bar-fill{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.4,0,.2,1);
+  animation:glow 2s ease-in-out infinite}
+@keyframes glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.45)}}
+.tc-stages{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.tc-pill{border-radius:99px;padding:3px 8px;font-size:10px;font-weight:600}
+.tc-pill.active{font-weight:900;transform:scale(1.06)}
+.tc-meta{display:flex;gap:8px;font-size:10px;color:var(--muted);flex-wrap:wrap;align-items:center}
+.tc-status{margin-right:auto;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800}
+.done-badge{width:40px;height:40px;border-radius:50%;background:#10B981;
+  display:flex;align-items:center;justify-content:center;font-size:19px;
+  animation:pop .4s cubic-bezier(.68,-.55,.27,1.55);flex-shrink:0}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+
+/* subject row */
+.subj-row{background:var(--glass);border:1px solid var(--border);border-radius:11px;
+  padding:8px 11px;flex:1;min-height:0;border-right-width:4px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  animation:fUp .4s ease backwards}
+@keyframes fUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.sr-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.sr-name{flex:1;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-meta{font-size:9px;color:var(--muted);margin-top:1px}
+.sr-chip{border-radius:6px;padding:2px 8px;font-size:9px;font-weight:800;flex-shrink:0}
+.sr-bar{height:4px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;margin-bottom:4px}
+.sr-fill{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.sr-dots{display:flex;gap:3px}
+.sr-dot{flex:1;height:3px;border-radius:2px;transition:background .35s}
+
+/* empty */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:8px;opacity:.3}
+.empty span{font-size:40px}.empty p{font-size:15px;font-weight:700}
+
+/* ticker */
+.ticker{height:var(--ticker-h);flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:0 16px;background:rgba(242,184,48,.07);border-top:1px solid rgba(242,184,48,.13);overflow:hidden}
+.ticker-lbl{font-size:9px;font-weight:800;color:var(--gold);white-space:nowrap;
+  border:1px solid rgba(242,184,48,.3);border-radius:3px;padding:1px 6px}
+.ticker-track{flex:1;overflow:hidden}
+.ticker-inner{display:inline-flex;gap:28px;align-items:center;white-space:nowrap;
+  animation:tScroll 35s linear infinite}
+@keyframes tScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.t-item{font-size:10px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+.t-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+/* refresh */
+.rbadge{position:fixed;bottom:8px;left:12px;z-index:99;background:rgba(0,0,0,.55);
+  border:1px solid var(--border);border-radius:99px;padding:3px 10px;font-size:10px;
+  color:var(--muted);backdrop-filter:blur(8px);display:flex;align-items:center;gap:5px}
+.rdot{width:5px;height:5px;border-radius:50%;background:var(--gold);
+  animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+</style>
+</head>
+<body>
+<div class="particles" id="parts"></div>
+<div class="shell">
+  <div class="hdr">
+    <img id="logo" src="" class="hdr-logo"/>
+    <div class="hdr-school"><h1 id="sName"></h1><p>لوحة متابعة سير الاختبارات الإلكترونية</p></div>
+    <div class="hdr-clock"><div class="hdr-time" id="clk">--:--</div><div class="hdr-date" id="dLbl"></div></div>
+  </div>
+  <div class="stats-row" id="statsRow"></div>
+  <div class="prog-wrap">
+    <span class="prog-lbl">نسبة الإنجاز الكلية</span>
+    <div class="prog-track"><div class="prog-fill" id="pFill" style="width:0%"></div></div>
+    <span class="prog-pct" id="pPct">0%</span>
+  </div>
+  <div class="cols">
+    <div class="panel" id="todayP"></div>
+    <div class="panel" id="subjP"></div>
+  </div>
+  <div class="ticker"><span class="ticker-lbl">📡 مباشر</span>
+    <div class="ticker-track"><div class="ticker-inner" id="tkr"></div></div></div>
+</div>
+<div class="rbadge"><div class="rdot"></div>تحديث خلال <strong id="cd">30</strong> ث</div>
+\x3cscript\x3e
+const COLORS=['#3B82F6','#8B5CF6','#06B6D4','#F59E0B','#EF4444','#10B981','#F97316','#22C55E','#A855F7','#6366F1'];
+const sc=i=>COLORS[i%COLORS.length];
+function loadD(){try{const r=localStorage.getItem('__dashData');return r?JSON.parse(r):null;}catch(e){return null;}}
+function tick(){
+  const n=new Date();
+  document.getElementById('clk').textContent=n.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('dLbl').textContent=n.toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+tick();setInterval(tick,1000);
+;(function(){const c=document.getElementById('parts'),pal=['#3B82F6','#8B5CF6','#F2B830','#10B981','#F97316'];
+for(let i=0;i<28;i++){const d=document.createElement('div');d.className='particle';
+const s=[5,7,9,11][i%4];Object.assign(d.style,{width:s+'px',height:s+'px',left:Math.random()*100+'%',
+background:pal[i%5],animationDuration:(9+Math.random()*16)+'s',animationDelay:(Math.random()*20)+'s'});c.appendChild(d);}})();
+function pct(b,st){return b.stage<0||!st.length?0:Math.round(((b.stage+1)/st.length)*100);}
+function sName(b,st){return b.stage<0?'لم تبدأ':(st[b.stage]||'—');}
+function isDone(b,st){return st.length>0&&b.stage===st.length-1;}
+function render(){
+  const D=loadD();
+  if(!D){document.getElementById('sName').textContent='لا توجد بيانات';return;}
+  const bu=D.bundles||[],st=D.stages||[],today=new Date().toISOString().slice(0,10);
+  // الشعار يُقرأ من مفتاح منفصل لتجنب تضخيم البيانات
+  try{const logo=localStorage.getItem('__dashLogo');if(logo)document.getElementById('logo').src=logo;}catch(e){}
+  document.getElementById('sName').textContent=D.schoolName;
+  const total=bu.length,done=bu.filter(b=>isDone(b,st)).length,
+        inP=bu.filter(b=>b.stage>=0&&!isDone(b,st)).length,
+        newB=bu.filter(b=>b.stage<0).length,
+        papers=bu.reduce((a,b)=>a+b.count,0),
+        ovPct=total?Math.round((done/total)*100):0;
+  document.getElementById('statsRow').innerHTML=\`
+    <div class="stat"><span class="stat-icon">📚</span><div><div class="stat-val" style="color:#3B82F6">\${total}</div><div class="stat-lbl">إجمالي المظاريف</div></div></div>
+    <div class="stat"><span class="stat-icon">✅</span><div><div class="stat-val" style="color:#10B981">\${done}</div><div class="stat-lbl">مكتملة</div></div></div>
+    <div class="stat"><span class="stat-icon">⏳</span><div><div class="stat-val" style="color:#F59E0B">\${inP}</div><div class="stat-lbl">قيد التنفيذ</div></div></div>
+    <div class="stat"><span class="stat-icon">🆕</span><div><div class="stat-val" style="color:#64748B">\${newB}</div><div class="stat-lbl">جديدة</div></div></div>
+    <div class="stat"><span class="stat-icon">📄</span><div><div class="stat-val" style="color:#8B5CF6">\${papers}</div><div class="stat-lbl">إجمالي الأوراق</div></div></div>\`;
+  setTimeout(()=>{document.getElementById('pFill').style.width=ovPct+'%';document.getElementById('pPct').textContent=ovPct+'%';},150);
+  const todayB=bu.filter(b=>b.examDate===today),tEl=document.getElementById('todayP');
+  if(!todayB.length){
+    tEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📅</span><h2>اختبارات اليوم</h2><span class="panel-badge">0 مادة</span></div><div class="empty"><span>📅</span><p>لا توجد اختبارات اليوم</p></div>\`;
+  }else{
+    const cards=todayB.map((b,i)=>{
+      const p=pct(b,st),col=b.stage<0?'#64748B':sc(b.stage),dn=isDone(b,st),sn=sName(b,st);
+      const pills=st.map((s,si)=>{const a=si===b.stage,ps=si<b.stage,bg=(a||ps)?sc(si):'rgba(255,255,255,.07)',tx=(a||ps)?'#fff':'rgba(255,255,255,.22)';
+        return \`<span class="tc-pill \${a?'active':''}" style="background:\${bg};color:\${tx}">\${s}</span>\`;}).join('');
+      return \`<div class="today-card" style="border-right-color:\${col};animation-delay:\${i*90}ms">
+        <div class="tc-top"><div><div class="tc-subject">\${b.subject}</div>\${b.grade?\`<div class="tc-grade">\${b.grade}</div>\`:''}</div>
+          \${dn?\`<div class="done-badge">✅</div>\`:\`<div class="tc-pct" style="color:\${col}">\${p}%</div>\`}</div>
+        <div class="tc-bar"><div class="tc-bar-fill" style="background:\${col};width:\${p}%"></div></div>
+        <div class="tc-stages">\${pills}</div>
+        <div class="tc-meta"><span>📄 \${b.count} ورقة</span>
+          \${b.examStart?\`<span>🕐 \${b.examStart}\${b.examEnd?' — '+b.examEnd:''}</span>\`:''}
+          \${b.examHall?\`<span>🏫 \${b.examHall}</span>\`:''}
+          <span class="tc-status" style="background:\${col}22;color:\${col};border:1px solid \${col}55">\${sn}</span></div></div>\`;}).join('');
+    tEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📅</span><h2>اختبارات اليوم</h2><span class="panel-badge">\${todayB.length} مادة</span></div><div class="panel-body">\${cards}</div>\`;
+  }
+  const map={};bu.forEach(b=>{if(!map[b.subject])map[b.subject]={subject:b.subject,bundles:[]};map[b.subject].bundles.push(b);});
+  const subjs=Object.values(map),sEl=document.getElementById('subjP');
+  if(!subjs.length){
+    sEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📊</span><h2>سير ورقة الاختبار</h2><span class="panel-badge">0</span></div><div class="empty"><span>📊</span><p>لا توجد بيانات</p></div>\`;
+  }else{
+    const rows=subjs.map((sm,i)=>{
+      const bArr=sm.bundles,mx=Math.max(...bArr.map(b=>b.stage)),
+            p=st.length?Math.max(0,Math.round(((mx+1)/st.length)*100)):0,
+            col=mx<0?'#64748B':sc(mx),dn=bArr.every(b=>isDone(b,st))&&st.length>0,
+            sn=mx<0?'لم تبدأ':(st[mx]||'—'),tp=bArr.reduce((a,b)=>a+b.count,0);
+      const dots=st.map((s,si)=>\`<div class="sr-dot" title="\${s}" style="background:\${si<=mx?sc(si):'rgba(255,255,255,.07)'}"></div>\`).join('');
+      return \`<div class="subj-row" style="border-right-color:\${col};animation-delay:\${i*55}ms">
+        <div class="sr-top"><div style="flex:1;min-width:0"><div class="sr-name">\${sm.subject}</div><div class="sr-meta">\${bArr.length} مظروف · \${tp} ورقة</div></div>
+          \${dn?\`<span class="sr-chip" style="background:#10B98120;color:#10B981;border:1px solid #10B98144">✅ مكتمل</span>\`
+              :\`<span class="sr-chip" style="background:\${col}20;color:\${col};border:1px solid \${col}44">\${sn}</span>\`}</div>
+        <div class="sr-bar"><div class="sr-fill" style="background:\${col};width:\${p}%"></div></div>
+        <div class="sr-dots">\${dots}</div></div>\`;}).join('');
+    sEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📊</span><h2>سير ورقة الاختبار</h2><span class="panel-badge">\${subjs.length} مادة</span></div><div class="panel-body">\${rows}</div>\`;
+  }
+  const tItems=bu.map(b=>{const col=b.stage<0?'#64748B':sc(b.stage);
+    return \`<span class="t-item"><span class="t-dot" style="background:\${col}"></span><strong>\${b.subject}</strong>\${b.grade?' ('+b.grade+')':''} — \${sName(b,st)} · \${b.count} ورقة</span><span style="color:rgba(255,255,255,.1)">◆</span>\`;}).join('');
+  document.getElementById('tkr').innerHTML=tItems+tItems;
+}
+render();
+let cd=30;
+const cdEl=document.getElementById('cd');
+setInterval(()=>{cd--;if(cdEl)cdEl.textContent=cd;if(cd<=0){cd=30;render();}},1000);
+\x3c/script\x3e
+</body></html>`);
+  win.document.close();
 }
 
 // INIT
