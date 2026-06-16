@@ -502,6 +502,14 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
           </div>
           <span style="color:rgba(255,255,255,.35);font-size:18px">←</span>
         </button>
+        <button onclick="quickLogin('monitor','mon123')" style="display:flex;align-items:center;gap:12px;padding:13px 15px;background:linear-gradient(135deg,#831843,#9D174D);border:none;border-radius:12px;cursor:pointer;width:100%;font-family:inherit">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">👁</div>
+          <div style="flex:1;text-align:right">
+            <p style="color:#fff;font-weight:700;font-size:13px;margin:0">مراقب اللجان</p>
+            <p style="color:rgba(255,255,255,.5);font-size:11px;margin:0;font-family:monospace;direction:ltr">monitor / mon123</p>
+          </div>
+          <span style="color:rgba(255,255,255,.35);font-size:18px">←</span>
+        </button>
         <button onclick="quickLogin('notify','1234')" style="display:flex;align-items:center;gap:12px;padding:13px 15px;background:linear-gradient(135deg,#5B21B6,#7C3AED);border:none;border-radius:12px;cursor:pointer;width:100%;font-family:inherit">
           <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📲</div>
           <div style="flex:1;text-align:right">
@@ -605,7 +613,7 @@ async function saveToCloud() {
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
     users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
-    monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[]
+    monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[]
   };
   await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
   // Also save to localStorage as backup
@@ -631,7 +639,7 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes"].forEach(function(k){
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
     }
@@ -739,6 +747,8 @@ let state = {
   examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
   monitorReports: [], // [{id,type,subject,grade,hall,date,monitorName,count,notes,sig,savedAt}]
   monitorNotes: [],   // [{id,subject,grade,hall,date,note,savedAt,user}]
+  monitorStudentObs: [], // [{id,targetType,name/teacherId,hall,obsType,note,savedAt}]
+  monitorDailyReports: [], // daily committee reports
 };
 
 let currentUser = null;
@@ -759,7 +769,7 @@ const PAGES = {
   controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
-  monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"} ],
+  monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_students",icon:"🧑‍🎓",label:"متابعة الطلاب"}, {k:"monitor_daily",icon:"📊",label:"تقرير يومي"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"} ],
 };
 
 // ═══════════════════════════════════════════════
@@ -1055,6 +1065,8 @@ function navigateTo(page) {
     case "inbox":               renderInbox(el);              break;
     case "monitor_committees":  renderMonitorCommittees(el);  break;
     case "monitor_papers":      renderMonitorPapers(el);      break;
+    case "monitor_students":    renderMonitorStudents(el);    break;
+    case "monitor_daily":       renderMonitorDaily(el);       break;
     case "monitor_pledge":      renderMonitorPledge(el);      break;
     case "monitor_reports":     renderMonitorReports(el);     break;
     default: el.innerHTML="<p class='empty'>الصفحة غير موجودة</p>";
@@ -4272,6 +4284,573 @@ const PLEDGE_FORMS = [
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
   },
 ];
+
+// ─────────────────────────────────────────────
+// متابعة الطلاب والملاحظين
+// ─────────────────────────────────────────────
+const STUDENT_OBS_TYPES = [
+  "خروج دورة المياه","خروج مبكر","التحدث مع زميل","الاستئذان","إحضار مسودة إضافية",
+  "تنبيه بالغش","مخالفة أخرى"
+];
+const TEACHER_OBS_TYPES = [
+  "الانشغال بالجوال","الجلوس على كرسي الملاحظ","الاستئذان المتكرر","التحدث مع الطلاب",
+  "التحدث مع ملاحظ آخر","طلب ملاحظ بديل","التغيب عن القاعة","مخالفة أخرى"
+];
+
+let _sobTab = "student"; // "student" | "teacher"
+
+// ─────────────────────────────────────────────
+// التقرير اليومي لمتابعة اللجان
+// ─────────────────────────────────────────────
+const DAILY_OBS_ITEMS = [
+  { id:"late_students",   label:"تأخر في دخول الطلاب" },
+  { id:"late_observers",  label:"تأخر في دخول الملاحظين" },
+  { id:"observer_note",   label:"ملاحظة على الملاحظين", hasNote:true },
+  { id:"cheating",        label:"حالات غش", hasNote:true },
+  { id:"blank_paper",     label:"ترك الورقة بيضاء" },
+  { id:"disturbance",     label:"إصدار إزعاج داخل قاعة الاختبار", hasNote:true },
+  { id:"paper_shortage",  label:"نقص في عدد الأوراق" },
+  { id:"medical",         label:"حالات مرضية استدعت الخروج", hasNote:true },
+  { id:"other",           label:"ملاحظات أخرى", hasNote:true },
+];
+
+const WEEK_DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+
+function renderMonitorDaily(el) {
+  const reports = (state.monitorDailyReports||[]).slice().reverse();
+  const gradeOptions = (state.grades||[]).map(g=>`<option value="${g}">${g}</option>`).join("");
+  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${s}">${s}</option>`).join("");
+  const todayDay = WEEK_DAYS_AR[new Date().getDay()];
+
+  el.innerHTML = `
+  <div class="page-wrap">
+
+  <!-- Form Card -->
+  <div class="card" style="margin-bottom:16px">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📊</span>تقرير يومي عن متابعة لجان الاختبارات</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:16px">الفصل الدراسي الثاني — العام الدراسي 1447هـ</p>
+
+    <!-- Basic Info -->
+    <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border)">
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:10px">📌 معلومات أساسية</p>
+      <div class="g2" style="margin-bottom:10px">
+        <div>
+          <label class="lbl">اليوم</label>
+          <select class="inp" id="dr_day">
+            ${WEEK_DAYS_AR.map(d=>`<option${d===todayDay?" selected":""}>${d}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">التاريخ</label>
+          ${hijriPicker("dr_date")}
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Table per Grade -->
+    <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border)">
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:12px">🎓 الحضور والغياب حسب الصف والمادة</p>
+      <div id="dr_rows_container">
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="dr_rows_table">
+          <thead>
+            <tr style="background:#1E40AF;color:#fff">
+              <th style="padding:9px 10px;text-align:right;font-weight:700;border-radius:8px 0 0 0">الصف</th>
+              <th style="padding:9px 10px;text-align:right;font-weight:700">المادة</th>
+              <th style="padding:9px 8px;text-align:center;font-weight:700">المسجلون</th>
+              <th style="padding:9px 8px;text-align:center;font-weight:700">الحاضرون</th>
+              <th style="padding:9px 8px;text-align:center;font-weight:700">الغائبون</th>
+              <th style="padding:9px 8px;text-align:center;font-weight:700;border-radius:0 8px 0 0">حذف</th>
+            </tr>
+          </thead>
+          <tbody id="dr_rows_body">
+            ${_buildDailyRow(0, gradeOptions, subjectOptions)}
+            ${_buildDailyRow(1, gradeOptions, subjectOptions)}
+            ${_buildDailyRow(2, gradeOptions, subjectOptions)}
+          </tbody>
+        </table>
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="_addDailyRow()">➕ إضافة صف</button>
+      </div>
+    </div>
+
+    <!-- Observations Checklist -->
+    <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border)">
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:12px">📋 ملاحظات مراقب اللجان</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${DAILY_OBS_ITEMS.map(item=>`
+        <div style="background:#fff;border-radius:10px;padding:10px 13px;border:1.5px solid var(--border)" id="obs_wrap_${item.id}">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="display:flex;gap:8px;margin-right:auto">
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#059669">
+                <input type="radio" name="obs_${item.id}" value="yes" id="obs_${item.id}_yes"
+                  onclick="document.getElementById('obs_detail_${item.id}').style.display=${item.hasNote?'this.checked?\'block\':\'none\'':'\'none\''}"
+                  style="accent-color:#059669;width:16px;height:16px"> نعم
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#EF4444">
+                <input type="radio" name="obs_${item.id}" value="no" id="obs_${item.id}_no" checked
+                  onclick="document.getElementById('obs_detail_${item.id}').style.display='none'"
+                  style="accent-color:#EF4444;width:16px;height:16px"> لا
+              </label>
+            </div>
+            <span style="font-size:13px;font-weight:700;color:var(--navy);flex:1;text-align:right">${item.label}</span>
+          </div>
+          ${item.hasNote?`<div id="obs_detail_${item.id}" style="display:none;margin-top:8px">
+            <input class="inp" id="obs_note_${item.id}" placeholder="اكتب التفاصيل هنا..." style="font-size:12px"/>
+          </div>`:`<div id="obs_detail_${item.id}" style="display:none"></div>`}
+        </div>`).join("")}
+      </div>
+    </div>
+
+    <!-- Monitor Signature -->
+    <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--border)">
+      <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:10px">✍️ التوقيع</p>
+      <div class="g2">
+        <div>
+          <label class="lbl">اسم مراقب اللجان</label>
+          <input class="inp" id="dr_monitor_name" value="${currentUser.name}" placeholder="اسم المراقب"/>
+        </div>
+        <div>
+          <label class="lbl">توقيع المراقب</label>
+          <canvas id="dr_sig_canvas" width="250" height="70"
+            style="border:1.5px solid var(--border);border-radius:9px;background:#fff;display:block;width:100%;max-width:300px;touch-action:none"></canvas>
+          <button class="btn btn-outline btn-sm" style="margin-top:5px" onclick="clearSigCanvas('dr_sig_canvas')">🗑️ مسح التوقيع</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-full" style="background:linear-gradient(135deg,#1E40AF,#3B82F6);color:#fff;font-size:14px;font-weight:800;padding:14px"
+      onclick="saveMonitorDailyReport()">💾 حفظ التقرير اليومي</button>
+  </div>
+
+  <!-- Saved Reports -->
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">🗂</span>التقارير اليومية المحفوظة (${reports.length})</p>
+    ${reports.length===0
+      ?`<div class="empty"><span class="empty-icon">📊</span>لا توجد تقارير يومية بعد</div>`
+      :`<div style="display:flex;flex-direction:column;gap:10px">
+        ${reports.map(r=>{
+          const obsYes=(r.observations||[]).filter(o=>o.value==="yes");
+          return `<div style="background:var(--bg);border-radius:12px;padding:13px 15px;border:1.5px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+              <span style="font-weight:800;color:var(--navy);font-size:13px">📅 ${r.day} — ${inputDateToHijri(r.date)||r.date}</span>
+              ${obsYes.length>0?`<span style="background:#FEE2E2;color:#991B1B;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">⚠️ ${obsYes.length} ملاحظة</span>`:`<span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">✅ بدون مخالفات</span>`}
+              <span style="font-size:11px;color:var(--muted);margin-right:auto">${r.monitorName||""}</span>
+            </div>
+            ${(r.rows||[]).length>0?`<div style="overflow-x:auto;margin-bottom:8px">
+              <table style="width:100%;border-collapse:collapse;font-size:11px">
+                <thead><tr style="background:#EFF6FF">
+                  <th style="padding:5px 8px;text-align:right;color:#1E40AF;font-weight:700">الصف</th>
+                  <th style="padding:5px 8px;text-align:right;color:#1E40AF;font-weight:700">المادة</th>
+                  <th style="padding:5px 8px;text-align:center;color:#1E40AF;font-weight:700">مسجل</th>
+                  <th style="padding:5px 8px;text-align:center;color:#059669;font-weight:700">حاضر</th>
+                  <th style="padding:5px 8px;text-align:center;color:#EF4444;font-weight:700">غائب</th>
+                </tr></thead>
+                <tbody>${(r.rows||[]).map((row,i)=>`<tr style="background:${i%2===0?"#fff":"#F8FAFC"}">
+                  <td style="padding:5px 8px;font-weight:700">${row.grade||"—"}</td>
+                  <td style="padding:5px 8px">${row.subject||"—"}</td>
+                  <td style="padding:5px 8px;text-align:center">${row.total||0}</td>
+                  <td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700">${row.present||0}</td>
+                  <td style="padding:5px 8px;text-align:center;color:#EF4444;font-weight:700">${row.absent||0}</td>
+                </tr>`).join("")}</tbody>
+              </table>
+            </div>`:""}
+            ${obsYes.length>0?`<div style="margin-bottom:8px">${obsYes.map(o=>`<span style="display:inline-block;background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin:2px 2px 2px 0">⚠️ ${o.label}${o.note?" — "+o.note:""}</span>`).join("")}</div>`:""}
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-navy btn-sm" style="flex:1" onclick="printDailyReport('${r.id}')">🖨️ طباعة</button>
+              <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteDailyReport('${r.id}')">🗑️ حذف</button>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`}
+  </div>
+
+  </div>`;
+
+  // init sig canvas
+  setTimeout(()=>initSigCanvas("dr_sig_canvas"),100);
+}
+
+let _dailyRowCount = 3;
+
+function _buildDailyRow(idx, gradeOpts, subjectOpts) {
+  return `<tr id="dr_row_${idx}" style="border-bottom:1px solid var(--border)">
+    <td style="padding:6px 6px">
+      <select class="inp" id="dr_grade_${idx}" style="font-size:11px;padding:5px 6px">
+        <option value="">-- الصف --</option>${gradeOpts}
+      </select>
+    </td>
+    <td style="padding:6px 6px">
+      <select class="inp" id="dr_subj_${idx}" style="font-size:11px;padding:5px 6px">
+        <option value="">-- المادة --</option>${subjectOpts}
+      </select>
+    </td>
+    <td style="padding:6px 4px"><input type="number" class="inp" id="dr_total_${idx}" min="0" value="0" style="font-size:12px;padding:5px;text-align:center" oninput="_calcAbsent(${idx})"/></td>
+    <td style="padding:6px 4px"><input type="number" class="inp" id="dr_pres_${idx}" min="0" value="0" style="font-size:12px;padding:5px;text-align:center" oninput="_calcAbsent(${idx})"/></td>
+    <td style="padding:6px 4px"><input type="number" class="inp" id="dr_abs_${idx}" min="0" value="0" style="font-size:12px;padding:5px;text-align:center" readonly style="background:#F8FAFC"/></td>
+    <td style="padding:6px 4px;text-align:center"><button class="del-btn" onclick="_removeDailyRow(${idx})">×</button></td>
+  </tr>`;
+}
+
+function _calcAbsent(idx) {
+  const t=parseInt((document.getElementById("dr_total_"+idx)||{}).value||0);
+  const p=parseInt((document.getElementById("dr_pres_"+idx)||{}).value||0);
+  const absEl=document.getElementById("dr_abs_"+idx);
+  if(absEl) absEl.value=Math.max(0,t-p);
+}
+
+function _addDailyRow() {
+  const gradeOptions = (state.grades||[]).map(g=>`<option value="${g}">${g}</option>`).join("");
+  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${s}">${s}</option>`).join("");
+  const tbody = document.getElementById("dr_rows_body");
+  if(!tbody) return;
+  const tr = document.createElement("tr");
+  tr.id = "dr_row_"+_dailyRowCount;
+  tr.style.borderBottom="1px solid var(--border)";
+  tr.innerHTML = _buildDailyRow(_dailyRowCount, gradeOptions, subjectOptions).replace(/<tr[^>]*>/,"").replace("</tr>","");
+  tbody.appendChild(tr);
+  _dailyRowCount++;
+}
+
+function _removeDailyRow(idx) {
+  const row = document.getElementById("dr_row_"+idx);
+  if(row) row.remove();
+}
+
+function saveMonitorDailyReport() {
+  const day = (document.getElementById("dr_day")||{}).value||"";
+  const date = hijriVal("dr_date");
+  const monitorName = (document.getElementById("dr_monitor_name")||{}).value?.trim()||currentUser.name;
+
+  // collect attendance rows
+  const rows = [];
+  for(let i=0;i<_dailyRowCount+10;i++){
+    const grEl=document.getElementById("dr_grade_"+i);
+    const subEl=document.getElementById("dr_subj_"+i);
+    if(!grEl&&!subEl) continue;
+    const grade=grEl?.value||""; const subject=subEl?.value||"";
+    if(!grade&&!subject) continue;
+    const total=parseInt((document.getElementById("dr_total_"+i)||{}).value||0);
+    const present=parseInt((document.getElementById("dr_pres_"+i)||{}).value||0);
+    const absent=Math.max(0,total-present);
+    rows.push({grade,subject,total,present,absent});
+  }
+
+  // collect observations
+  const observations = DAILY_OBS_ITEMS.map(item=>{
+    const yesEl=document.getElementById("obs_"+item.id+"_yes");
+    const value=yesEl&&yesEl.checked?"yes":"no";
+    const note=(document.getElementById("obs_note_"+item.id)||{}).value?.trim()||"";
+    return {id:item.id, label:item.label, value, note};
+  });
+
+  // signature
+  const canvas=document.getElementById("dr_sig_canvas");
+  const sig=canvas?canvas.toDataURL():"";
+
+  if(!state.monitorDailyReports) state.monitorDailyReports=[];
+  state.monitorDailyReports.push({
+    id:uid(), day, date, monitorName, rows, observations, sig,
+    savedAt:nowISO()
+  });
+  saveState(); saveToCloud();
+  toast("✅ تم حفظ التقرير اليومي");
+  _dailyRowCount=3;
+  renderMonitorDaily(document.getElementById("pageContent"));
+}
+
+function deleteDailyReport(id) {
+  if(!confirm("حذف هذا التقرير؟")) return;
+  state.monitorDailyReports=(state.monitorDailyReports||[]).filter(r=>r.id!==id);
+  saveState(); saveToCloud();
+  toast("تم الحذف");
+  renderMonitorDaily(document.getElementById("pageContent"));
+}
+
+function printDailyReport(id) {
+  const r=(state.monitorDailyReports||[]).find(x=>x.id===id);
+  if(!r){toast("التقرير غير موجود","err");return;}
+  const printDate=new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"full"});
+  const obsYes=(r.observations||[]).filter(o=>o.value==="yes");
+  const obsNo=(r.observations||[]).filter(o=>o.value!=="yes");
+
+  const rowsHtml=(r.rows||[]).map((row,i)=>`<tr style="background:${i%2===0?"#fff":"#F8FAFC"}">
+    <td style="padding:8px 10px;font-weight:700">${row.grade||"—"}</td>
+    <td style="padding:8px 10px">${row.subject||"—"}</td>
+    <td style="padding:8px 10px;text-align:center">${row.total||0}</td>
+    <td style="padding:8px 10px;text-align:center;color:#059669;font-weight:700">${row.present||0}</td>
+    <td style="padding:8px 10px;text-align:center;color:#EF4444;font-weight:700">${row.absent||0}</td>
+  </tr>`).join("");
+
+  const obsHtml=(r.observations||[]).map(o=>`<tr>
+    <td style="padding:8px 10px;font-weight:600">${o.label}</td>
+    <td style="padding:8px 10px;text-align:center">
+      <span style="font-weight:800;color:${o.value==="yes"?"#DC2626":"#059669"}">${o.value==="yes"?"✓ نعم":"— لا"}</span>
+    </td>
+    <td style="padding:8px 10px;color:#64748B;font-size:11px">${o.note||""}</td>
+  </tr>`).join("");
+
+  const win=window.open("","_blank","width=900,height=800");
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>تقرير يومي — ${r.day}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',sans-serif;direction:rtl;color:#0D1F3C;font-size:13px;background:#f8fafc}
+    .page{padding:22px;max-width:800px;margin:0 auto;background:#fff;min-height:100vh}
+    .header{border-bottom:3px solid #1E40AF;padding-bottom:14px;margin-bottom:18px}
+    .header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+    h1{font-size:17px;font-weight:900;color:#1E40AF}
+    .sub{font-size:11px;color:#64748B;margin-top:3px}
+    .badge{background:#1E40AF;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700}
+    .section-title{font-size:13px;font-weight:800;color:#1E40AF;padding:9px 14px;background:#EFF6FF;border-radius:8px;margin-bottom:10px;border-right:4px solid #1E40AF}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#1E40AF;color:#fff;padding:9px 10px;text-align:right;font-weight:700;font-size:12px}
+    td{padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:12px}
+    .obs-yes{color:#DC2626;font-weight:800}
+    .obs-no{color:#059669;font-weight:700}
+    .sig-box{border:1.5px solid #E5E7EB;border-radius:8px;padding:10px;text-align:center;min-height:90px;display:flex;align-items:center;justify-content:center}
+    .footer{margin-top:20px;padding-top:12px;border-top:2px solid #E5E7EB;display:flex;justify-content:space-between;align-items:flex-end}
+    .stamp-box{border:2px dashed #1E40AF;border-radius:10px;padding:12px 20px;text-align:center;min-width:160px}
+    .no-print{margin-top:16px;display:flex;gap:8px;padding:16px 0}
+    @media print{.no-print{display:none}body{background:#fff}}
+  </style></head><body><div class="page">
+
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <h1>📊 تقرير يومي عن متابعة لجان الاختبارات</h1>
+        <p class="sub">الفصل الدراسي الثاني — العام الدراسي 1447هـ</p>
+        <p class="sub" style="margin-top:4px">${state.schoolName}</p>
+      </div>
+      <div class="badge">${r.day} — ${inputDateToHijri(r.date)||r.date}</div>
+    </div>
+  </div>
+
+  ${(r.rows||[]).length>0?`
+  <div style="margin-bottom:18px">
+    <div class="section-title">🎓 الحضور والغياب</div>
+    <table>
+      <thead><tr><th>الصف</th><th>المادة</th><th style="text-align:center">المسجلون</th><th style="text-align:center">الحاضرون</th><th style="text-align:center">الغائبون</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>`:""}
+
+  <div style="margin-bottom:18px">
+    <div class="section-title">📋 ملاحظات مراقب اللجان</div>
+    <table>
+      <thead><tr><th>الملاحظة</th><th style="text-align:center;width:80px">الحالة</th><th>التفاصيل</th></tr></thead>
+      <tbody>${obsHtml}</tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div style="text-align:center">
+      <p style="font-size:12px;font-weight:700;margin-bottom:6px">مراقب اللجان</p>
+      <p style="font-size:13px;font-weight:800;color:#1E40AF;margin-bottom:8px">${r.monitorName||""}</p>
+      <div class="sig-box" style="min-width:200px">
+        ${r.sig?`<img src="${r.sig}" style="max-height:70px;max-width:180px"/>`:"التوقيع"}
+      </div>
+    </div>
+    <div class="stamp-box">
+      <p style="font-size:11px;color:#64748B;margin-bottom:4px">مدير المدرسة ورئيس لجنة الاختبارات</p>
+      <p style="font-size:13px;font-weight:800;color:#1E40AF">${state.schoolName}</p>
+      <div style="height:55px;margin-top:8px;border-top:1px dashed #CBD5E1;display:flex;align-items:center;justify-content:center">
+        <span style="font-size:11px;color:#CBD5E1">الختم / التوقيع</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:9px 22px;background:#1E40AF;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة / PDF</button>
+    <button onclick="window.close()" style="padding:9px 14px;background:#64748B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+  </div>
+
+  </div></body></html>`);
+  win.document.close();
+  toast("تم فتح التقرير للطباعة ✅");
+}
+
+function renderMonitorStudents(el) {
+  const obs = (state.monitorStudentObs||[]).slice().reverse();
+  const studentObs = obs.filter(o=>o.targetType==="student");
+  const teacherObs = obs.filter(o=>o.targetType==="teacher");
+
+  el.innerHTML = `
+  <div class="page-wrap">
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button onclick="_sobTab='student';renderMonitorStudents(document.getElementById('pageContent'))"
+      class="btn${_sobTab==='student'?' btn-navy':''}" style="flex:1;${_sobTab!=='student'?'background:var(--bg);color:var(--navy);border:1.5px solid var(--border)':''}">
+      🧑‍🎓 ملاحظات الطلاب <span style="background:${_sobTab==='student'?'rgba(255,255,255,.25)':'var(--border)'};border-radius:99px;padding:1px 8px;font-size:11px;margin-right:4px">${studentObs.length}</span>
+    </button>
+    <button onclick="_sobTab='teacher';renderMonitorStudents(document.getElementById('pageContent'))"
+      class="btn${_sobTab==='teacher'?' btn-navy':''}" style="flex:1;${_sobTab!=='teacher'?'background:var(--bg);color:var(--navy);border:1.5px solid var(--border)':''}">
+      👨‍🏫 ملاحظات الملاحظين <span style="background:${_sobTab==='teacher'?'rgba(255,255,255,.25)':'var(--border)'};border-radius:99px;padding:1px 8px;font-size:11px;margin-right:4px">${teacherObs.length}</span>
+    </button>
+  </div>
+
+  ${_sobTab==='student' ? `
+  <!-- Student Form -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">🧑‍🎓</span>تسجيل ملاحظة على طالب</p>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label class="lbl">اسم الطالب</label><input class="inp" id="sobs_name" placeholder="اسم الطالب كاملاً"/></div>
+      <div><label class="lbl">رقم اللجنة / القاعة</label><input class="inp" id="sobs_hall" placeholder="مثال: ٥" type="text"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label class="lbl">الصف</label>
+        <select class="inp" id="sobs_grade">
+          <option value="">-- اختر الصف --</option>
+          ${(state.grades||[]).map(g=>`<option>${g}</option>`).join("")}
+        </select>
+      </div>
+      <div><label class="lbl">نوع الملاحظة</label>
+        <select class="inp" id="sobs_type" onchange="document.getElementById('sobs_other_row').style.display=this.value==='مخالفة أخرى'?'block':'none'">
+          <option value="">-- اختر --</option>
+          ${STUDENT_OBS_TYPES.map(t=>`<option>${t}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div id="sobs_other_row" style="display:none;margin-bottom:10px">
+      <label class="lbl">تفاصيل المخالفة</label>
+      <input class="inp" id="sobs_other" placeholder="اكتب تفاصيل المخالفة..."/>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="lbl">ملاحظات إضافية (اختياري)</label>
+      <textarea class="inp" id="sobs_note" rows="2" placeholder="أي تفاصيل إضافية..." style="resize:vertical"></textarea>
+    </div>
+    <button class="btn btn-navy btn-full" onclick="saveStudentObs()">💾 حفظ الملاحظة</button>
+  </div>
+
+  <!-- Student Obs List -->
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">📋</span>سجل ملاحظات الطلاب (${studentObs.length})</p>
+    ${studentObs.length===0
+      ?`<div class="empty"><span class="empty-icon">🧑‍🎓</span>لا توجد ملاحظات مسجلة على الطلاب</div>`
+      :`<div style="display:flex;flex-direction:column;gap:8px">
+        ${studentObs.map(o=>`
+        <div style="background:var(--bg);border-radius:10px;padding:11px 14px;border-right:4px solid #3B82F6;position:relative">
+          <button class="del-btn" style="position:absolute;top:8px;left:8px" onclick="deleteStudentObs('${o.id}')">×</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+            <span style="font-weight:800;color:var(--navy);font-size:13px">${o.name||"—"}</span>
+            ${o.grade?`<span style="background:#DBEAFE;color:#1E40AF;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px">${o.grade}</span>`:""}
+            ${o.hall?`<span style="background:var(--border);color:var(--mid);font-size:10px;padding:2px 8px;border-radius:99px">لجنة ${o.hall}</span>`:""}
+            <span style="background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${o.obsType||"—"}</span>
+          </div>
+          ${o.note?`<p style="font-size:12px;color:var(--text);margin-top:4px">${o.note}</p>`:""}
+          <p style="font-size:10px;color:var(--muted);margin-top:4px">${fmt(o.savedAt)}</p>
+        </div>`).join("")}
+      </div>`}
+  </div>
+  ` : `
+  <!-- Teacher Form -->
+  <div class="card" style="margin-bottom:14px">
+    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">👨‍🏫</span>تسجيل ملاحظة على ملاحظ</p>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label class="lbl">اسم الملاحظ</label>
+        <select class="inp" id="tobs_name">${teacherOptions()}</select>
+      </div>
+      <div><label class="lbl">رقم اللجنة / القاعة</label><input class="inp" id="tobs_hall" placeholder="مثال: ٣" type="text"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label class="lbl">نوع الملاحظة</label>
+        <select class="inp" id="tobs_type" onchange="
+          const isOther=this.value==='مخالفة أخرى';
+          document.getElementById('tobs_other_row').style.display=isOther?'block':'none';
+          document.getElementById('tobs_sub_row').style.display=this.value==='طلب ملاحظ بديل'?'block':'none';">
+          <option value="">-- اختر --</option>
+          ${TEACHER_OBS_TYPES.map(t=>`<option>${t}</option>`).join("")}
+        </select>
+      </div>
+      <div><label class="lbl">الملاحظ البديل (إن وُجد)</label>
+        <div id="tobs_sub_row">
+          <select class="inp" id="tobs_sub">${teacherOptions()}</select>
+        </div>
+      </div>
+    </div>
+    <div id="tobs_other_row" style="display:none;margin-bottom:10px">
+      <label class="lbl">تفاصيل المخالفة</label>
+      <input class="inp" id="tobs_other" placeholder="اكتب تفاصيل المخالفة..."/>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="lbl">ملاحظات إضافية (اختياري)</label>
+      <textarea class="inp" id="tobs_note" rows="2" placeholder="أي تفاصيل إضافية..." style="resize:vertical"></textarea>
+    </div>
+    <button class="btn btn-green btn-full" onclick="saveTeacherObs()">💾 حفظ الملاحظة</button>
+  </div>
+
+  <!-- Teacher Obs List -->
+  <div class="card">
+    <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">📋</span>سجل ملاحظات الملاحظين (${teacherObs.length})</p>
+    ${teacherObs.length===0
+      ?`<div class="empty"><span class="empty-icon">👨‍🏫</span>لا توجد ملاحظات مسجلة على الملاحظين</div>`
+      :`<div style="display:flex;flex-direction:column;gap:8px">
+        ${teacherObs.map(o=>`
+        <div style="background:var(--bg);border-radius:10px;padding:11px 14px;border-right:4px solid #10B981;position:relative">
+          <button class="del-btn" style="position:absolute;top:8px;left:8px" onclick="deleteStudentObs('${o.id}')">×</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+            <span style="font-weight:800;color:var(--navy);font-size:13px">${o.name||"—"}</span>
+            ${o.hall?`<span style="background:var(--border);color:var(--mid);font-size:10px;padding:2px 8px;border-radius:99px">لجنة ${o.hall}</span>`:""}
+            <span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${o.obsType||"—"}</span>
+          </div>
+          ${o.substitute?`<p style="font-size:12px;color:#059669;font-weight:700;margin-top:3px">👤 الملاحظ البديل: ${o.substitute}</p>`:""}
+          ${o.note?`<p style="font-size:12px;color:var(--text);margin-top:4px">${o.note}</p>`:""}
+          <p style="font-size:10px;color:var(--muted);margin-top:4px">${fmt(o.savedAt)}</p>
+        </div>`).join("")}
+      </div>`}
+  </div>
+  `}
+
+  </div>`;
+}
+
+function saveStudentObs() {
+  const name = (document.getElementById("sobs_name")||{}).value?.trim();
+  const hall = (document.getElementById("sobs_hall")||{}).value?.trim();
+  const grade = (document.getElementById("sobs_grade")||{}).value;
+  const obsType = (document.getElementById("sobs_type")||{}).value;
+  const other = (document.getElementById("sobs_other")||{}).value?.trim();
+  const note = (document.getElementById("sobs_note")||{}).value?.trim();
+  if(!name) { toast("أدخل اسم الطالب","err"); return; }
+  if(!obsType) { toast("اختر نوع الملاحظة","err"); return; }
+  if(!state.monitorStudentObs) state.monitorStudentObs=[];
+  state.monitorStudentObs.push({
+    id:uid(), targetType:"student", name, hall, grade,
+    obsType: obsType==="مخالفة أخرى" ? (other||obsType) : obsType,
+    note, savedAt:nowISO(), recordedBy:currentUser.name
+  });
+  saveState(); saveToCloud();
+  toast("✅ تم تسجيل الملاحظة");
+  renderMonitorStudents(document.getElementById("pageContent"));
+}
+
+function saveTeacherObs() {
+  const name = (document.getElementById("tobs_name")||{}).value?.trim();
+  const hall = (document.getElementById("tobs_hall")||{}).value?.trim();
+  const obsType = (document.getElementById("tobs_type")||{}).value;
+  const other = (document.getElementById("tobs_other")||{}).value?.trim();
+  const note = (document.getElementById("tobs_note")||{}).value?.trim();
+  const substitute = (document.getElementById("tobs_sub")||{}).value?.trim();
+  if(!name) { toast("اختر اسم الملاحظ","err"); return; }
+  if(!obsType) { toast("اختر نوع الملاحظة","err"); return; }
+  if(!state.monitorStudentObs) state.monitorStudentObs=[];
+  state.monitorStudentObs.push({
+    id:uid(), targetType:"teacher", name, hall,
+    obsType: obsType==="مخالفة أخرى" ? (other||obsType) : obsType,
+    substitute: substitute||"", note, savedAt:nowISO(), recordedBy:currentUser.name
+  });
+  saveState(); saveToCloud();
+  toast("✅ تم تسجيل الملاحظة على الملاحظ");
+  renderMonitorStudents(document.getElementById("pageContent"));
+}
+
+function deleteStudentObs(id) {
+  state.monitorStudentObs = (state.monitorStudentObs||[]).filter(o=>o.id!==id);
+  saveState(); saveToCloud();
+  toast("تم الحذف");
+  renderMonitorStudents(document.getElementById("pageContent"));
+}
 
 function renderMonitorPledge(el) {
   const categories = [...new Set(PLEDGE_FORMS.map(f=>f.category))];
