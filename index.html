@@ -635,7 +635,14 @@ function showSyncDot(ok) {
   }
 }
 
-async function saveToCloud() {
+let _cloudSaveQueue = Promise.resolve();
+function saveToCloud() {
+  // متسلسلة (queue) لتفادي تضارب ترتيب اكتمال الطلبات عند تكرار النداء بسرعة،
+  // وهو ما كان يسبب ظهور خاطئ لتنبيه "تتوفر بيانات أحدث" حتى عند عدم وجود تعديل فعلي من جهة أخرى
+  _cloudSaveQueue = _cloudSaveQueue.then(_doSaveToCloud, _doSaveToCloud);
+  return _cloudSaveQueue;
+}
+async function _doSaveToCloud() {
   var settings = {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
     subjects:state.subjects, grades:state.grades,
