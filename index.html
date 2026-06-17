@@ -477,6 +477,16 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     </div>
     <div id="loginErr" class="login-err" style="display:none"></div>
     <div class="login-field">
+      <label>نوع الحساب</label>
+      <select class="inp" id="loginRole">
+        <option value="admin">مدير النظام</option>
+        <option value="controller">الكنترول</option>
+        <option value="notifier">مسؤول التنبيهات</option>
+        <option value="principal">مدير المدرسة</option>
+        <option value="monitor">مراقب اللجان</option>
+      </select>
+    </div>
+    <div class="login-field">
       <label>اسم المستخدم</label>
       <input class="inp" id="loginUser" placeholder="أدخل اسم المستخدم" autocomplete="username">
     </div>
@@ -1667,9 +1677,10 @@ function renderLoginDemos() {
 }
 
 async function doLogin() {
+  const role = document.getElementById("loginRole").value;
   const u = document.getElementById("loginUser").value.trim();
   const p = document.getElementById("loginPass").value;
-  const candidate = state.users.find(x=>x.username===u);
+  const candidate = state.users.find(x=>x.username===u && x.role===role);
   const found = (await verifyUserPassword(candidate, p)) ? candidate : null;
   const errEl = document.getElementById("loginErr");
   if(found) {
