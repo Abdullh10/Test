@@ -1616,6 +1616,19 @@ function restoreBackup(file) {
   reader.readAsText(file);
 }
 
+const FACTORY_RESET_PHRASE = "الحمد لله";
+function factoryReset() {
+  if(!confirm("هل تريد حذف جميع البيانات المحفوظة واستعادة الإعدادات الافتراضية؟\nتحذير: سيتم حذف جميع المظاريف والتعديلات!")) return;
+  const typed = prompt(`سيتم تنزيل نسخة احتياطية ثم حذف جميع البيانات نهائياً.\nللتأكيد، اكتب العبارة التالية بالضبط:\n${FACTORY_RESET_PHRASE}`);
+  if(typed===null) return;
+  if(typed.trim() !== FACTORY_RESET_PHRASE) { toast("لم تتم العملية — العبارة غير مطابقة","err"); return; }
+  downloadBackup();
+  setTimeout(function(){
+    localStorage.removeItem('examTrackerState_v1');
+    location.reload();
+  }, 600);
+}
+
 // تعبئة المرحلة الدراسية للطلاب المستوردين الذين لا تحمل سجلاتهم مرحلة بعد،
 // حسب نطاقات الأسماء التي حددتها المدرسة (نفس ترتيب الاستيراد الأصلي)
 function migrateStudentGrades() {
@@ -2866,16 +2879,7 @@ function renderSGeneral(el) {
       document.getElementById('hSchool').textContent=state.schoolName;
       document.getElementById('loginSchoolName').textContent=state.schoolName;
       saveState();saveToCloud();toast('تم الحفظ ✅')">💾 حفظ</button>
-    <button class="btn" style="background:var(--red)" onclick="
-      if(!confirm('هل تريد حذف جميع البيانات المحفوظة واستعادة الإعدادات الافتراضية؟
-تحذير: سيتم حذف جميع المظاريف والتعديلات!')) return;
-      if(!confirm('سيتم تنزيل نسخة احتياطية الآن قبل الحذف — احتفظ بها في مكان آمن. هل تريد الاستمرار؟')) return;
-      downloadBackup();
-      setTimeout(function(){
-        localStorage.removeItem('examTrackerState_v1');
-        location.reload();
-      }, 600);
-      ">🗑️ إعادة تعيين كامل</button>
+    <button class="btn" style="background:var(--red)" onclick="factoryReset()">🗑️ إعادة تعيين كامل</button>
   </div>
   </div>
   <div class="card" style="border:2px solid var(--green);background:var(--greenBg, #ECFDF5)">
