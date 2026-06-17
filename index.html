@@ -1698,7 +1698,7 @@ async function doLogin() {
   const errEl = document.getElementById("loginErr");
   if(found) {
     currentUser = found; errEl.style.display="none";
-    try{ sessionStorage.removeItem("examSession"); localStorage.removeItem("examSession_backup"); }catch(e){}
+    try{ var sData=JSON.stringify({username:found.username,role:found.role,lastPage:null}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
     document.getElementById("loginScreen").style.display="none";
     const shell = document.getElementById("appShell");
     shell.style.display="flex";
