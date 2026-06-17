@@ -5319,7 +5319,7 @@ function renderMonitorPapers(el) {
           </div>
           <div>
             <label class="lbl">الصف *</label>
-            <select class="inp" id="ppGrade">
+            <select class="inp" id="ppGrade" onchange="ppAutoFillStudents()">
               <option value="">-- اختر --</option>
               ${state.grades.map(g=>`<option>${g}</option>`).join("")}
             </select>
@@ -5328,7 +5328,10 @@ function renderMonitorPapers(el) {
         <div class="g2" style="margin-bottom:10px">
           <div>
             <label class="lbl">رقم القاعة / اللجنة *</label>
-            <input class="inp" id="ppHall" placeholder="مثال: قاعة 1"/>
+            <select class="inp" id="ppHall" onchange="ppAutoFillStudents()">
+              <option value="">-- اختر اللجنة --</option>
+              ${_sdbCommittees().map(c=>`<option value="${c}">${c}</option>`).join("")}
+            </select>
           </div>
           <div>
             <label class="lbl">التاريخ</label>
@@ -5341,7 +5344,7 @@ function renderMonitorPapers(el) {
             <select class="inp" id="ppObserver">${teacherOptions()}</select>
           </div>
           <div>
-            <label class="lbl">عدد الطلاب الحاضرين</label>
+            <label class="lbl">عدد الطلاب الحاضرين <span style="color:var(--muted);font-weight:400">(تلقائي حسب اللجنة والصف، يمكن تعديله)</span></label>
             <input class="inp" id="ppStudents" type="number" min="0" placeholder="0"/>
           </div>
         </div>
@@ -5407,6 +5410,14 @@ function renderMonitorPapers(el) {
   </div>`;
 
   initSigCanvas("sigCanvasPapers");
+}
+
+function ppAutoFillStudents() {
+  const hall = document.getElementById("ppHall").value;
+  const grade = document.getElementById("ppGrade").value;
+  if(!hall) return;
+  const count = (state.studentsDB||[]).filter(s=>s.committee===hall && (!grade || s.grade===grade)).length;
+  document.getElementById("ppStudents").value = count;
 }
 
 function saveMonitorPapers() {
