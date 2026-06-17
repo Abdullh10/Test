@@ -503,11 +503,15 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     <span class="h-title" id="hSchool"></span>
     <span class="h-role" id="hRole"></span>
     <span class="h-user" id="hUser"></span>
+    <span id="syncDot" title="حالة المزامنة مع السحابة" style="width:9px;height:9px;border-radius:50%;background:#22C55E;opacity:.35;margin:0 4px;flex-shrink:0;transition:opacity .3s"></span>
     <button id="bellBtn" onclick="navigateTo('inbox')" style="display:none;position:relative;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:20px;line-height:1;flex-shrink:0;transition:all .15s" title="التنبيهات">
       🔔<span id="bellBadge" style="display:none;position:absolute;top:-4px;left:-4px;background:#EF4444;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--navy);font-family:'IBM Plex Sans Arabic',sans-serif"></span>
     </button>
     <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
+  <div id="updateBanner" onclick="applyCloudUpdate()" style="display:none;background:#F0B429;color:#0D1F3C;text-align:center;padding:9px;font-size:13px;font-weight:700;cursor:pointer">
+    📥 تتوفر بيانات أحدث محدّثة من جهاز/حساب آخر — اضغط هنا للتحديث
+  </div>
   <nav id="appNav"></nav>
   <div id="appMain"><div class="page-wrap" id="pageContent"></div></div>
 </div>
@@ -586,37 +590,49 @@ async function sbGet(table, match) {
       headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY},
       mode:"cors"
     });
-    return r.ok ? r.json() : [];
-  } catch(e){ console.warn("sbGet:",e.message); return []; }
+    if(!r.ok) { showSyncDot(false); return []; }
+    return r.json();
+  } catch(e){ console.warn("sbGet:",e.message); showSyncDot(false); return []; }
 }
 
 async function sbUpsert(table, obj) {
   try {
-    await fetch(SUPABASE_URL+"/rest/v1/"+table, {
+    const r = await fetch(SUPABASE_URL+"/rest/v1/"+table, {
       method:"POST", mode:"cors",
       headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Prefer":"resolution=merge-duplicates,return=minimal"},
       body: JSON.stringify(obj)
     });
-  } catch(e){ console.warn("sbUpsert:",e.message); }
+    if(!r.ok) { showSyncDot(false); return false; }
+    return true;
+  } catch(e){ console.warn("sbUpsert:",e.message); showSyncDot(false); return false; }
 }
 
 async function sbDelete(table, id) {
   try {
-    await fetch(SUPABASE_URL+"/rest/v1/"+table+"?id=eq."+id, {
+    const r = await fetch(SUPABASE_URL+"/rest/v1/"+table+"?id=eq."+id, {
       method:"DELETE", mode:"cors",
       headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}
     });
-  } catch(e){ console.warn("sbDelete:",e.message); }
+    if(!r.ok) { showSyncDot(false); return false; }
+    return true;
+  } catch(e){ console.warn("sbDelete:",e.message); showSyncDot(false); return false; }
 }
 
-// نقطة المزامنة في الهيدر
+// نقطة المزامنة في الهيدر — تبقى حمراء وثابتة عند الفشل حتى تنجح المزامنة التالية
 function showSyncDot(ok) {
   var dot = document.getElementById("syncDot");
   if(!dot) return;
-  dot.style.background = ok ? "#22C55E" : "#EF4444";
-  dot.style.opacity = "1";
   clearTimeout(dot._t);
-  dot._t = setTimeout(function(){ dot.style.opacity="0.35"; }, 2500);
+  if(ok) {
+    dot.style.background = "#22C55E";
+    dot.style.opacity = "1";
+    dot.title = "آخر مزامنة ناجحة: " + new Date().toLocaleTimeString("ar-SA");
+    dot._t = setTimeout(function(){ dot.style.opacity="0.35"; }, 2500);
+  } else {
+    dot.style.background = "#EF4444";
+    dot.style.opacity = "1";
+    dot.title = "⚠️ فشلت آخر مزامنة مع السحابة — البيانات محفوظة محلياً فقط على هذا الجهاز";
+  }
 }
 
 async function saveToCloud() {
@@ -627,20 +643,23 @@ async function saveToCloud() {
     users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
     monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[], approvals:state.approvals||[], studentsDB:state.studentsDB||[], absenceLog:state.absenceLog||[]
   };
-  await sbUpsert("settings", {id:"main", data:settings, updated_at:new Date().toISOString()});
+  var updatedAt = new Date().toISOString();
+  var ok = await sbUpsert("settings", {id:"main", data:settings, updated_at:updatedAt});
   // Also save to localStorage as backup
   saveState();
-  showSyncDot(true);
+  if(ok) { showSyncDot(true); _lastCloudUpdatedAt = updatedAt; }
+  return ok;
 }
 
 async function saveBundleToCloud(b) {
-  await sbUpsert("bundles", {id:b.id, data:b, updated_at:new Date().toISOString()});
+  var ok = await sbUpsert("bundles", {id:b.id, data:b, updated_at:new Date().toISOString()});
   saveState();
-  showSyncDot(true);
+  if(ok) showSyncDot(true);
+  return ok;
 }
 
 async function deleteBundleFromCloud(id) {
-  await sbDelete("bundles", id);
+  return await sbDelete("bundles", id);
 }
 
 async function loadFromCloud() {
@@ -654,17 +673,11 @@ async function loadFromCloud() {
       ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
+      _lastCloudUpdatedAt = rows[0].updated_at || _lastCloudUpdatedAt;
     }
     // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود)
-    var defaultUsers = [
-      { id:"U1", name:"مدير النظام",        username:"admin",     salt:"aeb796ff44e3b993191d7393f7892ed3", passwordHash:"9e2fe0c37ab45b6c5df1f02acfa7233ad8480ee8e25b1c21e6529a663cd74bfc", role:"admin"      },
-      { id:"U2", name:"الكنترول",           username:"ctrl",      salt:"2bf214c0243c07e0f4ff868662aaf77e", passwordHash:"1f104e82d41121ff2ebd8cdc2ea08c0d59e02a11c63fd4653e5d19afd686b8c2", role:"controller" },
-      { id:"U5", name:"مراقب اللجان",       username:"monitor",   salt:"c557ce19e6cb29917a7e0c447a036669", passwordHash:"946ba9dc5c8d33d162d13d5e21338b25ac8fbf758fc23d96788a1cd9d0e5ef5c", role:"monitor"    },
-      { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    salt:"2832a24044d778a1a7b0c3ed09e8633a", passwordHash:"0e3a40977e53bf0e0a97780d641b56a705c909815b199cd8af2af97240d24d08", role:"notifier"   },
-      { id:"U4", name:"مدير المدرسة",       username:"principal", salt:"0b217b7b40523b379dece0018cbec4cc", passwordHash:"6ca7473d9e12b0be8de47ec2e03c16193a0e0a4f5f5a88275265e2957bba9c59", role:"principal"  },
-    ];
-    defaultUsers.forEach(function(du){
-      if(!state.users.find(function(u){ return u.id===du.id; })) state.users.push(du);
+    DEFAULT_USERS.forEach(function(du){
+      if(!state.users.find(function(u){ return u.id===du.id; })) state.users.push({...du});
     });
     // Load bundles
     var brows = await sbGet("bundles");
@@ -685,9 +698,45 @@ async function loadFromCloud() {
 }
 
 async function forceSyncAll() {
-  await saveToCloud();
+  var ok = await saveToCloud();
   for(var i=0;i<state.bundles.length;i++) await saveBundleToCloud(state.bundles[i]);
-  toast("✅ تمت المزامنة الكاملة مع السحابة");
+  toast(ok ? "✅ تمت المزامنة الكاملة مع السحابة" : "⚠️ تعذرت المزامنة مع السحابة — تحقق من الاتصال بالإنترنت", ok?"ok":"err");
+}
+
+// ── مزامنة شبه لحظية: فحص دوري لوجود تحديثات من جهاز/حساب آخر ──────────
+let _lastCloudUpdatedAt = null;
+let _pollTimer = null;
+
+async function checkForCloudUpdates() {
+  if(!currentUser || document.visibilityState !== "visible") return;
+  try {
+    var rows = await sbGet("settings", {id:"main"});
+    if(rows && rows[0] && rows[0].updated_at) {
+      if(_lastCloudUpdatedAt && rows[0].updated_at !== _lastCloudUpdatedAt) {
+        var banner = document.getElementById("updateBanner");
+        if(banner) banner.style.display = "block";
+      }
+    }
+  } catch(e){ /* فحص في الخلفية فقط، يتم تجاهل الأخطاء */ }
+}
+
+function startCloudPolling() {
+  if(_pollTimer) return;
+  _pollTimer = setInterval(checkForCloudUpdates, 30000);
+}
+
+function stopCloudPolling() {
+  clearInterval(_pollTimer);
+  _pollTimer = null;
+}
+
+async function applyCloudUpdate() {
+  var banner = document.getElementById("updateBanner");
+  if(banner) banner.style.display = "none";
+  await loadFromCloud();
+  renderNav();
+  navigateTo(currentPage);
+  toast("تم تحديث البيانات ✅");
 }
 
 const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F97316","#22C55E","#A855F7","#6366F1","#14B8A6","#64748B"];
@@ -1367,6 +1416,14 @@ const SEED_STUDENTS = [
 {n:'يوسف بن فالح بن خليف الويبار الشمري',sid:'1144029186',ph:'966503948851',c:'20'}
 ];
 
+const DEFAULT_USERS = [
+  { id:"U1", name:"مدير النظام",        username:"admin",     salt:"aeb796ff44e3b993191d7393f7892ed3", passwordHash:"9e2fe0c37ab45b6c5df1f02acfa7233ad8480ee8e25b1c21e6529a663cd74bfc", role:"admin"      },
+  { id:"U2", name:"الكنترول",           username:"ctrl",      salt:"2bf214c0243c07e0f4ff868662aaf77e", passwordHash:"1f104e82d41121ff2ebd8cdc2ea08c0d59e02a11c63fd4653e5d19afd686b8c2", role:"controller" },
+  { id:"U5", name:"مراقب اللجان",       username:"monitor",   salt:"c557ce19e6cb29917a7e0c447a036669", passwordHash:"946ba9dc5c8d33d162d13d5e21338b25ac8fbf758fc23d96788a1cd9d0e5ef5c", role:"monitor"    },
+  { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    salt:"2832a24044d778a1a7b0c3ed09e8633a", passwordHash:"0e3a40977e53bf0e0a97780d641b56a705c909815b199cd8af2af97240d24d08", role:"notifier"   },
+  { id:"U4", name:"مدير المدرسة",       username:"principal", salt:"0b217b7b40523b379dece0018cbec4cc", passwordHash:"6ca7473d9e12b0be8de47ec2e03c16193a0e0a4f5f5a88275265e2957bba9c59", role:"principal"  },
+];
+
 let state = {
   schoolName: "متابعة سير الاختبارات الإلكتروني",
   adminPhone: "+966551121498",
@@ -1425,13 +1482,7 @@ let state = {
     {id:"TH2WJ5I",name:"خالد بن عبدالله بن ابراهيم الباز",role:"corrector",phone:"+966557575511",subject:"",note:""},
     {id:"TBNS9IE",name:"حسين بن مانع بن حسين القحطاني",role:"corrector",phone:"+966567508504",subject:"",note:""}
   ],
-  users: [
-    { id:"U1", name:"مدير النظام",        username:"admin",     salt:"aeb796ff44e3b993191d7393f7892ed3", passwordHash:"9e2fe0c37ab45b6c5df1f02acfa7233ad8480ee8e25b1c21e6529a663cd74bfc", role:"admin"      },
-    { id:"U2", name:"الكنترول",           username:"ctrl",      salt:"2bf214c0243c07e0f4ff868662aaf77e", passwordHash:"1f104e82d41121ff2ebd8cdc2ea08c0d59e02a11c63fd4653e5d19afd686b8c2", role:"controller" },
-    { id:"U5", name:"مراقب اللجان",       username:"monitor",   salt:"c557ce19e6cb29917a7e0c447a036669", passwordHash:"946ba9dc5c8d33d162d13d5e21338b25ac8fbf758fc23d96788a1cd9d0e5ef5c", role:"monitor"    },
-    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    salt:"2832a24044d778a1a7b0c3ed09e8633a", passwordHash:"0e3a40977e53bf0e0a97780d641b56a705c909815b199cd8af2af97240d24d08", role:"notifier"   },
-    { id:"U4", name:"مدير المدرسة",       username:"principal", salt:"0b217b7b40523b379dece0018cbec4cc", passwordHash:"6ca7473d9e12b0be8de47ec2e03c16193a0e0a4f5f5a88275265e2957bba9c59", role:"principal"  },
-  ],
+  users: DEFAULT_USERS.map(u=>({...u})),
   bundles: [],
   notifLog: [],
   examSchedule: [],  // [{id,subject,grade,day,date,startTime,endTime,hall,note}]
@@ -1709,6 +1760,7 @@ async function doLogin() {
     document.getElementById("hRole").style.cssText = `background:${bg};color:${col};padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px`;
     document.getElementById("hUser").textContent = found.name;
     renderNav();
+    startCloudPolling();
     const defaultPage = (PAGES[found.role]&&PAGES[found.role][0]?PAGES[found.role][0].k:null) || "ctrl_scan";
     navigateTo(defaultPage);
   } else {
@@ -1736,18 +1788,22 @@ function enterShell(found, page) {
   var hUser = document.getElementById("hUser");
   if(hUser) hUser.textContent = found.name;
   renderNav();
+  startCloudPolling();
   var pg = page || (PAGES[found.role] && PAGES[found.role][0] ? PAGES[found.role][0].k : "ctrl_scan");
   navigateTo(pg);
 }
 
 function doLogout() {
   currentUser=null; currentPage="";
+  stopCloudPolling();
   try{ sessionStorage.removeItem("examSession"); localStorage.removeItem("examSession_backup"); }catch(e){}
   document.getElementById("loginScreen").style.display="flex";
   document.getElementById("appShell").style.display="none";
   document.getElementById("loginUser").value="";
   document.getElementById("loginPass").value="";
   document.getElementById("loginErr").style.display="none";
+  var banner = document.getElementById("updateBanner");
+  if(banner) banner.style.display="none";
 }
 
 // ═══════════════════════════════════════════════
@@ -8246,13 +8302,7 @@ migrateLegacyPasswords();
     if(!raw) raw = localStorage.getItem("examSession_backup");
     if(raw) {
       var sess = JSON.parse(raw);
-      var allU = (state.users && state.users.length) ? state.users : [
-        {id:"U1",name:"مدير النظام",username:"admin",role:"admin"},
-        {id:"U2",name:"الكنترول",username:"ctrl",role:"controller"},
-        {id:"U3",name:"مسؤول التنبيهات",username:"notify",role:"notifier"},
-        {id:"U4",name:"مدير المدرسة",username:"principal",role:"principal"},
-        {id:"U5",name:"مراقب اللجان",username:"monitor",role:"monitor"},
-      ];
+      var allU = (state.users && state.users.length) ? state.users : DEFAULT_USERS;
       var found = null;
       for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
       if(found) enterShell(found, sess.lastPage||null);
