@@ -1424,7 +1424,7 @@ let state = {
   monitorStudentObs: [], // [{id,targetType,name/teacherId,hall,obsType,note,savedAt}]
   monitorDailyReports: [], // daily committee reports
   approvals: [], // [{id,docType,docId,title,subtitle,submittedBy,submittedAt,status,principalName,principalSig,decidedAt,rejectReason}]
-  studentsDB: SEED_STUDENTS.map((s,i)=>({id:"S"+i,name:s.n,sid:s.sid,phone:s.ph,committee:s.c,grade:""})), // [{id,name,sid,phone,committee,grade}]
+  studentsDB: SEED_STUDENTS.map((s,i)=>({id:"S"+i,name:s.n,sid:s.sid,phone:s.ph,committee:s.c,grade:(i<=263?"أول ثانوي":i<=488?"ثاني ثانوي":"ثالث ثانوي")})), // [{id,name,sid,phone,committee,grade}]
 };
 
 let currentUser = null;
@@ -1560,6 +1560,29 @@ function loadState() {
       if (saved[k] !== undefined && saved[k] !== null) state[k] = saved[k];
     });
   } catch(e) { console.warn("loadState failed:", e); }
+  migrateStudentGrades();
+}
+
+// تعبئة المرحلة الدراسية للطلاب المستوردين الذين لا تحمل سجلاتهم مرحلة بعد،
+// حسب نطاقات الأسماء التي حددتها المدرسة (نفس ترتيب الاستيراد الأصلي)
+function migrateStudentGrades() {
+  const db = state.studentsDB||[];
+  if(db.length===0) return;
+  const idxOf = name => db.findIndex(s=>s.name===name);
+  const ranges = [
+    { from:"ابراهيم بن حبيب بن ابراهيم الخلف", to:"نواف بن فيصل بن لافي المطيري", grade:"أول ثانوي" },
+    { from:"إبراهيم بن عبدالله بن عبدالجليل البريكان", to:"ميسرة بن عماد بن مدني بغدادي", grade:"ثاني ثانوي" },
+    { from:"ابراهيم بن احمد بن مقيطيب المقيطيب", to:"يوسف بن فالح بن خليف الويبار الشمري", grade:"ثالث ثانوي" },
+  ];
+  let changed=false;
+  ranges.forEach(r=>{
+    const i1=idxOf(r.from), i2=idxOf(r.to);
+    if(i1<0||i2<0) return;
+    for(let i=Math.min(i1,i2); i<=Math.max(i1,i2); i++){
+      if(db[i] && !db[i].grade){ db[i].grade=r.grade; changed=true; }
+    }
+  });
+  if(changed) saveState();
 }
 
 // Wrap every state-mutating action with auto-save
