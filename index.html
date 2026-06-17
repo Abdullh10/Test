@@ -719,7 +719,7 @@ async function checkForCloudUpdates() {
   try {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].updated_at) {
-      if(_lastCloudUpdatedAt && rows[0].updated_at !== _lastCloudUpdatedAt) {
+      if(_lastCloudUpdatedAt && new Date(rows[0].updated_at).getTime() !== new Date(_lastCloudUpdatedAt).getTime()) {
         var banner = document.getElementById("updateBanner");
         if(banner) banner.style.display = "block";
       }
