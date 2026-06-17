@@ -5627,6 +5627,10 @@ function _sdbCommittees() {
     return String(a).localeCompare(String(b));
   });
 }
+function _sdbGrades() {
+  const set = new Set((state.studentsDB||[]).map(s=>s.grade).filter(Boolean));
+  return Array.from(set);
+}
 function _sdbFiltered() {
   const q = _sdbQ.trim();
   return (state.studentsDB||[]).filter(s=>{
@@ -5645,7 +5649,9 @@ function sdbUpdate(field, val) {
 function renderStudentsDB(el) {
   const list = _sdbFiltered();
   const committees = _sdbCommittees();
+  const grades = _sdbGrades();
   const total = (state.studentsDB||[]).length;
+  const isAdmin = currentUser && currentUser.role==="admin";
   el.innerHTML = `
   <div class="page-wrap" style="max-width:860px">
 
@@ -5661,9 +5667,9 @@ function renderStudentsDB(el) {
             <option value="">كل اللجان</option>
             ${committees.map(c=>`<option value="${c}"${c===_sdbCommittee?" selected":""}>لجنة ${c}</option>`).join("")}
           </select>
-          <select class="inp" id="sdb_grade" onchange="sdbUpdate('grade', this.value)" style="flex:1">
-            <option value="">كل المراحل</option>
-            ${state.grades.map(g=>`<option value="${g}"${g===_sdbGrade?" selected":""}>${g}</option>`).join("")}
+          <select class="inp" id="sdb_grade" onchange="sdbUpdate('grade', this.value)" style="flex:1"${grades.length===0?" disabled":""}>
+            <option value="">${grades.length===0?"لا توجد مراحل مسجلة":"كل المراحل"}</option>
+            ${grades.map(g=>`<option value="${g}"${g===_sdbGrade?" selected":""}>${g}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -5682,10 +5688,21 @@ function renderStudentsDB(el) {
             </div>
             <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${s.committee||"—"}</span>
             <a href="tel:+${s.phone}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${s.phone||"—"}</a>
-            <button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>
+            ${isAdmin?`<button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>`:""}
           </div>`).join("")}
           ${list.length>200?`<p style="font-size:11px;color:var(--muted);text-align:center;padding:6px">تم عرض أول 200 نتيجة فقط — استخدم البحث لتضييق النتائج</p>`:""}
         </div>`}
+    </div>
+
+    ${isAdmin?`
+    <div class="card" style="margin-bottom:14px">
+      <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📤</span>رفع بيانات الطلاب (ملف)</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">رفع ملف CSV أو نص (txt) يحتوي أعمدة بالترتيب: الاسم، رقم الطالب، الجوال، اللجنة، المرحلة (اختياري) — مفصولة بفاصلة أو tab، طالب في كل سطر</p>
+      <input type="file" class="inp" id="sdb_file" accept=".csv,.txt" style="margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="sdb_file_replace"> استبدال كامل قاعدة البيانات الحالية بهذا الملف (بدلاً من الإضافة)
+      </label>
+      <button class="btn btn-navy btn-full" onclick="sdbFileImport()">📤 رفع واستيراد</button>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -5708,13 +5725,41 @@ function renderStudentsDB(el) {
     </div>
 
     <div class="card">
-      <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📥</span>استيراد جماعي من ملف بيانات</p>
+      <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📥</span>استيراد جماعي (لصق نص)</p>
       <p style="font-size:12px;color:var(--muted);margin-bottom:8px">الصق البيانات بصيغة: الاسم - رقم الطالب - الجوال - اللجنة (كل طالب في سطر، وتُفصل الحقول بفاصلة أو tab)</p>
       <textarea class="inp" id="sdb_bulk" rows="5" placeholder="مثال: أحمد بن سعد العتيبي, 1152183305, 966505953101, 3"></textarea>
       <button class="btn btn-green btn-full" style="margin-top:8px" onclick="sdbBulkImport()">📥 استيراد</button>
-    </div>
+    </div>`:""}
 
   </div>`;
+}
+function _sdbParseLines(raw) {
+  const lines = raw.split("\n").map(l=>l.trim()).filter(Boolean);
+  const rows=[];
+  lines.forEach(line=>{
+    const parts = line.split(/[,\t]/).map(p=>p.trim());
+    if(parts.length<1 || !parts[0]) return;
+    if(/^(الاسم|name)$/i.test(parts[0])) return; // skip header row
+    rows.push({id:uid(), name:parts[0]||"", sid:parts[1]||"", phone:parts[2]||"", committee:parts[3]||"", grade:parts[4]||""});
+  });
+  return rows;
+}
+function sdbFileImport() {
+  const fileInput = document.getElementById("sdb_file");
+  const replace = document.getElementById("sdb_file_replace").checked;
+  const file = fileInput.files[0];
+  if(!file) { toast("اختر ملفًا أولاً","err"); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const rows = _sdbParseLines(e.target.result);
+    if(rows.length===0) { toast("لم يتم العثور على بيانات صحيحة في الملف","err"); return; }
+    state.studentsDB = replace ? rows : (state.studentsDB||[]).concat(rows);
+    saveState(); saveToCloud();
+    toast(`تم استيراد ${rows.length} طالب من الملف ✅`);
+    renderStudentsDB(document.getElementById("pageContent"));
+  };
+  reader.onerror = function(){ toast("تعذّر قراءة الملف","err"); };
+  reader.readAsText(file, "UTF-8");
 }
 function sdbAddStudent() {
   const name = document.getElementById("sdb_name").value.trim();
@@ -5735,19 +5780,11 @@ function sdbDelete(id) {
 }
 function sdbBulkImport() {
   const raw = document.getElementById("sdb_bulk").value;
-  const lines = raw.split("\n").map(l=>l.trim()).filter(Boolean);
-  let added=0;
-  lines.forEach(line=>{
-    const parts = line.split(/[,\t]/).map(p=>p.trim());
-    if(parts.length<1 || !parts[0]) return;
-    state.studentsDB.push({
-      id:uid(), name:parts[0]||"", sid:parts[1]||"", phone:parts[2]||"", committee:parts[3]||"", grade:parts[4]||""
-    });
-    added++;
-  });
-  if(added===0) { toast("لم يتم العثور على بيانات صحيحة","err"); return; }
+  const rows = _sdbParseLines(raw);
+  if(rows.length===0) { toast("لم يتم العثور على بيانات صحيحة","err"); return; }
+  state.studentsDB = (state.studentsDB||[]).concat(rows);
   saveState(); saveToCloud();
-  toast(`تم استيراد ${added} طالب ✅`);
+  toast(`تم استيراد ${rows.length} طالب ✅`);
   renderStudentsDB(document.getElementById("pageContent"));
 }
 
