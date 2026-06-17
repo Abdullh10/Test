@@ -665,7 +665,10 @@ async function loadFromCloud() {
       state.notifLog = nrows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); }).map(function(r){ return r.data; });
     }
   } catch(e){ console.warn("loadFromCloud:",e.message); }
-  finally { if(dot) dot.style.display="none"; }
+  finally {
+    migrateStudentGrades();
+    if(dot) dot.style.display="none";
+  }
 }
 
 async function forceSyncAll() {
@@ -1582,7 +1585,7 @@ function migrateStudentGrades() {
       if(db[i] && !db[i].grade){ db[i].grade=r.grade; changed=true; }
     }
   });
-  if(changed) saveState();
+  if(changed) { saveState(); if(typeof saveToCloud==="function") saveToCloud(); }
 }
 
 // Wrap every state-mutating action with auto-save
@@ -5667,10 +5670,9 @@ function sdbUpdate(field, val) {
   if(field==="q") _sdbQ=val;
   if(field==="committee") _sdbCommittee=val;
   if(field==="grade") _sdbGrade=val;
-  renderStudentsDB(document.getElementById("pageContent"));
+  _sdbRenderResults();
 }
 function renderStudentsDB(el) {
-  const list = _sdbFiltered();
   const committees = _sdbCommittees();
   const grades = _sdbGrades();
   const total = (state.studentsDB||[]).length;
@@ -5699,33 +5701,18 @@ function renderStudentsDB(el) {
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <p style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">نتائج البحث: ${list.length}</p>
-      ${list.length===0
-        ? `<div class="empty"><span class="empty-icon">🔍</span>لا توجد نتائج مطابقة</div>`
-        : `<div style="display:flex;flex-direction:column;gap:8px">
-          ${list.slice(0,200).map(s=>`
-          <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;border:1px solid var(--border)">
-            <div style="flex:1;min-width:0">
-              <p style="font-size:13px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</p>
-              <p style="font-size:11px;color:var(--muted);margin-top:2px">رقم الطالب: ${s.sid||"—"} ${s.grade?" | "+s.grade:""}</p>
-            </div>
-            <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${s.committee||"—"}</span>
-            <a href="tel:+${s.phone}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${s.phone||"—"}</a>
-            ${isAdmin?`<button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>`:""}
-          </div>`).join("")}
-          ${list.length>200?`<p style="font-size:11px;color:var(--muted);text-align:center;padding:6px">تم عرض أول 200 نتيجة فقط — استخدم البحث لتضييق النتائج</p>`:""}
-        </div>`}
+      <div id="sdb_resultsBox"></div>
     </div>
 
     ${isAdmin?`
     <div class="card" style="margin-bottom:14px">
-      <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📤</span>رفع بيانات الطلاب (ملف)</p>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">رفع ملف CSV أو نص (txt) يحتوي أعمدة بالترتيب: الاسم، رقم الطالب، الجوال، اللجنة، المرحلة (اختياري) — مفصولة بفاصلة أو tab، طالب في كل سطر</p>
-      <input type="file" class="inp" id="sdb_file" accept=".csv,.txt" style="margin-bottom:8px">
+      <p class="card-title"><span class="ct-icon" style="background:#FEF3C7">📤</span>رفع بيانات الطلاب (ملف Excel)</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">نزّل النموذج، عبّئ بيانات الطلاب فيه (الاسم، رقم الطالب، الجوال، اللجنة، المرحلة)، ثم ارفعه هنا ليتم إضافة الطلاب تلقائيًا</p>
+      <button class="btn" style="background:#065F46;color:#fff;width:100%;margin-bottom:10px" onclick="downloadStudentTemplate()">⬇️ تنزيل نموذج Excel</button>
+      <input type="file" class="inp" id="sdb_file" accept=".xlsx,.xls" style="margin-bottom:8px" onchange="handleStudentXlsxFile(this)">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:8px;cursor:pointer">
         <input type="checkbox" id="sdb_file_replace"> استبدال كامل قاعدة البيانات الحالية بهذا الملف (بدلاً من الإضافة)
       </label>
-      <button class="btn btn-navy btn-full" onclick="sdbFileImport()">📤 رفع واستيراد</button>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -5755,34 +5742,106 @@ function renderStudentsDB(el) {
     </div>`:""}
 
   </div>`;
+  _sdbRenderResults();
 }
-function _sdbParseLines(raw) {
-  const lines = raw.split("\n").map(l=>l.trim()).filter(Boolean);
-  const rows=[];
-  lines.forEach(line=>{
-    const parts = line.split(/[,\t]/).map(p=>p.trim());
-    if(parts.length<1 || !parts[0]) return;
-    if(/^(الاسم|name)$/i.test(parts[0])) return; // skip header row
-    rows.push({id:uid(), name:parts[0]||"", sid:parts[1]||"", phone:parts[2]||"", committee:parts[3]||"", grade:parts[4]||""});
-  });
-  return rows;
+function _sdbRenderResults() {
+  const box = document.getElementById("sdb_resultsBox");
+  if(!box) return;
+  const list = _sdbFiltered();
+  const isAdmin = currentUser && currentUser.role==="admin";
+  box.innerHTML = `
+    <p style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">نتائج البحث: ${list.length}</p>
+    ${list.length===0
+      ? `<div class="empty"><span class="empty-icon">🔍</span>لا توجد نتائج مطابقة</div>`
+      : `<div style="display:flex;flex-direction:column;gap:8px">
+        ${list.slice(0,200).map(s=>`
+        <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;border:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <p style="font-size:13px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:2px">رقم الطالب: ${s.sid||"—"} ${s.grade?" | "+s.grade:""}</p>
+          </div>
+          <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${s.committee||"—"}</span>
+          <a href="tel:+${s.phone}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${s.phone||"—"}</a>
+          ${isAdmin?`<button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>`:""}
+        </div>`).join("")}
+        ${list.length>200?`<p style="font-size:11px;color:var(--muted);text-align:center;padding:6px">تم عرض أول 200 نتيجة فقط — استخدم البحث لتضييق النتائج</p>`:""}
+      </div>`}
+  `;
 }
-function sdbFileImport() {
-  const fileInput = document.getElementById("sdb_file");
+function downloadStudentTemplate() {
+  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err"); return; }
+  const wb = XLSX.utils.book_new();
+  const headers = ["اسم الطالب *","رقم الطالب","رقم الجوال *","اللجنة *","المرحلة"];
+  const samples = [
+    ["أحمد بن سعد العتيبي", "1152183305", "966505953101", "3", "أول ثانوي"],
+    ["", "", "", "", ""],
+    ["", "", "", "", ""],
+    ["", "", "", "", ""],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
+  ws["!cols"] = [{wch:30},{wch:16},{wch:18},{wch:10},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, "بيانات الطلاب");
+  XLSX.writeFile(wb, "نموذج_بيانات_الطلاب.xlsx");
+  toast("تم تنزيل ملف النموذج ✅");
+}
+function handleStudentXlsxFile(input) {
+  const file = input.files[0];
+  if(file) processStudentXlsxFile(file);
+  input.value = "";
+}
+function processStudentXlsxFile(file) {
+  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة","err"); return; }
   const replace = document.getElementById("sdb_file_replace").checked;
-  const file = fileInput.files[0];
-  if(!file) { toast("اختر ملفًا أولاً","err"); return; }
   const reader = new FileReader();
-  reader.onload = function(e){
-    const rows = _sdbParseLines(e.target.result);
-    if(rows.length===0) { toast("لم يتم العثور على بيانات صحيحة في الملف","err"); return; }
-    state.studentsDB = replace ? rows : (state.studentsDB||[]).concat(rows);
-    saveState(); saveToCloud();
-    toast(`تم استيراد ${rows.length} طالب من الملف ✅`);
-    renderStudentsDB(document.getElementById("pageContent"));
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb   = XLSX.read(data, {type:"array"});
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+
+      let headerRow = -1;
+      for(let i=0;i<Math.min(rows.length,8);i++){
+        const r = rows[i].join("");
+        if(r.includes("اسم") || r.includes("Name") || r.includes("name")) { headerRow=i; break; }
+      }
+      if(headerRow < 0) { toast("لم يتم العثور على رأس الجدول — تأكد من استخدام النموذج الصحيح","err"); return; }
+
+      const hRow   = rows[headerRow].map(h=>String(h).trim());
+      const colMap = {};
+      hRow.forEach((h,i)=>{
+        if(h.includes("اسم")||h.includes("Name")||h.includes("name"))         colMap.name=i;
+        if(h.includes("الطالب")&&h.includes("رقم"))                          colMap.sid=i;
+        if(h.includes("الجوال")||h.includes("Phone")||h.includes("phone"))    colMap.phone=i;
+        if(h.includes("اللجنة")||h.includes("Committee")||h.includes("committee")) colMap.committee=i;
+        if(h.includes("المرحلة")||h.includes("Grade")||h.includes("grade"))   colMap.grade=i;
+      });
+      if(colMap.name===undefined) { toast("لم يتم العثور على عمود اسم الطالب","err"); return; }
+
+      const newRows=[];
+      for(let i=headerRow+1;i<rows.length;i++){
+        const row = rows[i];
+        const name = String(row[colMap.name]||"").trim();
+        if(!name) continue;
+        newRows.push({
+          id:uid(), name,
+          sid: colMap.sid!==undefined ? String(row[colMap.sid]||"").trim() : "",
+          phone: colMap.phone!==undefined ? String(row[colMap.phone]||"").trim() : "",
+          committee: colMap.committee!==undefined ? String(row[colMap.committee]||"").trim() : "",
+          grade: colMap.grade!==undefined ? String(row[colMap.grade]||"").trim() : "",
+        });
+      }
+      if(newRows.length===0) { toast("لم يتم العثور على بيانات طلاب في الملف","err"); return; }
+      state.studentsDB = replace ? newRows : (state.studentsDB||[]).concat(newRows);
+      saveState(); saveToCloud();
+      toast(`تم استيراد ${newRows.length} طالب من الملف ✅`);
+      renderStudentsDB(document.getElementById("pageContent"));
+    } catch(err) {
+      console.error(err);
+      toast("تعذّر قراءة الملف — تأكد من أنه بصيغة Excel صحيحة","err");
+    }
   };
-  reader.onerror = function(){ toast("تعذّر قراءة الملف","err"); };
-  reader.readAsText(file, "UTF-8");
+  reader.readAsArrayBuffer(file);
 }
 function sdbAddStudent() {
   const name = document.getElementById("sdb_name").value.trim();
@@ -5800,6 +5859,17 @@ function sdbDelete(id) {
   state.studentsDB = state.studentsDB.filter(s=>s.id!==id);
   saveState(); saveToCloud();
   renderStudentsDB(document.getElementById("pageContent"));
+}
+function _sdbParseLines(raw) {
+  const lines = raw.split("\n").map(l=>l.trim()).filter(Boolean);
+  const rows=[];
+  lines.forEach(line=>{
+    const parts = line.split(/[,\t]/).map(p=>p.trim());
+    if(parts.length<1 || !parts[0]) return;
+    if(/^(الاسم|name)$/i.test(parts[0])) return; // skip header row
+    rows.push({id:uid(), name:parts[0]||"", sid:parts[1]||"", phone:parts[2]||"", committee:parts[3]||"", grade:parts[4]||""});
+  });
+  return rows;
 }
 function sdbBulkImport() {
   const raw = document.getElementById("sdb_bulk").value;
