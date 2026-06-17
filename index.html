@@ -2975,7 +2975,7 @@ function renderSTeachers(el) {
         </div>
         <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
         <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
-        <button class="del-btn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');saveState();renderSTabContent()">×</button>
+        <button class="del-btn" onclick="state.teachers=state.teachers.filter(x=>x.id!='${t.id}');saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <hr class="divider"/>
@@ -3042,6 +3042,7 @@ function addTeacher() {
   if(!name||!phone){ toast("أدخل الاسم ورقم الواتساب","err"); return; }
   state.teachers.push({ id:"T"+uid(), name, phone, subject, role });
   saveState();
+  saveToCloud();
   toast("تم إضافة المعلم ✅");
   renderSTabContent();
 }
@@ -3818,6 +3819,7 @@ function confirmBulkImport(teachers) {
     added++;
   });
   saveState();
+  saveToCloud();
   window._parsedTeachers=null;
   toast(`✅ تم استيراد ${added} معلم${skipped>0?" · تم تجاهل "+skipped+" مكرر":""}`);
   renderSTabContent();
