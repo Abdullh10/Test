@@ -2046,7 +2046,7 @@ function renderAdminList(el) {
   el.innerHTML=`
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <p style="font-size:14px;font-weight:700;color:var(--navy)">${state.bundles.length} مظروف مسجّل</p>
-    <button class="btn btn-red btn-sm" onclick="if(confirm('حذف جميع المظاريف؟')){state.bundles=[];saveState();renderAdminList(document.getElementById('pageContent'));toast('تم الحذف','err')}">🗑️ حذف الكل</button>
+    <button class="btn btn-red btn-sm" onclick="adminDeleteAllBundles()">🗑️ حذف الكل</button>
   </div>
   <div id="adminBundleList"></div>`;
   renderAdminBundleList();
@@ -2091,6 +2091,17 @@ function adminDeleteBundle(id) {
   if(!confirm("حذف هذا المظروف نهائياً؟")) return;
   state.bundles = state.bundles.filter(b=>b.id!==id);
   saveState();
+  deleteBundleFromCloud(id);
+  toast("تم الحذف","err");
+  renderAdminList(document.getElementById("pageContent"));
+}
+
+function adminDeleteAllBundles() {
+  if(!confirm("حذف جميع المظاريف؟")) return;
+  const ids = state.bundles.map(b=>b.id);
+  state.bundles = [];
+  saveState();
+  ids.forEach(id=>deleteBundleFromCloud(id));
   toast("تم الحذف","err");
   renderAdminList(document.getElementById("pageContent"));
 }
@@ -2192,7 +2203,6 @@ function saveEditBundle(id) {
   b.examHall   = (document.getElementById("eb_hall")||{value:""}).value||b.examHall||"";
   b.examStart  = (document.getElementById("eb_start")||{value:""}).value||b.examStart||"";
   b.examEnd    = (document.getElementById("eb_end")||{value:""}).value||b.examEnd||"";
-  saveState();
   saveState();
   saveBundleToCloud(b);
   document.getElementById("editOverlay").remove();
@@ -2949,14 +2959,14 @@ function renderSSubjects(el) {
       ${state.subjects.map((s,i)=>`
       <div class="list-item">
         <span class="li-text">${s}</span>
-        <button class="del-btn" onclick="state.subjects.splice(${i},1);saveState();renderSTabContent()">×</button>
+        <button class="del-btn" onclick="state.subjects.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
       <input class="inp" id="newSubj" placeholder="اسم المادة الجديدة" style="flex:1"/>
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('newSubj').value.trim();
-        if(v){state.subjects.push(v);saveState();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+        if(v){state.subjects.push(v);saveState();saveToCloud();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
     </div>
   </div>`;
 }
@@ -2969,14 +2979,14 @@ function renderSGrades(el) {
       ${state.grades.map((g,i)=>`
       <div class="list-item">
         <span class="li-text">${g}</span>
-        <button class="del-btn" onclick="state.grades.splice(${i},1);saveState();renderSTabContent()">×</button>
+        <button class="del-btn" onclick="state.grades.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
       <input class="inp" id="newGrade" placeholder="اسم الصف الجديد" style="flex:1"/>
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('newGrade').value.trim();
-        if(v){state.grades.push(v);saveState();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
+        if(v){state.grades.push(v);saveState();saveToCloud();renderSTabContent();toast('تمت الإضافة')}">إضافة</button>
     </div>
   </div>`;
 }
@@ -3001,7 +3011,7 @@ function renderSStages(el) {
         const v=document.getElementById('newStage').value.trim();
         if(v){_editStages.push(v);renderSTabContent()}">إضافة</button>
     </div>
-    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];saveState();toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
+    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];saveState();saveToCloud();toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
   </div>`;
 }
 
@@ -6918,7 +6928,12 @@ if(!state.minutesData || !state.minutesData.forms) {
   }
 }
 
-function saveMinutes() { saveState(); }
+let _minutesSyncTimer = null;
+function saveMinutes() {
+  saveState();
+  clearTimeout(_minutesSyncTimer);
+  _minutesSyncTimer = setTimeout(saveToCloud, 1000);
+}
 
 function getHijriDateStr() {
   const md = state.minutesData;
@@ -8236,6 +8251,7 @@ migrateLegacyPasswords();
         {id:"U2",name:"الكنترول",username:"ctrl",role:"controller"},
         {id:"U3",name:"مسؤول التنبيهات",username:"notify",role:"notifier"},
         {id:"U4",name:"مدير المدرسة",username:"principal",role:"principal"},
+        {id:"U5",name:"مراقب اللجان",username:"monitor",role:"monitor"},
       ];
       var found = null;
       for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
