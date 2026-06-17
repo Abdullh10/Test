@@ -2588,7 +2588,49 @@ function renderCtrlList(el) {
 // ═══════════════════════════════════════════════
 // NOTIFIER — SEND (WhatsApp)
 // ═══════════════════════════════════════════════
-let _selTeachers=[], _selType="correction", _selBundle="";
+let _selTeachers=[], _selType="correction", _selBundle="", _teacherDropdownOpen=false;
+
+function teacherSelectorHTML() {
+  const all = state.teachers||[];
+  const allSelected = all.length>0 && _selTeachers.length===all.length;
+  const summary = _selTeachers.length===0 ? "اختر المعلمين..."
+    : allSelected ? `الكل (${all.length} معلم)`
+    : _selTeachers.length===1 ? esc((all.find(t=>t.id===_selTeachers[0])||{}).name||"")
+    : `${_selTeachers.length} معلمين محددين`;
+  return `
+  <div style="position:relative">
+    <button type="button" onclick="toggleTeacherDropdown()"
+      style="width:100%;display:flex;justify-content:space-between;align-items:center;background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:${_selTeachers.length?700:400};color:${_selTeachers.length?"var(--navy)":"var(--muted)"};cursor:pointer;font-family:inherit">
+      <span>${summary}</span>
+      <span style="font-size:11px;color:var(--mid)">${_teacherDropdownOpen?"▲":"▼"}</span>
+    </button>
+    ${_teacherDropdownOpen ? `
+    <div style="margin-top:6px;border:1.5px solid var(--border);border-radius:10px;background:#fff;box-shadow:var(--sh2);max-height:280px;overflow-y:auto;padding:6px">
+      ${all.length===0 ? `<p class="empty" style="padding:14px 0">لا يوجد معلمون — أضفهم من الإعدادات</p>` : `
+      <button type="button" onclick="toggleAllTeachers()"
+        style="width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:none;background:${allSelected?"rgba(11,29,58,.06)":"transparent"};cursor:pointer;font-family:inherit;margin-bottom:4px;border-bottom:1px solid var(--border);text-align:right">
+        <span style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${allSelected?"var(--navy)":"var(--border)"};background:${allSelected?"var(--navy)":"#fff"};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${allSelected?"✓":""}</span>
+        <span style="font-weight:700;font-size:13px;color:var(--navy)">تحديد الكل (${all.length})</span>
+      </button>
+      ${all.map(t=>{
+        const sel=_selTeachers.includes(t.id);
+        return `
+        <button type="button" onclick="toggleTeacher('${t.id}')"
+          style="width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:none;background:${sel?"rgba(11,29,58,.06)":"transparent"};cursor:pointer;font-family:inherit;text-align:right;margin-bottom:2px">
+          <span style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${sel?"var(--navy)":"var(--border)"};background:${sel?"var(--navy)":"#fff"};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${sel?"✓":""}</span>
+          <span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;background:${sel?"var(--navy)":"var(--border)"}">${esc(t.name.charAt(0))}</span>
+          <span style="flex:1;min-width:0">
+            <span style="font-weight:${sel?700:400};color:${sel?"var(--navy)":"var(--text)"};font-size:13px">${esc(t.name)}</span>
+            <span style="font-size:11px;color:var(--muted);margin-right:6px">${esc(t.subject||"")}</span>
+          </span>
+          <span class="tag" style="background:var(--purBg);color:var(--purple);flex-shrink:0">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
+        </button>`;
+      }).join("")}`}
+      <button type="button" onclick="toggleTeacherDropdown()"
+        style="width:100%;margin-top:6px;padding:9px;border-radius:8px;border:none;background:var(--navy);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✓ تم</button>
+    </div>` : ""}
+  </div>`;
+}
 
 function renderNotifSend(el) {
   const ntHTML=NOTIFY_TYPES.map(t=>`
@@ -2597,24 +2639,13 @@ function renderNotifSend(el) {
       ${t.icon} ${t.label}
     </button>`).join("");
 
-  const teachersHTML=state.teachers.map(t=>`
-    <button class="teacherRow${_selTeachers.includes(t.id)?" selected":""}" onclick="toggleTeacher('${t.id}')">
-      <div class="t-avatar" style="background:${_selTeachers.includes(t.id)?"var(--navy)":"var(--border)"}">${_selTeachers.includes(t.id)?"✓":t.name.charAt(0)}</div>
-      <div style="flex:1;text-align:right">
-        <span style="font-weight:${_selTeachers.includes(t.id)?800:400};color:${_selTeachers.includes(t.id)?"var(--navy)":"var(--mid)"};font-size:13px">${t.name}</span>
-        <span style="font-size:11px;color:var(--muted);margin-right:6px">${t.subject}</span>
-      </div>
-      <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
-      <span style="font-size:10px;color:var(--wa);font-family:monospace;direction:ltr;background:var(--waBg);padding:2px 7px;border-radius:99px">◈ ${t.phone}</span>
-    </button>`).join("") || `<p class="empty">لا يوجد معلمون — أضفهم من الإعدادات</p>`;
-
   el.innerHTML=`
   <div class="card">
     <p class="card-title">📲 إرسال تنبيه واتساب للمعلمين</p>
     <label class="lbl">نوع التنبيه</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${ntHTML}</div>
-    <label class="lbl">المعلمون المستهدفون (اختر واحداً أو أكثر)</label>
-    <div id="teacherList" style="margin-bottom:14px">${teachersHTML}</div>
+    <label class="lbl">المعلمون المستهدفون (اختر واحداً أو أكثر أو الكل)</label>
+    <div id="teacherSelectorBox" style="margin-bottom:14px">${teacherSelectorHTML()}</div>
     <label class="lbl">ربط بمظروف (اختياري)</label>
     <select class="inp" id="notif_bundle" style="margin-bottom:14px" onchange="_selBundle=this.value">
       <option value="">-- بدون ربط --</option>
@@ -2644,14 +2675,26 @@ function selNType(key) {
   _selType=key;
   renderNotifSend(document.getElementById("pageContent"));
 }
+function refreshTeacherSelector() {
+  const box=document.getElementById("teacherSelectorBox");
+  if(box) box.innerHTML=teacherSelectorHTML();
+  updatePreview();
+}
+function toggleTeacherDropdown() {
+  _teacherDropdownOpen=!_teacherDropdownOpen;
+  refreshTeacherSelector();
+}
+function toggleAllTeachers() {
+  const all=state.teachers||[];
+  _selTeachers = (_selTeachers.length===all.length) ? [] : all.map(t=>t.id);
+  refreshTeacherSelector();
+}
 function toggleTeacher(id) {
   _selTeachers = _selTeachers.includes(id) ? _selTeachers.filter(x=>x!==id) : [..._selTeachers,id];
-  const el=document.getElementById("pageContent");
-  renderNotifSend(el);
-  // restore message
+  refreshTeacherSelector();
 }
 function clearNotif() {
-  _selTeachers=[]; _selType="correction"; _selBundle="";
+  _selTeachers=[]; _selType="correction"; _selBundle=""; _teacherDropdownOpen=false;
   renderNotifSend(document.getElementById("pageContent"));
 }
 
