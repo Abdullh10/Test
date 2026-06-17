@@ -517,6 +517,46 @@ function esc(v) {
   return String(v==null?"":v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+// كلمات المرور تُخزَّن مُجزّأة (PBKDF2-SHA256) ولا تُحفظ كنص صريح بعد اليوم
+const PW_ITERATIONS = 50000;
+function randomSalt(len=16) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({name:"PBKDF2", salt:enc.encode(salt), iterations:PW_ITERATIONS, hash:"SHA-256"}, keyMaterial, 256);
+  return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function setUserPassword(user, plainPassword) {
+  user.salt = randomSalt();
+  user.passwordHash = await hashPassword(plainPassword, user.salt);
+  delete user.password;
+}
+async function verifyUserPassword(user, plainPassword) {
+  if(!user) return false;
+  if(user.passwordHash && user.salt) {
+    return (await hashPassword(plainPassword, user.salt)) === user.passwordHash;
+  }
+  // حساب قديم لم يُهاجَر بعد — يُحوَّل تلقائياً عند أول دخول ناجح
+  if(user.password !== undefined && user.password === plainPassword) {
+    await setUserPassword(user, plainPassword);
+    saveState();
+    if(typeof saveToCloud==="function") { try{ saveToCloud(); }catch(e){} }
+    return true;
+  }
+  return false;
+}
+async function migrateLegacyPasswords() {
+  const list = (state.users||[]).filter(u=>u.password!==undefined && !u.passwordHash);
+  if(!list.length) return;
+  for(const u of list) await setUserPassword(u, u.password);
+  saveState();
+  if(typeof saveToCloud==="function") { try{ saveToCloud(); }catch(e){} }
+}
+
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
@@ -607,11 +647,11 @@ async function loadFromCloud() {
     }
     // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود)
     var defaultUsers = [
-      { id:"U1", name:"مدير النظام",        username:"admin",     password:"admin123", role:"admin"      },
-      { id:"U2", name:"الكنترول",           username:"ctrl",      password:"ctrl123",  role:"controller" },
-      { id:"U5", name:"مراقب اللجان",       username:"monitor",   password:"mon123",   role:"monitor"    },
-      { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    password:"1234",     role:"notifier"   },
-      { id:"U4", name:"مدير المدرسة",       username:"principal", password:"prin123",  role:"principal"  },
+      { id:"U1", name:"مدير النظام",        username:"admin",     salt:"aeb796ff44e3b993191d7393f7892ed3", passwordHash:"9e2fe0c37ab45b6c5df1f02acfa7233ad8480ee8e25b1c21e6529a663cd74bfc", role:"admin"      },
+      { id:"U2", name:"الكنترول",           username:"ctrl",      salt:"2bf214c0243c07e0f4ff868662aaf77e", passwordHash:"1f104e82d41121ff2ebd8cdc2ea08c0d59e02a11c63fd4653e5d19afd686b8c2", role:"controller" },
+      { id:"U5", name:"مراقب اللجان",       username:"monitor",   salt:"c557ce19e6cb29917a7e0c447a036669", passwordHash:"946ba9dc5c8d33d162d13d5e21338b25ac8fbf758fc23d96788a1cd9d0e5ef5c", role:"monitor"    },
+      { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    salt:"2832a24044d778a1a7b0c3ed09e8633a", passwordHash:"0e3a40977e53bf0e0a97780d641b56a705c909815b199cd8af2af97240d24d08", role:"notifier"   },
+      { id:"U4", name:"مدير المدرسة",       username:"principal", salt:"0b217b7b40523b379dece0018cbec4cc", passwordHash:"6ca7473d9e12b0be8de47ec2e03c16193a0e0a4f5f5a88275265e2957bba9c59", role:"principal"  },
     ];
     defaultUsers.forEach(function(du){
       if(!state.users.find(function(u){ return u.id===du.id; })) state.users.push(du);
@@ -1376,11 +1416,11 @@ let state = {
     {id:"TBNS9IE",name:"حسين بن مانع بن حسين القحطاني",role:"corrector",phone:"+966567508504",subject:"",note:""}
   ],
   users: [
-    { id:"U1", name:"مدير النظام",        username:"admin",     password:"admin123", role:"admin"      },
-    { id:"U2", name:"الكنترول",           username:"ctrl",      password:"ctrl123",  role:"controller" },
-    { id:"U5", name:"مراقب اللجان",       username:"monitor",   password:"mon123",   role:"monitor"    },
-    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    password:"1234",     role:"notifier"   },
-    { id:"U4", name:"مدير المدرسة",       username:"principal", password:"prin123",  role:"principal"  },
+    { id:"U1", name:"مدير النظام",        username:"admin",     salt:"aeb796ff44e3b993191d7393f7892ed3", passwordHash:"9e2fe0c37ab45b6c5df1f02acfa7233ad8480ee8e25b1c21e6529a663cd74bfc", role:"admin"      },
+    { id:"U2", name:"الكنترول",           username:"ctrl",      salt:"2bf214c0243c07e0f4ff868662aaf77e", passwordHash:"1f104e82d41121ff2ebd8cdc2ea08c0d59e02a11c63fd4653e5d19afd686b8c2", role:"controller" },
+    { id:"U5", name:"مراقب اللجان",       username:"monitor",   salt:"c557ce19e6cb29917a7e0c447a036669", passwordHash:"946ba9dc5c8d33d162d13d5e21338b25ac8fbf758fc23d96788a1cd9d0e5ef5c", role:"monitor"    },
+    { id:"U3", name:"مسؤول التنبيهات",    username:"notify",    salt:"2832a24044d778a1a7b0c3ed09e8633a", passwordHash:"0e3a40977e53bf0e0a97780d641b56a705c909815b199cd8af2af97240d24d08", role:"notifier"   },
+    { id:"U4", name:"مدير المدرسة",       username:"principal", salt:"0b217b7b40523b379dece0018cbec4cc", passwordHash:"6ca7473d9e12b0be8de47ec2e03c16193a0e0a4f5f5a88275265e2957bba9c59", role:"principal"  },
   ],
   bundles: [],
   notifLog: [],
@@ -1626,10 +1666,11 @@ function renderLoginDemos() {
   if(el) el.textContent = state.schoolName;
 }
 
-function doLogin() {
+async function doLogin() {
   const u = document.getElementById("loginUser").value.trim();
   const p = document.getElementById("loginPass").value;
-  const found = state.users.find(x=>x.username===u&&x.password===p);
+  const candidate = state.users.find(x=>x.username===u);
+  const found = (await verifyUserPassword(candidate, p)) ? candidate : null;
   const errEl = document.getElementById("loginErr");
   if(found) {
     currentUser = found; errEl.style.display="none";
@@ -3059,20 +3100,22 @@ function editUserCommittees(id) {
   toast("تم تحديث لجان المراقب ✅");
   renderSTabContent();
 }
-function addUser() {
+async function addUser() {
   const name=(document.getElementById("nu_name")||{value:""}).value.trim();
   const username=(document.getElementById("nu_user")||{value:""}).value.trim();
   const password=(document.getElementById("nu_pass")||{value:""}).value;
   const role=(document.getElementById("nu_role")||{value:""}).value;
   if(!name||!username||!password){ toast("أكمل البيانات","err"); return; }
   if(state.users.find(u=>u.username===username)){ toast("اسم المستخدم موجود مسبقاً","err"); return; }
-  const newUser = { id:"U"+uid(), name, username, password, role };
+  const newUser = { id:"U"+uid(), name, username, role };
+  await setUserPassword(newUser, password);
   if(role==="monitor"){
     const raw=(document.getElementById("nu_committees")||{value:""}).value.trim();
     if(raw) newUser.assignedCommittees = raw.split(",").map(c=>c.trim()).filter(Boolean);
   }
   state.users.push(newUser);
   saveState();
+  if(typeof saveToCloud==="function") { try{ saveToCloud(); }catch(e){} }
   toast("تم إضافة الحساب ✅");
   renderSTabContent();
   renderLoginDemos();
@@ -8082,6 +8125,7 @@ setInterval(()=>{cd--;if(cdEl)cdEl.textContent=cd;if(cd<=0){cd=30;render();}},10
 // 1) Load localStorage FIRST so state is populated before anything renders
 loadState();
 renderLoginDemos();
+migrateLegacyPasswords();
 
 (async function() {
   // 2) Then try to sync from cloud (may overwrite with newer data)
@@ -8090,6 +8134,7 @@ renderLoginDemos();
     if(ldg){ ldg.style.display="flex"; }
     await loadFromCloud();
     if(ldg){ ldg.style.display="none"; }
+    await migrateLegacyPasswords();
     // After cloud load, also persist to localStorage so next refresh is instant
     saveState();
     refreshBellAfterLoad();
@@ -8106,10 +8151,10 @@ renderLoginDemos();
     if(raw) {
       var sess = JSON.parse(raw);
       var allU = (state.users && state.users.length) ? state.users : [
-        {id:"U1",name:"مدير النظام",username:"admin",password:"admin123",role:"admin"},
-        {id:"U2",name:"الكنترول",username:"ctrl",password:"ctrl123",role:"controller"},
-        {id:"U3",name:"مسؤول التنبيهات",username:"notify",password:"1234",role:"notifier"},
-        {id:"U4",name:"مدير المدرسة",username:"principal",password:"prin123",role:"principal"},
+        {id:"U1",name:"مدير النظام",username:"admin",role:"admin"},
+        {id:"U2",name:"الكنترول",username:"ctrl",role:"controller"},
+        {id:"U3",name:"مسؤول التنبيهات",username:"notify",role:"notifier"},
+        {id:"U4",name:"مدير المدرسة",username:"principal",role:"principal"},
       ];
       var found = null;
       for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
