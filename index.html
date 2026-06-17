@@ -2047,6 +2047,7 @@ function submitNewBundle() {
   };
   state.bundles.push(b);
   saveState();
+  saveBundleToCloud(b);   // ← مزامنة فورية مع السحابة
   _newBundleCreated = b;
   renderBundleSuccess(document.getElementById("pageContent"), b);
   toast("تم إنشاء المظروف وباركوده ✅");
