@@ -1517,7 +1517,7 @@ const NOTIFY_TYPES = [
 ];
 const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"admin_notifications",icon:"🔔",label:"كل التنبيهات"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
-  controller: [ {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
+  controller: [ {k:"ctrl_new",icon:"✦",label:"مظروف جديد"}, {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_absence",icon:"🧑‍🎓",label:"رصد غياب الطلاب"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_approvals",icon:"✅",label:"اعتماد المستندات"}, {k:"principal_archive",icon:"🗄",label:"الأرشيف النهائي"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
   monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_students",icon:"🧑‍🎓",label:"متابعة الطلاب"}, {k:"monitor_daily",icon:"📊",label:"تقرير يومي"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"monitor_stats",icon:"📈",label:"إحصائياتي"} ],
@@ -1876,6 +1876,7 @@ function navigateTo(page) {
   // render page
   switch(page) {
     case "admin_new":   renderAdminNew(el);    break;
+    case "ctrl_new":    renderAdminNew(el);    break;
     case "admin_list":  renderAdminList(el);   break;
     case "settings":    renderSettings(el);    break;
     case "ctrl_scan":   renderCtrlScan(el);    break;
@@ -2078,7 +2079,7 @@ function renderBundleSuccess(el, b) {
     </div>
     <div class="row" style="gap:8px">
       <button class="btn btn-navy" style="flex:1;box-shadow:var(--sh2)" onclick="printBundle('${b.barcode}','${b.subject}','${b.count}')">🖨️ طباعة</button>
-      <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo('admin_new')">➕ مظروف آخر</button>
+      <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo(currentUser&&currentUser.role==='controller'?'ctrl_new':'admin_new')">➕ مظروف آخر</button>
     </div>
   </div>`;
 }
@@ -2629,7 +2630,7 @@ function doAdvance() {
 // CONTROLLER — LIST
 // ═══════════════════════════════════════════════
 function renderCtrlList(el) {
-  if(state.bundles.length===0){ el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◈</span>لا توجد مظاريف حتى الآن<br/><span style="font-size:12px;color:var(--faint)">أنشئ مظروفاً جديداً من حساب المدير</span></div></div>`; return; }
+  if(state.bundles.length===0){ el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◈</span>لا توجد مظاريف حتى الآن<br/><span style="font-size:12px;color:var(--faint)">أنشئ مظروفاً جديداً من قسم "مظروف جديد"</span></div></div>`; return; }
   el.innerHTML=`<div id="ctrlBundleList"></div>`;
   const container=document.getElementById("ctrlBundleList");
   state.bundles.forEach(b=>{
