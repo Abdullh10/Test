@@ -4654,11 +4654,22 @@ function renderPrincipalReport(el) {
   const subjDone       = Object.values(subjectMap).filter(d=>d.total>0 && d.done===d.total).length;
   const subjIncomplete = subjTotal - subjDone;
 
-  // papers whose correction phase is actually finished (not just "exists somewhere in the system")
-  const correctionStageIdx = state.stages.findIndex(s=>s.includes("تصحيح") && s.includes("انتهاء"));
-  const papersCorrected = correctionStageIdx===-1
-    ? state.bundles.filter(b=>b.stage===stagesLen-1).reduce((a,b)=>a+b.count,0)
-    : state.bundles.filter(b=>b.stage>=correctionStageIdx).reduce((a,b)=>a+b.count,0);
+  // Papers whose correction phase is actually finished, cumulative across every exam
+  // (not just today's). Stage labels are free-text and school-customizable, so we can't
+  // assume an exact phrase like "تم الانتهاء من التصحيح" — instead find the LAST stage
+  // mentioning "تصحيح": if its own wording marks completion (انتهاء/تم/اكتمل) a bundle
+  // counts once it REACHES that stage, otherwise correction is only truly done once the
+  // bundle has moved PAST it to the next stage.
+  const correctionIdxs = [];
+  state.stages.forEach((s,i)=>{ if(s.includes("تصحيح")) correctionIdxs.push(i); });
+  let papersCorrected;
+  if(correctionIdxs.length===0){
+    papersCorrected = state.bundles.filter(b=>b.stage===stagesLen-1).reduce((a,b)=>a+b.count,0);
+  } else {
+    const lastIdx = correctionIdxs[correctionIdxs.length-1];
+    const isDoneMarker = /انتهاء|تم |اكتمل/.test(state.stages[lastIdx]);
+    papersCorrected = state.bundles.filter(b=> isDoneMarker ? b.stage>=lastIdx : b.stage>lastIdx).reduce((a,b)=>a+b.count,0);
+  }
 
   // documents overview: pledges (monitorReports), minutes (minutesArchive), daily reports
   const pledgeList  = state.monitorReports||[];
@@ -4692,20 +4703,25 @@ function renderPrincipalReport(el) {
     else if(b.stage>=0) gradeMap[g].inProg++;
   });
 
-  // teacher map — separate buckets per role so a teacher who both corrects
-  // and reviews the same bundle isn't lumped into a single conflated count
+  // teacher map — separate buckets per role AND per subject, so a teacher who both
+  // corrects and reviews (or who works across several subjects) isn't lumped into a
+  // single ambiguous count
   const tMap={};
   const TEACHER_ROLE_BUCKET=[["corrector","corrected"],["corrector2","corrected"],["reviewer","reviewed"],["reviewer2","reviewed"],["auditor","audited"],["auditor2","audited"]];
   state.bundles.forEach(b=>{
+    const subj=b.subject||"غير محدد";
     TEACHER_ROLE_BUCKET.forEach(([field,bucket])=>{
       const tid=b[field];
       if(!tid) return;
       const t=state.teachers.find(x=>x.id===tid);
       if(!t) return;
-      if(!tMap[t.id]) tMap[t.id]={name:t.name,bundles:0,papers:0,done:0,corrected:0,correctedPapers:0,reviewed:0,reviewedPapers:0,audited:0,auditedPapers:0};
+      if(!tMap[t.id]) tMap[t.id]={name:t.name,bundles:0,papers:0,done:0,corrected:0,correctedPapers:0,reviewed:0,reviewedPapers:0,audited:0,auditedPapers:0,bySubject:{}};
       tMap[t.id].bundles++; tMap[t.id].papers+=b.count;
       tMap[t.id][bucket]++; tMap[t.id][bucket+"Papers"]+=b.count;
       if(b.stage===stagesLen-1) tMap[t.id].done++;
+      const key=subj+"|"+bucket;
+      if(!tMap[t.id].bySubject[key]) tMap[t.id].bySubject[key]={subject:subj,bucket,papers:0};
+      tMap[t.id].bySubject[key].papers+=b.count;
     });
   });
 
@@ -4999,9 +5015,12 @@ function renderPrincipalReport(el) {
             </div>
             ${bar(p2,col,6)}
             <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-              ${d.corrected>0?`<span style="font-size:10px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:2px 8px;border-radius:99px">✏️ مصححة: ${d.correctedPapers}</span>`:""}
-              ${d.reviewed>0?`<span style="font-size:10px;font-weight:700;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:99px">🔍 مراجعة: ${d.reviewedPapers}</span>`:""}
-              ${d.audited>0?`<span style="font-size:10px;font-weight:700;color:#5B21B6;background:#EDE9FE;padding:2px 8px;border-radius:99px">✅ مدققة: ${d.auditedPapers}</span>`:""}
+              ${Object.values(d.bySubject).sort((a,b2)=>a.subject.localeCompare(b2.subject)).map(it=>{
+                const meta = it.bucket==="corrected" ? {icon:"✏️",label:"تصحيح",color:"#1E40AF",bg:"#DBEAFE"}
+                           : it.bucket==="reviewed"  ? {icon:"🔍",label:"مراجعة",color:"#92400E",bg:"#FEF3C7"}
+                           :                            {icon:"✅",label:"تدقيق",color:"#5B21B6",bg:"#EDE9FE"};
+                return `<span style="font-size:10px;font-weight:700;color:${meta.color};background:${meta.bg};padding:2px 8px;border-radius:99px">${meta.icon} ${it.subject} - ${meta.label}: ${it.papers}</span>`;
+              }).join("")}
             </div>
           </div>
         </div>`;
