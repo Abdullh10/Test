@@ -1602,6 +1602,12 @@ const PAGES = {
 // HELPERS
 // ═══════════════════════════════════════════════
 function uid()    { return Math.random().toString(36).slice(2,8).toUpperCase(); }
+// ينشئ معرّفاً غير مكرر بمقارنته بقائمة موجودة — لتفادي تصادم نادر بين باركودات/معرّفات سجلات مختلفة
+function uniqueUid(existing) {
+  let id = uid();
+  while(existing.has(id)) id = uid();
+  return id;
+}
 function nowISO() { return new Date().toISOString(); }
 function fmt(iso) { try { return new Date(iso).toLocaleString("ar-SA-u-ca-islamic-umalqura",{dateStyle:"short",timeStyle:"short"}); } catch(e){ return iso; } }
 
@@ -1680,7 +1686,7 @@ function makeQR(value, size=130) {
 }
 
 function phoneToWA(phone) {
-  return phone.replace(/[^\d]/g,"");
+  return (phone||"").replace(/[^\d]/g,"");
 }
 function waLink(phone, msg) {
   const num = phoneToWA(phone);
@@ -2113,8 +2119,10 @@ function submitNewBundle() {
   const examEnd    = (document.getElementById("bf_end")||{value:""}).value||"";
   if(!subject) { toast("اختر المادة","err"); return; }
   if(!count||isNaN(count)||+count<1) { toast("أدخل عدد الأوراق","err"); return; }
+  const existingIds = new Set(state.bundles.map(x=>x.id));
+  let barcode; do { barcode = `M${uid()}`; } while(state.bundles.some(x=>x.barcode===barcode));
   const b = {
-    id:uid(), barcode:`M${uid()}`,
+    id:uniqueUid(existingIds), barcode,
     subject, grade, count:+count,
     corrector, corrector2, reviewer, reviewer2, auditor, auditor2, note,
     examDay, examDate, examHall, examStart, examEnd,
