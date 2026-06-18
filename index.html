@@ -680,6 +680,13 @@ function _monitorVisible(record) {
   return false;
 }
 
+// لجان المراقب الحالي إن كان مقيّداً بلجان محددة، أو null إن كان يرى كل اللجان
+// (غير مراقب، أو مراقب غير مقيّد)
+function _monitorOwnCommittees() {
+  if(!currentUser || currentUser.role!=="monitor") return null;
+  return (currentUser.assignedCommittees && currentUser.assignedCommittees.length) ? currentUser.assignedCommittees : null;
+}
+
 function _mergeById(cloudArr, localArr, deletedSet) {
   var map = {};
   (cloudArr||[]).forEach(function(item){ if(item && item.id) map[item.id] = item; });
@@ -6262,9 +6269,8 @@ let _sdbQ = "", _sdbCommittee = "", _sdbGrade = "";
 function _sdbCommittees() {
   const set = new Set((state.studentsDB||[]).map(s=>s.committee).filter(Boolean));
   let list = Array.from(set).sort(_sdbCommitteeCompare);
-  if(currentUser && currentUser.role==="monitor" && currentUser.assignedCommittees && currentUser.assignedCommittees.length){
-    list = list.filter(c=>currentUser.assignedCommittees.includes(c));
-  }
+  const own = _monitorOwnCommittees();
+  if(own) list = list.filter(c=>own.includes(c));
   return list;
 }
 function _sdbGrades() {
@@ -6280,7 +6286,7 @@ function _sdbCommitteeCompare(a, b) {
 }
 function _sdbFiltered() {
   const q = _sdbQ.trim();
-  const visible = (currentUser && currentUser.role==="monitor" && currentUser.assignedCommittees && currentUser.assignedCommittees.length) ? currentUser.assignedCommittees : null;
+  const visible = _monitorOwnCommittees();
   const gradeOrder = state.grades||[];
   return (state.studentsDB||[]).filter(s=>{
     if(visible && !visible.includes(s.committee)) return false;
@@ -6306,8 +6312,8 @@ function sdbUpdate(field, val) {
 function renderStudentsDB(el) {
   const committees = _sdbCommittees();
   const grades = _sdbGrades();
-  const isMonitorScoped = currentUser && currentUser.role==="monitor" && currentUser.assignedCommittees && currentUser.assignedCommittees.length;
-  const total = isMonitorScoped ? (state.studentsDB||[]).filter(s=>currentUser.assignedCommittees.includes(s.committee)).length : (state.studentsDB||[]).length;
+  const ownCommittees = _monitorOwnCommittees();
+  const total = ownCommittees ? (state.studentsDB||[]).filter(s=>ownCommittees.includes(s.committee)).length : (state.studentsDB||[]).length;
   const isAdmin = currentUser && currentUser.role==="admin";
   el.innerHTML = `
   <div class="page-wrap" style="max-width:860px">
