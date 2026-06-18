@@ -4283,17 +4283,20 @@ function renderPrinSubject(el) {
     name:s, idx:i, count:filtered.filter(b=>b.stage===i).length, color:sc(i)
   }));
 
-  // Teacher workload for this subject
+  // Teacher workload for this subject — keyed by (name, role) so a teacher
+  // playing two different roles on this subject's bundles gets a row per role
+  // instead of one conflated row that mixes both jobs together
   const tMap={};
   filtered.forEach(b=>{
     [[b.corrector,"مصحح"],[b.corrector2,"مصحح 2"],[b.reviewer,"مراجع"],[b.reviewer2,"مراجع 2"],[b.auditor,"مدقق"],[b.auditor2,"مدقق 2"]]
     .filter(([id])=>id).forEach(([id,role])=>{
       const t=state.teachers.find(x=>x.id===id);
       if(!t) return;
-      if(!tMap[t.name]) tMap[t.name]={role,bundles:0,papers:0,stageSum:0};
-      tMap[t.name].bundles++;
-      tMap[t.name].papers+=b.count;
-      tMap[t.name].stageSum+=Math.max(0,b.stage+1);
+      const key=t.name+"|"+role;
+      if(!tMap[key]) tMap[key]={name:t.name,role,bundles:0,papers:0,stageSum:0};
+      tMap[key].bundles++;
+      tMap[key].papers+=b.count;
+      tMap[key].stageSum+=Math.max(0,b.stage+1);
     });
   });
 
@@ -4388,9 +4391,9 @@ function renderPrinSubject(el) {
         <th style="text-align:center">الأوراق</th>
       </tr></thead>
       <tbody>
-        ${Object.entries(tMap).sort((a,b)=>b[1].bundles-a[1].bundles).map(([name,d])=>`
+        ${Object.values(tMap).sort((a,b)=>b.bundles-a.bundles).map(d=>`
         <tr>
-          <td style="font-weight:700;color:var(--navy)">${name}</td>
+          <td style="font-weight:700;color:var(--navy)">${d.name}</td>
           <td><span style="background:var(--purBg);color:var(--purple);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.role}</span></td>
           <td style="text-align:center;font-weight:700">${d.bundles}</td>
           <td style="text-align:center;color:var(--mid)">${d.papers}</td>
@@ -4647,6 +4650,15 @@ function renderPrincipalReport(el) {
     if(!subjectMap[s].stages[sk]) subjectMap[s].stages[sk]=0;
     subjectMap[s].stages[sk]++;
   });
+  const subjTotal      = Object.keys(subjectMap).length;
+  const subjDone       = Object.values(subjectMap).filter(d=>d.total>0 && d.done===d.total).length;
+  const subjIncomplete = subjTotal - subjDone;
+
+  // papers whose correction phase is actually finished (not just "exists somewhere in the system")
+  const correctionStageIdx = state.stages.findIndex(s=>s.includes("تصحيح") && s.includes("انتهاء"));
+  const papersCorrected = correctionStageIdx===-1
+    ? state.bundles.filter(b=>b.stage===stagesLen-1).reduce((a,b)=>a+b.count,0)
+    : state.bundles.filter(b=>b.stage>=correctionStageIdx).reduce((a,b)=>a+b.count,0);
 
   // documents overview: pledges (monitorReports), minutes (minutesArchive), daily reports
   const pledgeList  = state.monitorReports||[];
@@ -4680,14 +4692,19 @@ function renderPrincipalReport(el) {
     else if(b.stage>=0) gradeMap[g].inProg++;
   });
 
-  // teacher map
+  // teacher map — separate buckets per role so a teacher who both corrects
+  // and reviews the same bundle isn't lumped into a single conflated count
   const tMap={};
+  const TEACHER_ROLE_BUCKET=[["corrector","corrected"],["corrector2","corrected"],["reviewer","reviewed"],["reviewer2","reviewed"],["auditor","audited"],["auditor2","audited"]];
   state.bundles.forEach(b=>{
-    [b.corrector,b.corrector2,b.reviewer,b.reviewer2,b.auditor,b.auditor2].filter(Boolean).forEach(tid=>{
+    TEACHER_ROLE_BUCKET.forEach(([field,bucket])=>{
+      const tid=b[field];
+      if(!tid) return;
       const t=state.teachers.find(x=>x.id===tid);
       if(!t) return;
-      if(!tMap[t.id]) tMap[t.id]={name:t.name,bundles:0,papers:0,done:0};
+      if(!tMap[t.id]) tMap[t.id]={name:t.name,bundles:0,papers:0,done:0,corrected:0,correctedPapers:0,reviewed:0,reviewedPapers:0,audited:0,auditedPapers:0};
       tMap[t.id].bundles++; tMap[t.id].papers+=b.count;
+      tMap[t.id][bucket]++; tMap[t.id][bucket+"Papers"]+=b.count;
       if(b.stage===stagesLen-1) tMap[t.id].done++;
     });
   });
@@ -4750,20 +4767,20 @@ function renderPrincipalReport(el) {
 
     <!-- KPI cards -->
     <div style="background:linear-gradient(135deg,#1E40AF,#3B82F6);border-radius:14px;padding:14px;color:#fff;text-align:center">
-      <p style="font-size:30px;font-weight:900">${total}</p>
-      <p style="font-size:11px;opacity:.9;margin-top:2px">إجمالي المظاريف</p>
+      <p style="font-size:30px;font-weight:900">${subjTotal}</p>
+      <p style="font-size:11px;opacity:.9;margin-top:2px">إجمالي المواد</p>
     </div>
     <div style="background:linear-gradient(135deg,#065F46,#10B981);border-radius:14px;padding:14px;color:#fff;text-align:center">
-      <p style="font-size:30px;font-weight:900">${done}</p>
-      <p style="font-size:11px;opacity:.9;margin-top:2px">مظاريف مكتملة ✅</p>
+      <p style="font-size:30px;font-weight:900">${subjDone}</p>
+      <p style="font-size:11px;opacity:.9;margin-top:2px">مواد مكتملة ✅</p>
     </div>
     <div style="background:linear-gradient(135deg,#92400E,#F59E0B);border-radius:14px;padding:14px;color:#fff;text-align:center">
-      <p style="font-size:30px;font-weight:900">${incomplete}</p>
-      <p style="font-size:11px;opacity:.9;margin-top:2px">غير مكتملة ⚠️</p>
+      <p style="font-size:30px;font-weight:900">${subjIncomplete}</p>
+      <p style="font-size:11px;opacity:.9;margin-top:2px">مواد غير مكتملة ⚠️</p>
     </div>
     <div style="background:linear-gradient(135deg,#4C1D95,#8B5CF6);border-radius:14px;padding:14px;color:#fff;text-align:center">
-      <p style="font-size:30px;font-weight:900">${totalPapers}</p>
-      <p style="font-size:11px;opacity:.9;margin-top:2px">إجمالي الأوراق 📄</p>
+      <p style="font-size:30px;font-weight:900">${papersCorrected}</p>
+      <p style="font-size:11px;opacity:.9;margin-top:2px">إجمالي الأوراق المصححة 📄</p>
     </div>
   </div>
 
@@ -4978,9 +4995,14 @@ function renderPrincipalReport(el) {
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
               <span style="font-size:12px;font-weight:700;color:var(--navy)">${d.name}</span>
-              <span style="font-size:11px;color:var(--muted)">${d.done}/${d.bundles} | ${d.papers} ورقة</span>
+              <span style="font-size:11px;color:var(--muted)">${d.done}/${d.bundles} مظروف</span>
             </div>
             ${bar(p2,col,6)}
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              ${d.corrected>0?`<span style="font-size:10px;font-weight:700;color:#1E40AF;background:#DBEAFE;padding:2px 8px;border-radius:99px">✏️ مصححة: ${d.correctedPapers}</span>`:""}
+              ${d.reviewed>0?`<span style="font-size:10px;font-weight:700;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:99px">🔍 مراجعة: ${d.reviewedPapers}</span>`:""}
+              ${d.audited>0?`<span style="font-size:10px;font-weight:700;color:#5B21B6;background:#EDE9FE;padding:2px 8px;border-radius:99px">✅ مدققة: ${d.auditedPapers}</span>`:""}
+            </div>
           </div>
         </div>`;
       }).join("")}
