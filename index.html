@@ -509,9 +509,6 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     </button>
     <button class="h-logout" onclick="doLogout()">خروج</button>
   </header>
-  <div id="updateBanner" onclick="applyCloudUpdate()" style="display:none;background:#F0B429;color:#0D1F3C;text-align:center;padding:9px;font-size:13px;font-weight:700;cursor:pointer">
-    📥 تتوفر بيانات أحدث محدّثة من جهاز/حساب آخر — اضغط هنا للتحديث
-  </div>
   <nav id="appNav"></nav>
   <div id="appMain"><div class="page-wrap" id="pageContent"></div></div>
 </div>
@@ -791,8 +788,7 @@ async function checkForCloudUpdates() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].updated_at) {
       if(_lastCloudUpdatedAt && new Date(rows[0].updated_at).getTime() !== new Date(_lastCloudUpdatedAt).getTime()) {
-        var banner = document.getElementById("updateBanner");
-        if(banner) banner.style.display = "block";
+        await applyCloudUpdate(true);
       }
     }
   } catch(e){ /* فحص في الخلفية فقط، يتم تجاهل الأخطاء */ }
@@ -808,17 +804,19 @@ function stopCloudPolling() {
   _pollTimer = null;
 }
 
-async function applyCloudUpdate() {
-  var banner = document.getElementById("updateBanner");
-  if(banner) banner.style.display = "none";
+async function applyCloudUpdate(silent) {
   // يُنفَّذ ضمن نفس طابور المزامنة المستخدَم للحفظ، لمنع تحميل بيانات سحابية
   // أثناء عملية حفظ قيد التنفيذ، وهو ما قد يتسبب باستبدال البيانات المُحمَّلة حديثاً
   // ببيانات محلية أقدم عند اكتمال الحفظ المتأخر
   _cloudSaveQueue = _cloudSaveQueue.then(loadFromCloud, loadFromCloud);
   await _cloudSaveQueue;
   renderNav();
-  navigateTo(currentPage);
-  toast("تم تحديث البيانات ✅");
+  // لا تُعِد رسم الصفحة الحالية إذا كان المستخدم يكتب داخل حقل إدخال،
+  // لتجنّب فقدان ما لم يُحفظ بعد من إدخال جارٍ
+  var active = document.activeElement;
+  var isEditing = active && ["INPUT","TEXTAREA","SELECT"].includes(active.tagName);
+  if(!isEditing) navigateTo(currentPage);
+  if(!silent) toast("تم تحديث البيانات ✅");
 }
 
 const PALETTE = ["#3B82F6","#8B5CF6","#06B6D4","#F59E0B","#EF4444","#10B981","#F97316","#22C55E","#A855F7","#6366F1","#14B8A6","#64748B"];
@@ -1890,8 +1888,6 @@ function doLogout() {
   document.getElementById("loginUser").value="";
   document.getElementById("loginPass").value="";
   document.getElementById("loginErr").style.display="none";
-  var banner = document.getElementById("updateBanner");
-  if(banner) banner.style.display="none";
 }
 
 // ═══════════════════════════════════════════════
