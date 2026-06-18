@@ -8161,9 +8161,16 @@ function _submitReply(msgId, view, mi){
   const pm=state.principalMessages.find(m=>m.id===msgId);
   if(pm){ if(!pm.replies) pm.replies=[]; pm.replies.push(reply); }
 
-  // Add to inbox entry
-  const inb=state.inbox.find(m=>(m.msgId===msgId||m.id===msgId) && m.to===currentUser.role);
-  if(inb){ if(!inb.replies) inb.replies=[]; inb.replies.push(reply); }
+  // Add to every inbox copy of this thread (one per original target), so a reply from any
+  // party — including the principal replying from the "sent" view — reaches everyone else,
+  // and re-flag those copies unread so the other side notices the new reply
+  state.inbox.forEach(m=>{
+    if(m.msgId===msgId || m.id===msgId){
+      if(!m.replies) m.replies=[];
+      m.replies.push(reply);
+      if(m.to!==currentUser.role) m.read=false;
+    }
+  });
 
   // If replying from inbox → create notification for principal (فقط لو كانت الرسالة جزءاً من محادثة فعلية أرسلها مدير المدرسة)
   if(view==="inbox" && pm){
