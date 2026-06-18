@@ -1592,7 +1592,7 @@ const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"admin_notifications",icon:"🔔",label:"كل التنبيهات"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
   controller: [ {k:"ctrl_new",icon:"✦",label:"مظروف جديد"}, {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_absence",icon:"🧑‍🎓",label:"رصد غياب الطلاب"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
-  principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_approvals",icon:"✅",label:"اعتماد المستندات"}, {k:"principal_archive",icon:"🗄",label:"الأرشيف النهائي"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"} ],
+  principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_approvals",icon:"✅",label:"اعتماد المستندات"}, {k:"principal_archive",icon:"🗄",label:"الأرشيف النهائي"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"}, {k:"inbox",icon:"🔔",label:"الوارد"} ],
   monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_students",icon:"🧑‍🎓",label:"متابعة الطلاب"}, {k:"monitor_daily",icon:"📊",label:"تقرير يومي"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"monitor_stats",icon:"📈",label:"إحصائياتي"} ],
 };
 
@@ -1893,33 +1893,6 @@ function doLogout() {
 // ═══════════════════════════════════════════════
 // NAV
 // ═══════════════════════════════════════════════
-function getUnreadCount() {
-  if(!currentUser) return 0;
-  const inbox = (state.inbox||[]).filter(m=>m.to===currentUser.role && !m.read);
-  return inbox.length;
-}
-
-function updateBell() {
-  const btn = document.getElementById("bellBtn");
-  const badge = document.getElementById("bellBadge");
-  if(!btn||!badge) return;
-  const roles = ["controller","notifier","monitor"];
-  if(currentUser && roles.includes(currentUser.role)) {
-    btn.style.display = "flex";
-    btn.style.alignItems = "center";
-    btn.style.justifyContent = "center";
-    const cnt = getUnreadCount();
-    if(cnt>0) {
-      badge.style.display = "flex";
-      badge.textContent = cnt>9?"9+":cnt;
-    } else {
-      badge.style.display = "none";
-    }
-  } else {
-    btn.style.display = "none";
-  }
-}
-
 function renderNav() {
   const nav = document.getElementById("appNav");
   nav.innerHTML = "";
@@ -8088,6 +8061,9 @@ function _renderMsgCard(m, mi, view){
   const replies=m.replies||[];
   const newReplies=view==="sent"?replies.filter(r=>!r.readByPrincipal).length:0;
   const isInbox=(view==="inbox");
+  // الردود مدعومة فقط للرسائل المرتبطة بمحادثة فعلية (مرسلة عبر مدير المدرسة)؛
+  // التنبيهات التلقائية (مثل اعتماد مستند) إشعارات أحادية الاتجاه بلا قناة رد محدّدة
+  const canReply=isInbox?!!m.msgId:true;
   const toStr=(m.targetLabels||[]).join(" و ");
   const replyBoxId=`replyBox_${view}_${mi}`;
   const taBtnId=`replyToggle_${view}_${mi}`;
@@ -8138,12 +8114,12 @@ function _renderMsgCard(m, mi, view){
     ${replies.length>0?`<div style="padding:10px 16px 4px;background:#fafbfd">${threadHtml}</div>`:""}
 
     <!-- ── reply action bar ── -->
-    <div style="padding:10px 14px;background:#f4f6fb;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+    ${canReply?`<div style="padding:10px 14px;background:#f4f6fb;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
       <div id="${replyBoxId}" style="display:none">
         <textarea id="${taId}" class="inp" rows="3"
           placeholder="اكتب ردك هنا..." style="font-size:13px;line-height:1.65;resize:vertical;margin-bottom:8px"></textarea>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-navy btn-sm" onclick="_submitReply('${m.id||""}','${view}',${mi})">↩️ إرسال الرد</button>
+          <button class="btn btn-navy btn-sm" onclick="_submitReply('${m.msgId||m.id||""}','${view}',${mi})">↩️ إرسال الرد</button>
           <button class="btn btn-outline btn-sm" onclick="
             document.getElementById('${replyBoxId}').style.display='none';
             document.getElementById('${taBtnId}').style.display='flex';
@@ -8158,7 +8134,7 @@ function _renderMsgCard(m, mi, view){
         ">
         ↩️ رد على الرسالة
       </button>
-    </div>
+    </div>`:""}
   </div>`;
 }
 
@@ -8189,8 +8165,8 @@ function _submitReply(msgId, view, mi){
   const inb=state.inbox.find(m=>(m.msgId===msgId||m.id===msgId) && m.to===currentUser.role);
   if(inb){ if(!inb.replies) inb.replies=[]; inb.replies.push(reply); }
 
-  // If replying from inbox → create notification for principal
-  if(view==="inbox"){
+  // If replying from inbox → create notification for principal (فقط لو كانت الرسالة جزءاً من محادثة فعلية أرسلها مدير المدرسة)
+  if(view==="inbox" && pm){
     state.inbox.unshift({
       id:"inb_rep_"+Date.now(),
       msgId,
