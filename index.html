@@ -6173,13 +6173,7 @@ function printDailyReport(id) {
 let _sdbQ = "", _sdbCommittee = "", _sdbGrade = "";
 function _sdbCommittees() {
   const set = new Set((state.studentsDB||[]).map(s=>s.committee).filter(Boolean));
-  let list = Array.from(set).sort((a,b)=>{
-    const an=parseInt(a), bn=parseInt(b);
-    if(!isNaN(an)&&!isNaN(bn)) return an-bn;
-    if(!isNaN(an)) return -1;
-    if(!isNaN(bn)) return 1;
-    return String(a).localeCompare(String(b));
-  });
+  let list = Array.from(set).sort(_sdbCommitteeCompare);
   if(currentUser && currentUser.role==="monitor" && currentUser.assignedCommittees && currentUser.assignedCommittees.length){
     list = list.filter(c=>currentUser.assignedCommittees.includes(c));
   }
@@ -6189,15 +6183,30 @@ function _sdbGrades() {
   const set = new Set((state.studentsDB||[]).map(s=>s.grade).filter(Boolean));
   return Array.from(set);
 }
+function _sdbCommitteeCompare(a, b) {
+  const an=parseInt(a), bn=parseInt(b);
+  if(!isNaN(an)&&!isNaN(bn)) return an-bn;
+  if(!isNaN(an)) return -1;
+  if(!isNaN(bn)) return 1;
+  return String(a||"").localeCompare(String(b||""));
+}
 function _sdbFiltered() {
   const q = _sdbQ.trim();
   const visible = (currentUser && currentUser.role==="monitor" && currentUser.assignedCommittees && currentUser.assignedCommittees.length) ? currentUser.assignedCommittees : null;
+  const gradeOrder = state.grades||[];
   return (state.studentsDB||[]).filter(s=>{
     if(visible && !visible.includes(s.committee)) return false;
     if(_sdbCommittee && s.committee!==_sdbCommittee) return false;
     if(_sdbGrade && s.grade!==_sdbGrade) return false;
     if(q && !(s.name.includes(q) || (s.sid||"").includes(q) || (s.phone||"").includes(q))) return false;
     return true;
+  }).sort((a,b)=>{
+    const cc = _sdbCommitteeCompare(a.committee, b.committee);
+    if(cc!==0) return cc;
+    const ag=gradeOrder.indexOf(a.grade), bg=gradeOrder.indexOf(b.grade);
+    const gc = (ag===-1&&bg===-1) ? String(a.grade||"").localeCompare(String(b.grade||"")) : (ag===-1?1 : bg===-1?-1 : ag-bg);
+    if(gc!==0) return gc;
+    return String(a.name||"").localeCompare(String(b.name||""));
   });
 }
 function sdbUpdate(field, val) {
