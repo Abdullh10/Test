@@ -646,6 +646,8 @@ function saveToCloud() {
 // آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
 // تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
 var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users"];
+// عدد النسخ السابقة المحفوظة في سجل الأرشيف السحابي (يُستخدم للاسترجاع عند الأخطاء)
+var _HISTORY_LIMIT = 20;
 
 function _markDeleted(id) {
   if(!state._deletedIds) state._deletedIds = [];
@@ -666,9 +668,10 @@ function _mergeById(cloudArr, localArr, deletedSet) {
 async function _doSaveToCloud() {
   // قراءة آخر نسخة سحابية قبل الحفظ ثم دمجها مع البيانات المحلية بدل استبدالها بالكامل
   var cloudData = {};
+  var prevUpdatedAt = null;
   try {
     var existing = await sbGet("settings", {id:"main"});
-    if(existing && existing[0] && existing[0].data) cloudData = existing[0].data;
+    if(existing && existing[0] && existing[0].data) { cloudData = existing[0].data; prevUpdatedAt = existing[0].updated_at; }
   } catch(e) { /* تعذرت قراءة النسخة السحابية، سيتم الحفظ بالبيانات المحلية فقط */ }
 
   var deletedSet = {};
@@ -691,6 +694,17 @@ async function _doSaveToCloud() {
     monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[], approvals:state.approvals||[], studentsDB:state.studentsDB||[], absenceLog:state.absenceLog||[],
     _deletedIds: state._deletedIds||[]
   };
+
+  // أرشفة النسخة السحابية السابقة (قبل استبدالها) ضمن سجل تاريخي، لإمكانية الاسترجاع عند الأخطاء
+  var history = cloudData._history || [];
+  if(Object.keys(cloudData).length) {
+    var prevSnapshot = {};
+    Object.keys(cloudData).forEach(function(k){ if(k!=="_history") prevSnapshot[k] = cloudData[k]; });
+    history = history.concat([{ at: prevUpdatedAt || new Date().toISOString(), data: prevSnapshot }]);
+    if(history.length > _HISTORY_LIMIT) history = history.slice(history.length - _HISTORY_LIMIT);
+  }
+  settings._history = history;
+
   var updatedAt = new Date().toISOString();
   var ok = await sbUpsert("settings", {id:"main", data:settings, updated_at:updatedAt});
   // Also save to localStorage as backup
@@ -3005,7 +3019,7 @@ function renderSettings(el) {
   if(!_editStages) _editStages=[...state.stages];
   el.innerHTML=`
   <div class="s-tabs">
-    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["users","👥 حسابات"],["phone","📱 واتساب"]].map(([k,l])=>`
+    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["users","👥 حسابات"],["phone","📱 واتساب"],["history","🕓 النسخ السابقة"]].map(([k,l])=>`
     <button class="sTab${_sTab===k?" active":""}" onclick="switchSTab('${k}')">${l}</button>`).join("")}
   </div>
   <div id="sTabContent"></div>`;
@@ -3025,6 +3039,7 @@ function renderSTabContent() {
     case "teachers": renderSTeachers(el);  break;
     case "users":    renderSUsers(el);     break;
     case "phone":    renderSPhone(el);     break;
+    case "history":  renderSHistory(el);   break;
   }
 }
 
@@ -3225,6 +3240,46 @@ function renderSPhone(el) {
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">الرقم الحالي المفعّل:</p>
     <p style="font-family:monospace;font-size:18px;font-weight:800;color:var(--navy);direction:ltr">${state.adminPhone}</p>
   </div>`;
+}
+
+async function renderSHistory(el) {
+  el.innerHTML = `<div class="card">
+    <p class="card-title">🕓 النسخ السابقة من البيانات السحابية</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يحفظ النظام نسخة من البيانات قبل كل تحديث سحابي (آخر ${_HISTORY_LIMIT} نسخة)، لاستخدامها عند حدوث خطأ غير مقصود.</p>
+    <div id="sHistList" style="font-size:13px;color:var(--muted)">⏳ جلب السجل...</div>
+  </div>`;
+  const listEl = document.getElementById("sHistList");
+  try {
+    const history = await loadCloudHistory();
+    if(!history.length) { listEl.innerHTML = "لا توجد نسخ سابقة محفوظة بعد."; return; }
+    listEl.innerHTML = history.map((h,idx)=>{
+      return `<div class="list-item" style="flex-wrap:wrap">
+        <span style="flex:1;font-size:13px">${fmt(h.at)}</span>
+        <button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="restoreHistorySnapshot(${idx})">↩️ استرجاع هذه النسخة</button>
+      </div>`;
+    }).reverse().join("");
+  } catch(e) {
+    listEl.innerHTML = "تعذر جلب السجل، تأكد من الاتصال بالإنترنت.";
+  }
+}
+
+async function loadCloudHistory() {
+  const rows = await sbGet("settings", {id:"main"});
+  if(rows && rows[0] && rows[0].data && rows[0].data._history) return rows[0].data._history;
+  return [];
+}
+
+async function restoreHistorySnapshot(idx) {
+  if(!confirm("سيتم استرجاع البيانات لهذه النسخة السابقة، وستُحفظ النسخة الحالية تلقائياً ضمن السجل قبل ذلك. هل تريد الاستمرار؟")) return;
+  const history = await loadCloudHistory();
+  const snap = history[idx];
+  if(!snap){ toast("تعذر العثور على النسخة","err"); return; }
+  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","_deletedIds"];
+  keys.forEach(function(k){ if(snap.data[k]!==undefined) state[k]=snap.data[k]; });
+  saveState();
+  await saveToCloud();
+  toast("✅ تم استرجاع النسخة المحددة");
+  renderSTabContent();
 }
 
 function deleteUserAccount(id) {
