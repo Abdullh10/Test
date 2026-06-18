@@ -1,4 +1,4 @@
-const CACHE_NAME = "exam-tracker-shell-v1";
+const CACHE_NAME = "exam-tracker-shell-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -40,8 +40,11 @@ self.addEventListener("fetch", (event) => {
   });
   if (!isShellAsset) return;
 
+  // cache:"no-store" يفرض طلباً شبكياً حقيقياً كل مرة، متجاوزاً ذاكرة تخزين HTTP
+  // المؤقتة للمتصفح (لا فقط ذاكرة الـService Worker)؛ بدون هذا قد يستمر عرض نسخة
+  // قديمة من الواجهة بعد كل تحديث للتطبيق حتى لو كانت استراتيجية الكاش "شبكة أولاً"
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-store" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
