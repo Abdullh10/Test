@@ -304,6 +304,25 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 }
 .bundle-actions{display:flex;gap:6px;align-items:center}
 
+/* ── BUNDLE TABLE (ctrl envelope list) ──────────── */
+.bundleTableWrap{background:var(--white);border-radius:var(--r12);box-shadow:var(--sh1);border:1px solid var(--border);overflow:hidden}
+.bundleTable{width:100%;border-collapse:collapse;font-size:13px}
+.bundleTable thead th{background:var(--navy);color:#fff;padding:11px 14px;text-align:right;font-weight:700;font-size:12px;white-space:nowrap}
+.bundleTable tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.bundleTable tbody tr:last-child{border-bottom:none}
+.bundleTable tbody tr:hover{background:rgba(11,29,58,.04)}
+.bundleTable td{padding:12px 14px;vertical-align:middle}
+.statusCellInner{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+@media (max-width:700px){
+  .bundleTable thead{display:none}
+  .bundleTable, .bundleTable tbody, .bundleTable tr, .bundleTable td{display:block;width:100%}
+  .bundleTable tbody tr{padding:12px 14px}
+  .bundleTable td{padding:5px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .bundleTable td::before{content:attr(data-label);font-size:11px;font-weight:700;color:var(--muted);flex-shrink:0}
+  .bundleTable td.statusCell{align-items:flex-start}
+  .statusCellInner{flex:1}
+}
+
 /* ── TEACHER ROW ─────────────────────────────── */
 .teacher-row{
   display:flex;align-items:center;gap:10px;padding:11px 13px;
@@ -2813,31 +2832,42 @@ async function doAdvance() {
 // ═══════════════════════════════════════════════
 function renderCtrlList(el) {
   if(state.bundles.length===0){ el.innerHTML=`<div class="card"><div class="empty"><span class="empty-icon">◈</span>لا توجد مظاريف حتى الآن<br/><span style="font-size:12px;color:var(--faint)">أنشئ مظروفاً جديداً من قسم "مظروف جديد"</span></div></div>`; return; }
-  el.innerHTML=`<div id="ctrlBundleList"></div>`;
+  el.innerHTML=`
+  <div class="bundleTableWrap">
+    <table class="bundleTable">
+      <thead><tr>
+        <th>المادة</th>
+        <th>الصف</th>
+        <th>عدد الورق</th>
+        <th>الباركود</th>
+        <th>الحالة</th>
+      </tr></thead>
+      <tbody id="ctrlBundleList"></tbody>
+    </table>
+  </div>`;
   const container=document.getElementById("ctrlBundleList");
   state.bundles.forEach(b=>{
     const stageName=b.stage<0?"◈ جديد":state.stages[b.stage]||"—";
     const color=b.stage<0?"var(--muted)":sc(b.stage);
     const pct=state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
-    const div=document.createElement("div");
-    div.className="bundle-card";
-    div.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
-    div.innerHTML=`
-      <div class="bundle-icon" style="background:${color}20;overflow:hidden"><svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='${color}' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/><polyline points='3.27 6.96 12 12.01 20.73 6.96'/><line x1='12' y1='22.08' x2='12' y2='12'/></svg></div>
-      <div class="bundle-info">
-        <div class="row" style="flex-wrap:wrap;gap:5px">
-          <span class="bundle-name">${b.subject}</span>
-          ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
-          <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
+    const tr=document.createElement("tr");
+    tr.className="bundleRow";
+    tr.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
+    tr.innerHTML=`
+      <td data-label="المادة"><span class="bundle-name">${b.subject}</span></td>
+      <td data-label="الصف">${b.grade||"—"}</td>
+      <td data-label="عدد الورق"><span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span></td>
+      <td data-label="الباركود"><span class="bundle-meta" style="margin:0">${b.barcode}</span></td>
+      <td data-label="الحالة" class="statusCell">
+        <div class="statusCellInner">
+          <span class="bundle-badge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>
+          <div class="bundle-progress" style="min-width:90px">
+            <div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${color}"></div></div>
+            <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
+          </div>
         </div>
-        <p class="bundle-meta">${b.barcode}</p>
-        <div class="bundle-progress">
-          <div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${color}"></div></div>
-          <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
-        </div>
-      </div>
-      <span class="bundle-badge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>`;
-    container.appendChild(div);
+      </td>`;
+    container.appendChild(tr);
   });
 }
 
