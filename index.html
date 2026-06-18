@@ -642,13 +642,54 @@ function saveToCloud() {
   _cloudSaveQueue = _cloudSaveQueue.then(_doSaveToCloud, _doSaveToCloud);
   return _cloudSaveQueue;
 }
+// حقول مشتركة بين عدة مستخدمين (تقارير، تعهدات، اعتمادات، إلخ) — يتم دمجها مع
+// آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
+// تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
+var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users"];
+
+function _markDeleted(id) {
+  if(!state._deletedIds) state._deletedIds = [];
+  if(id && state._deletedIds.indexOf(id)===-1) state._deletedIds.push(id);
+}
+
+function _mergeById(cloudArr, localArr, deletedSet) {
+  var map = {};
+  (cloudArr||[]).forEach(function(item){ if(item && item.id) map[item.id] = item; });
+  (localArr||[]).forEach(function(item){ if(item && item.id) map[item.id] = item; }); // المحلي يفوز عند تعارض نفس المعرف (تعديل أحدث)
+  var result = [];
+  Object.keys(map).forEach(function(id){
+    if(!deletedSet[id]) result.push(map[id]);
+  });
+  return result;
+}
+
 async function _doSaveToCloud() {
+  // قراءة آخر نسخة سحابية قبل الحفظ ثم دمجها مع البيانات المحلية بدل استبدالها بالكامل
+  var cloudData = {};
+  try {
+    var existing = await sbGet("settings", {id:"main"});
+    if(existing && existing[0] && existing[0].data) cloudData = existing[0].data;
+  } catch(e) { /* تعذرت قراءة النسخة السحابية، سيتم الحفظ بالبيانات المحلية فقط */ }
+
+  var deletedSet = {};
+  (cloudData._deletedIds||[]).concat(state._deletedIds||[]).forEach(function(id){ deletedSet[id]=true; });
+  state._deletedIds = Object.keys(deletedSet);
+
+  _MERGE_FIELDS.forEach(function(k){
+    state[k] = _mergeById(cloudData[k], state[k], deletedSet);
+  });
+  // ضمان وجود المستخدمين الافتراضيين دائماً (إلا إذا تم حذفهم عمداً)
+  DEFAULT_USERS.forEach(function(du){
+    if(!deletedSet[du.id] && !state.users.find(function(u){ return u.id===du.id; })) state.users.push({...du});
+  });
+
   var settings = {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
     users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
-    monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[], approvals:state.approvals||[], studentsDB:state.studentsDB||[], absenceLog:state.absenceLog||[]
+    monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[], approvals:state.approvals||[], studentsDB:state.studentsDB||[], absenceLog:state.absenceLog||[],
+    _deletedIds: state._deletedIds||[]
   };
   var updatedAt = new Date().toISOString();
   var ok = await sbUpsert("settings", {id:"main", data:settings, updated_at:updatedAt});
@@ -677,14 +718,14 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog"].forEach(function(k){
+      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","_deletedIds"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
       _lastCloudUpdatedAt = rows[0].updated_at || _lastCloudUpdatedAt;
     }
-    // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود)
+    // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود، إلا إذا حذفها المدير عمداً)
     DEFAULT_USERS.forEach(function(du){
-      if(!state.users.find(function(u){ return u.id===du.id; })) state.users.push({...du});
+      if((state._deletedIds||[]).indexOf(du.id)===-1 && !state.users.find(function(u){ return u.id===du.id; })) state.users.push({...du});
     });
     // Load bundles
     var brows = await sbGet("bundles");
@@ -2950,6 +2991,7 @@ function saveAbsenceLog() {
 }
 function deleteAbsenceLog(id) {
   state.absenceLog = state.absenceLog.filter(r=>r.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   renderNotifAbsence(document.getElementById("pageContent"));
 }
@@ -3175,7 +3217,7 @@ function renderSPhone(el) {
     <div class="row">
       <button class="btn btn-navy" onclick="
         const v=document.getElementById('s_adminPhone').value.trim();
-        if(v){state.adminPhone=v;saveState();toast('تم حفظ الرقم ✅')}">💾 حفظ الرقم</button>
+        if(v){state.adminPhone=v;saveState();saveToCloud();toast('تم حفظ الرقم ✅')}">💾 حفظ الرقم</button>
       <a href="${waLink(state.adminPhone,"اختبار الرسالة — نظام تتبع المظاريف")}" target="_blank"
         class="btn btn-wa">📲 اختبار الرقم</a>
     </div>
@@ -3183,6 +3225,14 @@ function renderSPhone(el) {
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:8px">الرقم الحالي المفعّل:</p>
     <p style="font-family:monospace;font-size:18px;font-weight:800;color:var(--navy);direction:ltr">${state.adminPhone}</p>
   </div>`;
+}
+
+function deleteUserAccount(id) {
+  if(!confirm("حذف هذا الحساب؟")) return;
+  state.users = state.users.filter(x=>x.id!==id);
+  _markDeleted(id);
+  saveState(); saveToCloud();
+  renderSTabContent();
 }
 
 function renderSUsers(el) {
@@ -3200,7 +3250,7 @@ function renderSUsers(el) {
           <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
           ${u.role==="monitor"?`<span class="tag" style="background:#F1F5F9;color:#334155">${u.assignedCommittees&&u.assignedCommittees.length?"لجان: "+u.assignedCommittees.join("، "):"كل اللجان"}</span>
           <button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="editUserCommittees('${u.id}')">✏️ اللجان</button>`:""}
-          ${u.id!==(currentUser&&currentUser.id)?`<button class="del-btn" onclick="state.users=state.users.filter(x=>x.id!='${u.id}');saveState();renderSTabContent()">×</button>`:""}
+          ${u.id!==(currentUser&&currentUser.id)?`<button class="del-btn" onclick="deleteUserAccount('${u.id}')">×</button>`:""}
         </div>`;
       }).join("")}
     </div>
@@ -5292,6 +5342,7 @@ function saveMonitorNote() {
 
 function deleteMonitorNote(id) {
   state.monitorNotes = (state.monitorNotes||[]).filter(n=>n.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   toast("تم الحذف");
   renderMonitorCommittees(document.getElementById("pageContent"));
@@ -5869,6 +5920,7 @@ function saveMonitorDailyReport() {
 function deleteDailyReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
   state.monitorDailyReports=(state.monitorDailyReports||[]).filter(r=>r.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   toast("تم الحذف");
   renderMonitorDaily(document.getElementById("pageContent"));
@@ -6435,6 +6487,7 @@ function saveTeacherObs() {
 
 function deleteStudentObs(id) {
   state.monitorStudentObs = (state.monitorStudentObs||[]).filter(o=>o.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   toast("تم الحذف");
   renderMonitorStudents(document.getElementById("pageContent"));
@@ -6699,9 +6752,11 @@ function renderMonitorStats(el) {
 function deleteMonitorReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
   state.monitorReports = (state.monitorReports||[]).filter(r=>r.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   toast("تم الحذف");
-  renderMonitorReports(document.getElementById("pageContent"));
+  if(currentPage==="monitor_papers") renderMonitorPapers(document.getElementById("pageContent"));
+  else renderMonitorReports(document.getElementById("pageContent"));
 }
 
 function printMonitorReport(id) {
