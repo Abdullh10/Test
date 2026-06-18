@@ -721,6 +721,8 @@ async function _doSaveToCloud() {
 }
 
 async function saveBundleToCloud(b) {
+  // يمنع إعادة إحياء مظروف محذوف عبر جهاز كان غير متصل وقت الحذف ثم حاول حفظه مجدداً
+  if((state._deletedIds||[]).includes(b.id)) return false;
   var ok = await sbUpsert("bundles", {id:b.id, data:b, updated_at:new Date().toISOString()});
   saveState();
   if(ok) showSyncDot(true);
@@ -745,9 +747,18 @@ async function loadFromCloud() {
     var rows = await sbGet("settings", {id:"main"});
     if(rows && rows[0] && rows[0].data) {
       var d = rows[0].data;
-      ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","_deletedIds"].forEach(function(k){
+      // الحقول المشتركة (تقارير/ملاحظات/اعتمادات/مستخدمين/طلاب/معلمين..) تُدمج بمعرّف العنصر
+      // مع ما هو موجود محلياً بدل استبدالها بالكامل — لمنع ضياع إضافة محلية لم تُرفع
+      // للسحابة بعد عندما يصل تحديث ناتج عن تعديل غير متعلق من جهاز آخر (نفس منطق _doSaveToCloud)
+      var deletedSet = {};
+      (d._deletedIds||[]).concat(state._deletedIds||[]).forEach(function(id){ deletedSet[id]=true; });
+      ["schoolName","adminPhone","subjects","grades","stages","examSchedule","minutesData"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
+      _MERGE_FIELDS.forEach(function(k){
+        if(d[k] !== undefined) state[k] = _mergeById(d[k], state[k], deletedSet);
+      });
+      state._deletedIds = Object.keys(deletedSet);
       _lastCloudUpdatedAt = rows[0].updated_at || _lastCloudUpdatedAt;
     }
     // ضمان وجود المستخدمين الافتراضيين دائماً (لا تُحذف عند تحديث الكود، إلا إذا حذفها المدير عمداً)
@@ -757,7 +768,9 @@ async function loadFromCloud() {
     // Load bundles
     var brows = await sbGet("bundles");
     if(brows && brows.length) {
-      state.bundles = brows.sort(function(a,b){ return new Date(a.created_at)-new Date(b.created_at); }).map(function(r){ return r.data; });
+      var delSet = state._deletedIds||[];
+      state.bundles = brows.filter(function(r){ return delSet.indexOf(r.id)===-1; })
+        .sort(function(a,b){ return new Date(a.created_at)-new Date(b.created_at); }).map(function(r){ return r.data; });
     }
     // Load notifLog
     var nrows = await sbGet("notif_log");
@@ -1599,7 +1612,8 @@ const PAGES = {
 // ═══════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════
-function uid()    { return Math.random().toString(36).slice(2,8).toUpperCase(); }
+// دمج الطابع الزمني مع جزء عشوائي يقلل بشدة من فرصة تصادم المعرّفات بين أجهزة مختلفة مقارنة بالعشوائية فقط
+function uid()    { return (Date.now().toString(36)+Math.random().toString(36).slice(2,8)).toUpperCase(); }
 // ينشئ معرّفاً غير مكرر بمقارنته بقائمة موجودة — لتفادي تصادم نادر بين باركودات/معرّفات سجلات مختلفة
 function uniqueUid(existing) {
   let id = uid();
@@ -1835,7 +1849,7 @@ async function doLogin() {
   const errEl = document.getElementById("loginErr");
   if(found) {
     currentUser = found; errEl.style.display="none";
-    try{ var sData=JSON.stringify({username:found.username,role:found.role,lastPage:null}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
+    try{ var sData=JSON.stringify({username:found.username,role:found.role,lastPage:null,loggedAt:Date.now()}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
     document.getElementById("loginScreen").style.display="none";
     const shell = document.getElementById("appShell");
     shell.style.display="flex";
@@ -1907,11 +1921,12 @@ function renderNav() {
   updateBell();
 }
 
-const ADMIN_ONLY_PAGES = ["settings"];
 function navigateTo(page) {
-  if(ADMIN_ONLY_PAGES.includes(page) && (!currentUser || currentUser.role!=="admin")) {
-    toast("هذه الصفحة مخصصة لمدير النظام فقط","err");
-    page = (PAGES[currentUser&&currentUser.role]&&PAGES[currentUser.role][0]) ? PAGES[currentUser.role][0].k : "ctrl_scan";
+  // كل صفحة مسموح بها فقط للأدوار التي تظهر في قائمتها داخل PAGES — يمنع وصول أي دور لصفحة دور آخر
+  const allowedPages = (currentUser && PAGES[currentUser.role]) ? PAGES[currentUser.role].map(p=>p.k) : [];
+  if(!allowedPages.includes(page)) {
+    toast("لا تملك صلاحية الوصول لهذه الصفحة","err");
+    page = allowedPages[0] || "ctrl_scan";
   }
   currentPage = page;
   // Save current page in session for restore after refresh
@@ -2211,25 +2226,30 @@ function renderAdminBundleList() {
 }
 
 function adminDeleteBundle(id) {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   if(!confirm("حذف هذا المظروف نهائياً؟")) return;
   state.bundles = state.bundles.filter(b=>b.id!==id);
-  saveState();
+  _markDeleted(id); // يمنع إعادة ظهور المظروف لو حاول جهاز آخر غير متصل حفظه مرة أخرى بعد حذفه
+  saveState(); saveToCloud();
   deleteBundleFromCloud(id);
   toast("تم الحذف","err");
   renderAdminList(document.getElementById("pageContent"));
 }
 
 function adminDeleteAllBundles() {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   if(!confirm("حذف جميع المظاريف؟")) return;
   const ids = state.bundles.map(b=>b.id);
   state.bundles = [];
-  saveState();
+  ids.forEach(id=>_markDeleted(id));
+  saveState(); saveToCloud();
   ids.forEach(id=>deleteBundleFromCloud(id));
   toast("تم الحذف","err");
   renderAdminList(document.getElementById("pageContent"));
 }
 
 function adminEditBundle(id) {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   const b = state.bundles.find(x=>x.id===id);
   if(!b)return;
   const overlay = document.createElement("div");
@@ -2310,6 +2330,7 @@ function adminEditBundle(id) {
 }
 
 function saveEditBundle(id) {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   const b = state.bundles.find(x=>x.id===id);
   if(!b)return;
   b.subject    = document.getElementById("eb_subject").value||b.subject;
@@ -2669,7 +2690,7 @@ function renderStageSelector() {
   area.innerHTML=html;
 }
 
-function doAdvance() {
+async function doAdvance() {
   if(_confirmStg===null||!_scanHit)return;
   const idx=_confirmStg;
   const b=state.bundles.find(x=>x.id===_scanHit.id);
@@ -2678,6 +2699,19 @@ function doAdvance() {
   if(idx===state.stages.length-1 && (!b.corrector||!b.reviewer)) {
     if(!confirm("هذا المظروف سيُعتبر مكتملاً ولكن لم يتم تحديد المصحح و/أو المراجع. هل تريد المتابعة؟")) { _confirmStg=null; renderStageSelector(); return; }
   }
+  // تحقق من السحابة قبل الحفظ: لو قام جهاز آخر بتقديم هذا المظروف بالفعل خلال نافذة المزامنة الدورية (٣٠ ثانية)
+  // نوقف العملية ونحدّث الحالة بدل تسجيل تقدّم متعارض على نفس المظروف
+  try {
+    const fresh = await sbGet("bundles", {id:b.id});
+    const cloudData = fresh && fresh[0] && fresh[0].data;
+    if(cloudData && cloudData.stage !== b.stage) {
+      b.stage = cloudData.stage; b.log = cloudData.log||b.log;
+      saveState();
+      toast("⚠️ تم تقديم هذا المظروف من جهاز آخر للتو — تم تحديث حالته، أعد المحاولة إذا لزم","err");
+      _confirmStg=null; renderScanResult();
+      return;
+    }
+  } catch(e) { /* تعذر التحقق من السحابة، استمر بالعملية محلياً */ }
   const note=(document.getElementById("stageNote")||{value:""}).value||"";
   const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
   b.stage=idx; b.log.push(entry);
@@ -2969,8 +3003,8 @@ function renderNotifAbsence(el) {
               <span style="font-size:12px;font-weight:800;color:var(--navy)">${r.grade||"—"} ${r.committee?" | لجنة "+r.committee:""}</span>
               <span style="font-size:11px;color:var(--muted)">${r.date||""}</span>
             </div>
-            <p style="font-size:12px;color:var(--text);white-space:pre-line;line-height:1.7">${r.names}</p>
-            ${r.note?`<p style="font-size:11px;color:var(--muted);margin-top:4px">📝 ${r.note}</p>`:""}
+            <p style="font-size:12px;color:var(--text);white-space:pre-line;line-height:1.7">${esc(r.names)}</p>
+            ${r.note?`<p style="font-size:11px;color:var(--muted);margin-top:4px">📝 ${esc(r.note)}</p>`:""}
             <div style="text-align:left;margin-top:6px">
               <button class="del-btn" onclick="deleteAbsenceLog('${r.id}')" title="حذف">×</button>
             </div>
@@ -3219,6 +3253,7 @@ function renderSTeachers(el) {
 }
 
 function addTeacher() {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   const name  = (document.getElementById("nt_name")||{value:""}).value.trim();
   const phone = (document.getElementById("nt_phone")||{value:""}).value.trim();
   const subject=(document.getElementById("nt_subject")||{value:""}).value;
@@ -3231,6 +3266,7 @@ function addTeacher() {
   renderSTabContent();
 }
 function deleteTeacher(id) {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   state.teachers = state.teachers.filter(x=>x.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
@@ -3298,6 +3334,7 @@ async function restoreHistorySnapshot(idx) {
 }
 
 function deleteUserAccount(id) {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   if(!confirm("حذف هذا الحساب؟")) return;
   state.users = state.users.filter(x=>x.id!==id);
   _markDeleted(id);
@@ -3520,7 +3557,7 @@ function renderCtrlReport(el) {
             <p style="font-size:10px;color:var(--faint)">حُفظ: ${savedDate}</p>
           </div>
           <div style="display:flex;gap:7px;flex-wrap:wrap">
-            ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('minutes','${a.id}','${a.label}','${dateStr}')">📨 إرسال للاعتماد</button>`:""}
+            ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('minutes','${a.id}','${encodeURIComponent(a.label)}','${encodeURIComponent(dateStr)}')">📨 إرسال للاعتماد</button>`:""}
             <button class="btn btn-navy btn-sm" onclick="printArchivedMinutes(${i})">🖨️ طباعة PDF</button>
             <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteArchivedMinutes('${a.id}')">✕ حذف</button>
           </div>
@@ -3578,6 +3615,7 @@ function printArchivedMinutesById(id) {
 }
 
 function deleteArchivedMinutes(id) {
+  if(!currentUser || currentUser.role!=="controller") { toast("هذا الإجراء مخصص للكنترول فقط","err"); return; }
   if(!confirm("حذف هذه النسخة؟")) return;
   if(_hasPendingApproval("minutes", id) && !confirm("هذا المحضر بانتظار اعتماد مدير المدرسة — حذفه سيترك طلب الاعتماد بلا مستند. هل تريد الحذف رغم ذلك؟")) return;
   state.minutesArchive = (state.minutesArchive||[]).filter(a=>a.id!==id);
@@ -5075,6 +5113,9 @@ function _hasPendingApproval(docType, docId) {
 }
 
 function submitForApproval(docType, docId, title, subtitle) {
+  // title/subtitle تصل مُرمَّزة بـ encodeURIComponent من زر onclick لمنع كسر السمة/الكود عبر نص يحتوي على علامات اقتباس
+  try{ title = decodeURIComponent(title); }catch(e){}
+  try{ subtitle = decodeURIComponent(subtitle||""); }catch(e){}
   if(!state.approvals) state.approvals=[];
   const existing = state.approvals.find(a=>a.docType===docType && a.docId===docId);
   if(existing && existing.status==="pending") { toast("المستند مُرسل مسبقاً وبانتظار الاعتماد","err"); return; }
@@ -5172,6 +5213,7 @@ function viewApprovalDoc(docType, docId) {
 }
 
 function approveDocument(approvalId) {
+  if(!currentUser || currentUser.role!=="principal") { toast("هذا الإجراء مخصص لمدير المدرسة فقط","err"); return; }
   const a = (state.approvals||[]).find(x=>x.id===approvalId);
   if(!a) return;
   if(!_approvalDocExists(a.docType, a.docId)) { toast("لا يمكن الاعتماد — المستند المرتبط بهذا الطلب تم حذفه","err"); _approvingId=null; renderPrincipalApprovals(document.getElementById("pageContent")); return; }
@@ -5189,6 +5231,7 @@ function approveDocument(approvalId) {
 }
 
 function rejectDocument(approvalId) {
+  if(!currentUser || currentUser.role!=="principal") { toast("هذا الإجراء مخصص لمدير المدرسة فقط","err"); return; }
   const reason = prompt("سبب الرفض (اختياري):","");
   if(reason===null) return;
   const a = (state.approvals||[]).find(x=>x.id===approvalId);
@@ -5231,8 +5274,8 @@ function renderPrincipalArchive(el) {
         <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border)">
           <span style="font-size:20px">${APPROVAL_DOC_ICONS[a.docType]||"📄"}</span>
           <div style="flex:1;min-width:140px">
-            <p style="font-size:13px;font-weight:700;color:var(--navy)">${a.title}</p>
-            <p style="font-size:10px;color:var(--muted)">من: ${a.submittedBy} · اعتمد: ${fmt(a.decidedAt)} بواسطة ${a.principalName}</p>
+            <p style="font-size:13px;font-weight:700;color:var(--navy)">${esc(a.title)}</p>
+            <p style="font-size:10px;color:var(--muted)">من: ${esc(a.submittedBy)} · اعتمد: ${fmt(a.decidedAt)} بواسطة ${esc(a.principalName)}</p>
           </div>
           ${a.principalSig?`<img src="${a.principalSig}" style="height:32px;border:1px solid var(--border);border-radius:5px;background:#fff" title="توقيع المدير"/>`:""}
           <button class="btn btn-navy btn-sm" onclick="viewApprovalDoc('${a.docType}','${a.docId}')">🖨️ عرض/طباعة</button>
@@ -5959,7 +6002,7 @@ function renderMonitorDaily(el) {
             </div>`:""}
             ${obsYes.length>0?`<div style="margin-bottom:8px">${obsYes.map(o=>`<span style="display:inline-block;background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin:2px 2px 2px 0">⚠️ ${o.label}${o.note?" — "+o.note:""}</span>`).join("")}</div>`:""}
             <div style="display:flex;gap:8px;margin-top:8px">
-              ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('daily','${r.id}','تقرير يومي — ${r.day}','${inputDateToHijri(r.date)||r.date}')">📨 اعتماد</button>`:""}
+              ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('daily','${r.id}','${encodeURIComponent('تقرير يومي — '+r.day)}','${encodeURIComponent(inputDateToHijri(r.date)||r.date)}')">📨 اعتماد</button>`:""}
               <button class="btn btn-navy btn-sm" style="flex:1" onclick="printDailyReport('${r.id}')">🖨️ طباعة</button>
               <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteDailyReport('${r.id}')">🗑️ حذف</button>
             </div>
@@ -6880,13 +6923,13 @@ function renderMonitorReports(el) {
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div style="width:40px;height:40px;background:${color}18;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:1px solid ${color}30">${icon}</div>
               <div style="flex:1;min-width:130px">
-                <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${label} ${apprBadge}</p>
-                <p style="font-size:11px;color:var(--muted)">الطالب: ${stName}${r.grade?" · "+r.grade:""}${r.subject?" · "+r.subject:""}</p>
-                <p style="font-size:10px;color:var(--faint)">المراقب: ${r.monitorName||"—"} · ${fmt(r.savedAt)}</p>
+                <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${esc(label)} ${apprBadge}</p>
+                <p style="font-size:11px;color:var(--muted)">الطالب: ${esc(stName)}${r.grade?" · "+esc(r.grade):""}${r.subject?" · "+esc(r.subject):""}</p>
+                <p style="font-size:10px;color:var(--faint)">المراقب: ${esc(r.monitorName||"—")} · ${fmt(r.savedAt)}</p>
               </div>
               ${r.sigStudent ? `<img src="${r.sigStudent}" style="height:36px;border:1px solid var(--border);border-radius:5px;object-fit:contain;background:#fff" title="توقيع الطالب"/>` : ""}
               <div style="display:flex;gap:6px;flex-wrap:wrap">
-                ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('pledge','${r.id}','${label}','${stName}')">📨 اعتماد</button>`:""}
+                ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('pledge','${r.id}','${encodeURIComponent(label)}','${encodeURIComponent(stName)}')">📨 اعتماد</button>`:""}
                 <button class="btn btn-navy btn-sm" onclick="printMonitorReport('${r.id}')">🖨️ PDF</button>
                 <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteMonitorReport('${r.id}')">✕</button>
               </div>
@@ -7900,6 +7943,7 @@ function updateMsgPreview(){
 }
 
 function sendPrincipalMsg(){
+  if(!currentUser || currentUser.role!=="principal") { toast("هذا الإجراء مخصص لمدير المدرسة فقط","err"); return; }
   const title=(document.getElementById("msgTitle")||{}).value.trim();
   const body=(document.getElementById("msgBody")||{}).value.trim();
   if(!title){toast("أدخل عنوان الرسالة","err");return;}
@@ -7939,6 +7983,7 @@ function sendPrincipalMsg(){
 
 // ─── sent box (principal) ────────────────────────
 function deletePrincipalMessage(id){
+  if(!currentUser || currentUser.role!=="principal") { toast("هذا الإجراء مخصص لمدير المدرسة فقط","err"); return; }
   if(!confirm("حذف هذه الرسالة؟")) return;
   state.principalMessages=(state.principalMessages||[]).filter(m=>m.id!==id);
   _markDeleted(id);
@@ -8585,10 +8630,17 @@ migrateLegacyPasswords();
     if(!raw) raw = localStorage.getItem("examSession_backup");
     if(raw) {
       var sess = JSON.parse(raw);
-      var allU = (state.users && state.users.length) ? state.users : DEFAULT_USERS;
-      var found = null;
-      for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
-      if(found) enterShell(found, sess.lastPage||null);
+      // الجلسة المخزّنة بشكل دائم (localStorage) تنتهي صلاحيتها بعد ١٢ ساعة لتقليل مخاطر بقاء
+      // جهاز عام/مشترك مسجّلاً للدخول لفترة طويلة دون داعٍ
+      var maxAge = 12*3600*1000;
+      if(!sess.loggedAt || (Date.now()-sess.loggedAt) > maxAge) {
+        sessionStorage.removeItem("examSession"); localStorage.removeItem("examSession_backup");
+      } else {
+        var allU = (state.users && state.users.length) ? state.users : DEFAULT_USERS;
+        var found = null;
+        for(var i=0;i<allU.length;i++){ if(allU[i].username===sess.username){found=allU[i];break;} }
+        if(found) enterShell(found, sess.lastPage||null);
+      }
     }
   } catch(e){}
 })();
