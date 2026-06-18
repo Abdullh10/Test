@@ -811,7 +811,11 @@ function stopCloudPolling() {
 async function applyCloudUpdate() {
   var banner = document.getElementById("updateBanner");
   if(banner) banner.style.display = "none";
-  await loadFromCloud();
+  // يُنفَّذ ضمن نفس طابور المزامنة المستخدَم للحفظ، لمنع تحميل بيانات سحابية
+  // أثناء عملية حفظ قيد التنفيذ، وهو ما قد يتسبب باستبدال البيانات المُحمَّلة حديثاً
+  // ببيانات محلية أقدم عند اكتمال الحفظ المتأخر
+  _cloudSaveQueue = _cloudSaveQueue.then(loadFromCloud, loadFromCloud);
+  await _cloudSaveQueue;
   renderNav();
   navigateTo(currentPage);
   toast("تم تحديث البيانات ✅");
