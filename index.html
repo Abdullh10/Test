@@ -4937,8 +4937,8 @@ function renderPrincipalReport(el) {
     </div>
     ${(state.monitorNotes||[]).slice(-3).reverse().map(n=>`
     <div style="margin-top:8px;background:var(--bg);border-radius:9px;padding:9px 12px;border-right:3px solid #7C3AED">
-      <p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px">${n.subject||"—"} ${n.grade?"| "+n.grade:""} <span style="font-size:10px;color:var(--muted);font-weight:400">${inputDateToHijri(n.date)||""}</span></p>
-      <p style="font-size:12px;color:var(--text);line-height:1.6">${n.note}</p>
+      <p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px">${esc(n.subject)||"—"} ${n.grade?"| "+esc(n.grade):""} <span style="font-size:10px;color:var(--muted);font-weight:400">${inputDateToHijri(n.date)||""}</span></p>
+      <p style="font-size:12px;color:var(--text);line-height:1.6">${esc(n.note)}</p>
     </div>`).join("")}
   </div>`:""}
 
@@ -5070,8 +5070,8 @@ function renderPrincipalApprovals(el) {
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
             <span style="font-size:20px">${APPROVAL_DOC_ICONS[a.docType]||"📄"}</span>
             <div style="flex:1;min-width:140px">
-              <p style="font-weight:800;color:var(--navy);font-size:13px">${a.title}</p>
-              <p style="font-size:11px;color:var(--muted)">${a.subtitle||""} · مُرسل من: ${a.submittedBy} · ${fmt(a.submittedAt)}</p>
+              <p style="font-weight:800;color:var(--navy);font-size:13px">${esc(a.title)}</p>
+              <p style="font-size:11px;color:var(--muted)">${esc(a.subtitle)} · مُرسل من: ${esc(a.submittedBy)} · ${fmt(a.submittedAt)}</p>
             </div>
             <span style="background:#DBEAFE;color:#1E40AF;font-size:10px;font-weight:700;padding:2px 9px;border-radius:99px">${APPROVAL_DOC_LABELS[a.docType]||a.docType}</span>
           </div>
@@ -5101,8 +5101,8 @@ function renderPrincipalApprovals(el) {
       <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border-radius:9px;border:1px solid var(--border)">
         <span style="font-size:16px">${APPROVAL_DOC_ICONS[a.docType]||"📄"}</span>
         <div style="flex:1">
-          <p style="font-size:12px;font-weight:700;color:var(--navy)">${a.title}</p>
-          <p style="font-size:10px;color:var(--muted)">${a.status==="approved"?"اعتمد بتاريخ "+fmt(a.decidedAt):"رُفض: "+(a.rejectReason||"—")}</p>
+          <p style="font-size:12px;font-weight:700;color:var(--navy)">${esc(a.title)}</p>
+          <p style="font-size:10px;color:var(--muted)">${a.status==="approved"?"اعتمد بتاريخ "+fmt(a.decidedAt):"رُفض: "+esc(a.rejectReason||"—")}</p>
         </div>
         <span style="font-size:10px;font-weight:800;color:${a.status==="approved"?"#059669":"#EF4444"}">${a.status==="approved"?"✅ معتمد":"✕ مرفوض"}</span>
       </div>`).join("")}
@@ -5398,11 +5398,11 @@ function renderMonitorCommittees(el) {
         [...notes].reverse().map((n,i) => `
         <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;border-right:4px solid var(--blue);border:1px solid var(--border);border-right:4px solid #3B82F6">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-            <span style="font-weight:800;color:var(--navy);font-size:13px">${n.subject||"—"} — ${n.grade||"—"}</span>
-            <span style="font-size:11px;color:var(--muted)">${n.hall||""}</span>
+            <span style="font-weight:800;color:var(--navy);font-size:13px">${esc(n.subject)||"—"} — ${esc(n.grade)||"—"}</span>
+            <span style="font-size:11px;color:var(--muted)">${esc(n.hall)}</span>
             <span style="font-size:11px;color:var(--muted);margin-right:auto">${inputDateToHijri(n.date)||""}</span>
           </div>
-          <p style="font-size:13px;color:var(--dark);margin-bottom:6px">${n.note}</p>
+          <p style="font-size:13px;color:var(--dark);margin-bottom:6px">${esc(n.note)}</p>
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
             <span style="font-size:10px;color:var(--faint)">${fmt(n.savedAt)}</span>
             <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteMonitorNote('${n.id}')">✕ حذف</button>
@@ -6516,8 +6516,8 @@ function renderMonitorStudents(el) {
             ${o.hall?`<span style="background:var(--border);color:var(--mid);font-size:10px;padding:2px 8px;border-radius:99px">لجنة ${o.hall}</span>`:""}
             <span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${o.obsType||"—"}</span>
           </div>
-          ${o.substitute?`<p style="font-size:12px;color:#059669;font-weight:700;margin-top:3px">👤 الملاحظ البديل: ${o.substitute}</p>`:""}
-          ${o.note?`<p style="font-size:12px;color:var(--text);margin-top:4px">${o.note}</p>`:""}
+          ${o.substitute?`<p style="font-size:12px;color:#059669;font-weight:700;margin-top:3px">👤 الملاحظ البديل: ${esc(o.substitute)}</p>`:""}
+          ${o.note?`<p style="font-size:12px;color:var(--text);margin-top:4px">${esc(o.note)}</p>`:""}
           <p style="font-size:10px;color:var(--muted);margin-top:4px">${fmt(o.savedAt)}</p>
         </div>`).join("")}
       </div>`}
@@ -8040,11 +8040,11 @@ function _renderMsgCard(m, mi, view){
       </div>
       <div style="flex:1;background:${isMine?'#f0f4ff':'#f8f9fc'};border-radius:10px;padding:9px 13px;margin-bottom:5px;border:1px solid ${isMine?'#c7d4ff':'var(--border)'}">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap">
-          <span style="font-weight:800;color:var(--navy);font-size:12px">${r.from}</span>
+          <span style="font-weight:800;color:var(--navy);font-size:12px">${esc(r.from)}</span>
           ${isMine?`<span style="background:#DBEAFE;color:#1E40AF;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">أنت</span>`:`<span style="background:#D1FAE5;color:#059669;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">رد وارد ↩️</span>`}
           <span style="margin-right:auto;font-size:10px;color:var(--muted)">${fmt(r.ts)}</span>
         </div>
-        <p style="font-size:13px;color:var(--text);line-height:1.65;white-space:pre-wrap;margin:0">${r.body}</p>
+        <p style="font-size:13px;color:var(--text);line-height:1.65;white-space:pre-wrap;margin:0">${esc(r.body)}</p>
       </div>
     </div>`;
   }).join("");
@@ -8057,7 +8057,7 @@ function _renderMsgCard(m, mi, view){
       <span style="font-size:20px">${mt.icon}</span>
       <span style="font-weight:800;color:${mt.color};font-size:13px">${mt.label}</span>
       ${isInbox
-        ?`<span style="font-size:11px;color:var(--mid)">من: <b>${m.from}</b></span>`
+        ?`<span style="font-size:11px;color:var(--mid)">من: <b>${esc(m.from)}</b></span>`
         :`<span style="background:rgba(0,0,0,.07);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;color:var(--mid)">إلى: ${toStr}</span>`}
       ${replies.length>0?`<span style="background:${mt.color}20;color:${mt.color};border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;border:1px solid ${mt.color}40">${replies.length} ${replies.length===1?'رد':'ردود'}</span>`:""}
       ${newReplies>0?`<span style="background:#059669;color:#fff;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:800">↩️ رد جديد</span>`:""}
@@ -8067,8 +8067,8 @@ function _renderMsgCard(m, mi, view){
 
     <!-- ── original message body ── -->
     <div style="padding:13px 16px;background:#fff;border-bottom:${replies.length?'1px solid var(--border)':'none'}">
-      <p style="font-weight:800;color:var(--navy);font-size:15px;margin-bottom:7px">${m.title}</p>
-      <p style="font-size:13px;color:var(--text);line-height:1.75;white-space:pre-wrap">${m.body}</p>
+      <p style="font-weight:800;color:var(--navy);font-size:15px;margin-bottom:7px">${esc(m.title)}</p>
+      <p style="font-size:13px;color:var(--text);line-height:1.75;white-space:pre-wrap">${esc(m.body)}</p>
     </div>
 
     <!-- ── reply thread ── -->
