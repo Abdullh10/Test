@@ -2253,7 +2253,7 @@ function renderAdminBundleList() {
     const corrT     = state.teachers.find(t=>t.id===b.corrector);
     const pct       = state.stages.length ? Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)) : 0;
     const div = document.createElement("div");
-    div.className="bundleCard";
+    div.className="bundle-card";
     div.style.cursor="default";
     div.innerHTML=`
       <div class="bundle-icon" style="background:${color}20">${makeQR(b.barcode,42).replace('<svg','<svg style="border-radius:4px"')}</div>
@@ -2820,7 +2820,7 @@ function renderCtrlList(el) {
     const color=b.stage<0?"var(--muted)":sc(b.stage);
     const pct=state.stages.length?Math.max(0,Math.round(((b.stage+1)/state.stages.length)*100)):0;
     const div=document.createElement("div");
-    div.className="bundleCard";
+    div.className="bundle-card";
     div.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
     div.innerHTML=`
       <div class="bundle-icon" style="background:${color}20;overflow:hidden"><svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='${color}' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/><polyline points='3.27 6.96 12 12.01 20.73 6.96'/><line x1='12' y1='22.08' x2='12' y2='12'/></svg></div>
