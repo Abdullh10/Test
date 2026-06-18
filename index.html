@@ -1605,6 +1605,9 @@ let state = {
   approvals: [], // [{id,docType,docId,title,subtitle,submittedBy,submittedAt,status,principalName,principalSig,decidedAt,rejectReason}]
   studentsDB: SEED_STUDENTS.map((s,i)=>({id:"S"+i,name:s.n,sid:s.sid,phone:s.ph,committee:s.c,grade:(i<=263?"أول ثانوي":i<=488?"ثاني ثانوي":"ثالث ثانوي"),specialNeeds:""})), // [{id,name,sid,phone,committee,grade,specialNeeds}]
   absenceLog: [], // [{id,date,grade,committee,names,note,savedAt,user}]
+  inbox: [], // [{id,to,from,type,title,body,ts,read}] رسائل واردة للكنترول/المدير
+  principalMessages: [], // [{id,...}] رسائل موجهة لمدير المدرسة
+  minutesArchive: [], // [{id,...}] أرشيف محاضر فتح المظاريف المعتمدة
 };
 
 let currentUser = null;
@@ -5155,7 +5158,6 @@ function submitForApproval(docType, docId, title, subtitle) {
   // title/subtitle تصل مُرمَّزة بـ encodeURIComponent من زر onclick لمنع كسر السمة/الكود عبر نص يحتوي على علامات اقتباس
   try{ title = decodeURIComponent(title); }catch(e){}
   try{ subtitle = decodeURIComponent(subtitle||""); }catch(e){}
-  if(!state.approvals) state.approvals=[];
   const existing = state.approvals.find(a=>a.docType===docType && a.docId===docId);
   if(existing && existing.status==="pending") { toast("المستند مُرسل مسبقاً وبانتظار الاعتماد","err"); return; }
   if(existing) {
@@ -5170,7 +5172,6 @@ function submitForApproval(docType, docId, title, subtitle) {
     });
   }
   // إشعار مدير المدرسة
-  if(!state.inbox) state.inbox=[];
   state.inbox.push({ id:uid(), to:"principal", from:currentUser.name, type:"important",
     title:"مستند جديد بانتظار الاعتماد", body:`${APPROVAL_DOC_LABELS[docType]||""}: ${title}`, ts:nowISO(), read:false });
   saveState(); saveToCloud();
@@ -5181,7 +5182,6 @@ function submitForApproval(docType, docId, title, subtitle) {
 let _approvingId = null;
 
 function renderPrincipalApprovals(el) {
-  if(!state.approvals) state.approvals=[];
   const pending = state.approvals.filter(a=>a.status==="pending").sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));
   const decided = state.approvals.filter(a=>a.status!=="pending").sort((a,b)=>new Date(b.decidedAt||b.submittedAt)-new Date(a.decidedAt||a.submittedAt)).slice(0,10);
 
@@ -5260,7 +5260,6 @@ function approveDocument(approvalId) {
   const sig = canvas ? canvas.toDataURL() : "";
   a.status="approved"; a.principalName=currentUser.name; a.principalSig=sig; a.decidedAt=nowISO();
   // إشعار صاحب المستند
-  if(!state.inbox) state.inbox=[];
   state.inbox.push({ id:uid(), to: a.docType==="minutes"?"controller":"monitor", from:"مدير المدرسة", type:"info",
     title:"تم اعتماد مستندك", body:a.title, ts:nowISO(), read:false });
   _approvingId=null;
@@ -5277,7 +5276,6 @@ function rejectDocument(approvalId) {
   if(!a) return;
   // الرفض مسموح حتى لو حُذف المستند، فهو لا يفترض وجوده مثل الاعتماد
   a.status="rejected"; a.principalName=currentUser.name; a.decidedAt=nowISO(); a.rejectReason=reason||"";
-  if(!state.inbox) state.inbox=[];
   state.inbox.push({ id:uid(), to: a.docType==="minutes"?"controller":"monitor", from:"مدير المدرسة", type:"urgent",
     title:"تم رفض مستندك", body:a.title+(reason?" — "+reason:""), ts:nowISO(), read:false });
   saveState(); saveToCloud();
@@ -5286,7 +5284,6 @@ function rejectDocument(approvalId) {
 }
 
 function renderPrincipalArchive(el) {
-  if(!state.approvals) state.approvals=[];
   const approved = state.approvals.filter(a=>a.status==="approved").sort((a,b)=>new Date(b.decidedAt)-new Date(a.decidedAt));
   const byType = {};
   approved.forEach(a=>{ if(!byType[a.docType]) byType[a.docType]=[]; byType[a.docType].push(a); });
@@ -5554,10 +5551,8 @@ function saveMonitorNote() {
   const date = hijriVal("mnDate");
   const note = document.getElementById("mnNote").value.trim();
   if (!note) { toast("اكتب الملاحظة أولاً","err"); return; }
-  if (!state.monitorNotes) state.monitorNotes = [];
   state.monitorNotes.push({ id:uid(), subject:subj, grade:grade, hall:hall, date:date, note:note, savedAt:nowISO(), user:currentUser.name });
   // إرسال إشعار للكنترول
-  if (!state.inbox) state.inbox = [];
   const detailParts = [];
   if (subj) detailParts.push(subj + (grade ? " — " + grade : ""));
   if (hall) detailParts.push("القاعة: " + hall);
@@ -5718,7 +5713,6 @@ function saveMonitorPapers() {
   if (!hall) { toast("أدخل رقم القاعة","err"); return; }
   const canvas = document.getElementById("sigCanvasPapers");
   const sig = canvas ? canvas.toDataURL() : "";
-  if (!state.monitorReports) state.monitorReports = [];
   state.monitorReports.push({
     id:uid(), type:"papers", subject:subj, grade:grade, hall:hall, date:date,
     observer:observer, students:students, qCount:parseInt(qCount)||0, aCount:parseInt(aCount)||0,
@@ -6136,7 +6130,6 @@ function saveMonitorDailyReport() {
   const canvas=document.getElementById("dr_sig_canvas");
   const sig=canvas?canvas.toDataURL():"";
 
-  if(!state.monitorDailyReports) state.monitorDailyReports=[];
   state.monitorDailyReports.push({
     id:uid(), day, date, monitorName, rows, observations, sig,
     savedAt:nowISO()
@@ -6723,7 +6716,6 @@ function saveStudentObs() {
   const note = (document.getElementById("sobs_note")||{}).value?.trim();
   if(!name) { toast("أدخل اسم الطالب","err"); return; }
   if(!obsType) { toast("اختر نوع الملاحظة","err"); return; }
-  if(!state.monitorStudentObs) state.monitorStudentObs=[];
   state.monitorStudentObs.push({
     id:uid(), targetType:"student", name, hall, grade,
     obsType: obsType==="مخالفة أخرى" ? (other||obsType) : obsType,
@@ -6743,7 +6735,6 @@ function saveTeacherObs() {
   const substitute = (document.getElementById("tobs_sub")||{}).value?.trim();
   if(!name) { toast("اختر اسم الملاحظ","err"); return; }
   if(!obsType) { toast("اختر نوع الملاحظة","err"); return; }
-  if(!state.monitorStudentObs) state.monitorStudentObs=[];
   state.monitorStudentObs.push({
     id:uid(), targetType:"teacher", name, hall,
     obsType: obsType==="مخالفة أخرى" ? (other||obsType) : obsType,
@@ -6933,7 +6924,6 @@ function saveMonitorPledge(pledgeType) {
   const sigStudent = f.hasStudentSig ? (document.getElementById("sigStudent")||{}).toDataURL?.() || "" : "";
   const sigMonitor = f.hasMonitorSig ? (document.getElementById("sigMonitor")||{}).toDataURL?.() || "" : "";
 
-  if(!state.monitorReports) state.monitorReports=[];
   state.monitorReports.push({
     id:uid(), type:pledgeType, pledgeTitle:f.title,
     studentName:data.st_name||"", studentCivil:data.st_civil||"", studentSeat:data.st_seat||"",
@@ -7680,8 +7670,6 @@ function archiveMinutes(fi) {
   const form = md.forms[fi];
   if(!form){ toast("لا يوجد محضر للحفظ","err"); return; }
 
-  if(!state.minutesArchive) state.minutesArchive=[];
-
   // Build snapshot — deep copy without canvas data (keep sig URLs)
   const snapshot = {
     id: "arc_" + Date.now(),
@@ -7865,9 +7853,6 @@ function _mtOf(key){ return MSG_TYPES.find(t=>t.key===key)||MSG_TYPES[2]; }
 
 // ─── compose (principal) ────────────────────────
 function renderPrincipalCompose(el){
-  if(!state.principalMessages) state.principalMessages=[];
-  if(!state.inbox) state.inbox=[];
-
   const typeHtml = MSG_TYPES.map(t=>`
     <button onclick="_msgType='${t.key}';
       document.querySelectorAll('.msg-type-btn').forEach(b=>{
@@ -7969,9 +7954,6 @@ function sendPrincipalMsg(){
   const mt=_mtOf(_msgType);
   const msgId="msg_"+Date.now();
   const ts=nowISO();
-  if(!state.principalMessages) state.principalMessages=[];
-  if(!state.inbox) state.inbox=[];
-
   state.principalMessages.unshift({
     id:msgId, ts, title, body,
     type:_msgType, typeLabel:mt.label, typeIcon:mt.icon, typeColor:mt.color,
@@ -8077,7 +8059,6 @@ function _adminNotifRenderResults(){
   </div>`;
 }
 function renderAdminNotifications(el){
-  if(!state.inbox) state.inbox=[];
   const all=state.inbox;
   const counts={};
   MSG_TYPES.forEach(t=>counts[t.key]=all.filter(m=>m.type===t.key).length);
@@ -8129,7 +8110,6 @@ function clearMyInbox(){
   toast("تم مسح صندوق الوارد");
 }
 function renderInbox(el){
-  if(!state.inbox) state.inbox=[];
   const myMsgs=state.inbox.filter(m=>m.to===currentUser.role)
                            .sort((a,b)=>new Date(b.ts)-new Date(a.ts));
   const unread=myMsgs.filter(m=>!m.read).length;
@@ -8256,9 +8236,6 @@ function _submitReply(msgId, view, mi){
     fromRole:currentUser.role,
     readByPrincipal:(view==="sent"), // sent = principal replying = auto-read
   };
-
-  if(!state.principalMessages) state.principalMessages=[];
-  if(!state.inbox) state.inbox=[];
 
   // Add to principalMessages entry
   const pm=state.principalMessages.find(m=>m.id===msgId);
