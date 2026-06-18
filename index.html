@@ -496,7 +496,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
     </div>
     <div id="loginErr" class="login-err" style="display:none"></div>
     <div class="login-field">
-      <label>نوع الحساب</label>
+      <label for="loginRole">نوع الحساب</label>
       <select class="inp" id="loginRole">
         <option value="admin">مدير النظام</option>
         <option value="controller">الكنترول</option>
@@ -506,7 +506,7 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
       </select>
     </div>
     <div class="login-field">
-      <label>اسم المستخدم</label>
+      <label for="loginUser">اسم المستخدم</label>
       <input class="inp" id="loginUser" placeholder="أدخل اسم المستخدم" autocomplete="username">
     </div>
     <div class="login-field">
@@ -2036,14 +2036,14 @@ function renderAdminNew(el) {
     <p class="card-title">➕ إنشاء مظروف جديد</p>
     <div class="g2" style="margin-bottom:10px">
       <div>
-        <label class="lbl">المادة *</label>
+        <label for="bf_subject" class="lbl">المادة *</label>
         <select class="inp" id="bf_subject">
           <option value="">-- اختر المادة --</option>
           ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
         </select>
       </div>
       <div>
-        <label class="lbl">الصف الدراسي</label>
+        <label for="bf_grade" class="lbl">الصف الدراسي</label>
         <select class="inp" id="bf_grade">
           <option value="">-- اختياري --</option>
           ${state.grades.map(g=>`<option>${g}</option>`).join("")}
@@ -2051,27 +2051,27 @@ function renderAdminNew(el) {
       </div>
     </div>
     <div style="margin-bottom:10px">
-      <label class="lbl">عدد الأوراق في المظروف *</label>
+      <label for="bf_count" class="lbl">عدد الأوراق في المظروف *</label>
       <input class="inp" id="bf_count" type="number" min="1" placeholder="مثال: 32"/>
     </div>
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">تكليفات المظروف</p>
     <div class="g3" style="margin-bottom:6px">
       <div>
-        <label class="lbl">المصحح 1 *</label>
+        <label for="bf_corrector" class="lbl">المصحح 1 *</label>
         <select class="inp" id="bf_corrector">
           <option value="">-- اختر --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
         </select>
       </div>
       <div>
-        <label class="lbl">المراجع 1 *</label>
+        <label for="bf_reviewer" class="lbl">المراجع 1 *</label>
         <select class="inp" id="bf_reviewer">
           <option value="">-- اختر --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
         </select>
       </div>
       <div>
-        <label class="lbl">المدقق 1 *</label>
+        <label for="bf_auditor" class="lbl">المدقق 1 *</label>
         <select class="inp" id="bf_auditor">
           <option value="">-- اختر --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
@@ -2080,21 +2080,21 @@ function renderAdminNew(el) {
     </div>
     <div class="g3" style="margin-bottom:10px">
       <div>
-        <label class="lbl" style="color:var(--muted)">المصحح 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
+        <label for="bf_corrector2" class="lbl" style="color:var(--muted)">المصحح 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_corrector2">
           <option value="">-- لا يوجد --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
         </select>
       </div>
       <div>
-        <label class="lbl" style="color:var(--muted)">المراجع 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
+        <label for="bf_reviewer2" class="lbl" style="color:var(--muted)">المراجع 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_reviewer2">
           <option value="">-- لا يوجد --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
         </select>
       </div>
       <div>
-        <label class="lbl" style="color:var(--muted)">المدقق 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
+        <label for="bf_auditor2" class="lbl" style="color:var(--muted)">المدقق 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_auditor2">
           <option value="">-- لا يوجد --</option>
           ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
@@ -2102,13 +2102,13 @@ function renderAdminNew(el) {
       </div>
     </div>
     <div style="margin-bottom:16px">
-      <label class="lbl">ملاحظة</label>
+      <label for="bf_note" class="lbl">ملاحظة</label>
       <input class="inp" id="bf_note" placeholder="ملاحظة اختيارية..."/>
     </div>
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin:12px 0 8px">📅 بيانات الاختبار</p>
     <div class="g3" style="margin-bottom:10px">
       <div>
-        <label class="lbl">يوم الاختبار</label>
+        <label for="bf_day" class="lbl">يوم الاختبار</label>
         <select class="inp" id="bf_day">
           <option value="">-- اليوم --</option>
           <option>الأحد</option><option>الاثنين</option><option>الثلاثاء</option>
@@ -2116,21 +2116,21 @@ function renderAdminNew(el) {
         </select>
       </div>
       <div>
-        <label class="lbl">تاريخ الاختبار (هجري)</label>
+        <label for="bf_examdate_d" class="lbl">تاريخ الاختبار (هجري)</label>
         ${hijriPicker("bf_examdate")}
       </div>
       <div>
-        <label class="lbl">القاعة / اللجنة</label>
+        <label for="bf_hall" class="lbl">القاعة / اللجنة</label>
         <input class="inp" id="bf_hall" placeholder="مثال: قاعة A"/>
       </div>
     </div>
     <div class="g2" style="margin-bottom:14px">
       <div>
-        <label class="lbl">وقت البدء</label>
+        <label for="bf_start" class="lbl">وقت البدء</label>
         <input class="inp" id="bf_start" type="time"/>
       </div>
       <div>
-        <label class="lbl">وقت الانتهاء</label>
+        <label for="bf_end" class="lbl">وقت الانتهاء</label>
         <input class="inp" id="bf_end" type="time"/>
       </div>
     </div>
@@ -2311,50 +2311,50 @@ function adminEditBundle(id) {
   overlay.innerHTML=`
   <div class="modal">
     <p class="modalTitle">✏️ تعديل المظروف — ${b.barcode}</p>
-    <label class="lbl">المادة</label>
+    <label for="eb_subject" class="lbl">المادة</label>
     <select class="inp" id="eb_subject" style="margin-bottom:10px">
       ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${s}</option>`).join("")}
     </select>
-    <label class="lbl">الصف</label>
+    <label for="eb_grade" class="lbl">الصف</label>
     <select class="inp" id="eb_grade" style="margin-bottom:10px">
       <option value="">-- اختياري --</option>
       ${state.grades.map(g=>`<option${g===b.grade?" selected":""}>${g}</option>`).join("")}
     </select>
-    <label class="lbl">عدد الأوراق</label>
+    <label for="eb_count" class="lbl">عدد الأوراق</label>
     <input class="inp" id="eb_count" type="number" value="${b.count}" style="margin-bottom:10px"/>
-    <label class="lbl">المصحح 1</label>
+    <label for="eb_corrector" class="lbl">المصحح 1</label>
     <select class="inp" id="eb_corrector" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector?" selected":""}>${t.name}</option>`).join("")}
     </select>
-    <label class="lbl" style="color:var(--muted)">المصحح 2 (اختياري)</label>
+    <label for="eb_corrector2" class="lbl" style="color:var(--muted)">المصحح 2 (اختياري)</label>
     <select class="inp" id="eb_corrector2" style="margin-bottom:10px">
       <option value="">-- لا يوجد --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector2?" selected":""}>${t.name}</option>`).join("")}
     </select>
-    <label class="lbl">المراجع 1</label>
+    <label for="eb_reviewer" class="lbl">المراجع 1</label>
     <select class="inp" id="eb_reviewer" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer?" selected":""}>${t.name}</option>`).join("")}
     </select>
-    <label class="lbl" style="color:var(--muted)">المراجع 2 (اختياري)</label>
+    <label for="eb_reviewer2" class="lbl" style="color:var(--muted)">المراجع 2 (اختياري)</label>
     <select class="inp" id="eb_reviewer2" style="margin-bottom:10px">
       <option value="">-- لا يوجد --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer2?" selected":""}>${t.name}</option>`).join("")}
     </select>
-    <label class="lbl">المدقق 1</label>
+    <label for="eb_auditor" class="lbl">المدقق 1</label>
     <select class="inp" id="eb_auditor" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${t.name}</option>`).join("")}
     </select>
-    <label class="lbl" style="color:var(--muted)">المدقق 2 (اختياري)</label>
+    <label for="eb_auditor2" class="lbl" style="color:var(--muted)">المدقق 2 (اختياري)</label>
     <select class="inp" id="eb_auditor2" style="margin-bottom:16px">
       <option value="">-- لا يوجد --</option>
       ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor2?" selected":""}>${t.name}</option>`).join("")}
     </select>
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin:8px 0 6px">📅 بيانات الاختبار</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">اليوم</label>
+      <div><label for="eb_day" style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">اليوم</label>
         <select class="inp" id="eb_day" style="font-size:12px">
           <option value="">-- اليوم --</option>
           <option ${b.examDay=='الأحد'?'selected':''}">الأحد</option>
@@ -2363,15 +2363,15 @@ function adminEditBundle(id) {
           <option ${b.examDay=='الأربعاء'?'selected':''}">الأربعاء</option>
           <option ${b.examDay=='الخميس'?'selected':''}">الخميس</option>
         </select></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ (هجري)</label>
+      <div><label for="eb_examdate_d" style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">التاريخ (هجري)</label>
         ${hijriPicker("eb_examdate", b.examDate||"")}</div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">القاعة</label>
+      <div><label for="eb_hall" style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">القاعة</label>
         <input class="inp" id="eb_hall" value="${b.examHall||''}" style="font-size:12px"/></div>
-      <div><label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت البدء</label>
+      <div><label for="eb_start" style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت البدء</label>
         <input class="inp" id="eb_start" type="time" value="${b.examStart||''}" style="font-size:12px"/></div>
     </div>
     <div style="margin-bottom:12px">
-      <label style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت الانتهاء</label>
+      <label for="eb_end" style="font-size:11px;color:var(--mid);display:block;margin-bottom:3px">وقت الانتهاء</label>
       <input class="inp" id="eb_end" type="time" value="${b.examEnd||''}" style="font-size:12px"/>
     </div>
     <div class="row">
@@ -2870,12 +2870,12 @@ function renderNotifSend(el) {
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${ntHTML}</div>
     <label class="lbl">المعلمون المستهدفون (اختر واحداً أو أكثر أو الكل)</label>
     <div id="teacherSelectorBox" style="margin-bottom:14px">${teacherSelectorHTML()}</div>
-    <label class="lbl">ربط بمظروف (اختياري)</label>
+    <label for="notif_bundle" class="lbl">ربط بمظروف (اختياري)</label>
     <select class="inp" id="notif_bundle" style="margin-bottom:14px" onchange="_selBundle=this.value">
       <option value="">-- بدون ربط --</option>
       ${state.bundles.map(b=>`<option value="${b.id}"${_selBundle===b.id?" selected":""}>${b.barcode} — ${b.subject}${b.grade?" "+b.grade:""}</option>`).join("")}
     </select>
-    <label class="lbl">نص الرسالة *</label>
+    <label for="notif_msg" class="lbl">نص الرسالة *</label>
     <textarea class="inp" id="notif_msg" rows="3" placeholder="اكتب نص التنبيه هنا...">${""}</textarea>
     <!-- Preview -->
     <div id="notifPreview" style="margin-top:12px"></div>
@@ -3331,7 +3331,7 @@ function renderSPhone(el) {
   <div class="card">
     <p class="card-title">📱 رقم واتساب المدير</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">يستخدم في المراسلات المباشرة ومسؤول التنبيهات</p>
-    <label class="lbl">رقم الواتساب (بمفتاح الدولة +966)</label>
+    <label for="s_adminPhone" class="lbl">رقم الواتساب (بمفتاح الدولة +966)</label>
     <input class="inp" id="s_adminPhone" value="${state.adminPhone}" dir="ltr" placeholder="+966XXXXXXXXX" style="margin-bottom:12px"/>
     <div class="row">
       <button class="btn btn-navy" onclick="
@@ -3434,7 +3434,7 @@ function renderSUsers(el) {
       </select>
     </div>
     <div id="nu_committeesWrap" style="margin-bottom:12px">
-      <label class="lbl">اللجان المخصصة لهذا المراقب (مفصولة بفاصلة، مثال: 1,2,3 أو خاصة)</label>
+      <label for="nu_committees" class="lbl">اللجان المخصصة لهذا المراقب (مفصولة بفاصلة، مثال: 1,2,3 أو خاصة)</label>
       <input class="inp" id="nu_committees" placeholder="مثال: 15,16,17,18,19,20,خاصة" dir="ltr"/>
     </div>
     <button class="btn btn-navy btn-full" onclick="addUser()">إضافة الحساب</button>
@@ -5472,14 +5472,14 @@ function renderMonitorCommittees(el) {
         <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:12px">➕ تسجيل ملاحظة جديدة</p>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">المادة</label>
+            <label for="mnSubj" class="lbl">المادة</label>
             <select class="inp" id="mnSubj">
               <option value="">-- اختر --</option>
               ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
             </select>
           </div>
           <div>
-            <label class="lbl">الصف</label>
+            <label for="mnGrade" class="lbl">الصف</label>
             <select class="inp" id="mnGrade">
               <option value="">-- اختر --</option>
               ${state.grades.map(g=>`<option>${g}</option>`).join("")}
@@ -5488,16 +5488,16 @@ function renderMonitorCommittees(el) {
         </div>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">رقم القاعة / اللجنة</label>
+            <label for="mnHall" class="lbl">رقم القاعة / اللجنة</label>
             <input class="inp" id="mnHall" placeholder="مثال: قاعة 1"/>
           </div>
           <div>
-            <label class="lbl">التاريخ</label>
+            <label for="mnDate_d" class="lbl">التاريخ</label>
             ${hijriPicker("mnDate")}
           </div>
         </div>
         <div style="margin-bottom:10px">
-          <label class="lbl">الملاحظة</label>
+          <label for="mnNote" class="lbl">الملاحظة</label>
           <textarea class="inp" id="mnNote" rows="3" placeholder="اكتب ملاحظتك هنا للكنترول..." style="resize:vertical"></textarea>
         </div>
         <button class="btn btn-green btn-full" onclick="saveMonitorNote()">💾 حفظ الملاحظة وإبلاغ الكنترول</button>
@@ -5603,14 +5603,14 @@ function renderMonitorPapers(el) {
         <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:12px">📝 نموذج استلام وعد الأوراق</p>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">المادة *</label>
+            <label for="ppSubj" class="lbl">المادة *</label>
             <select class="inp" id="ppSubj">
               <option value="">-- اختر --</option>
               ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
             </select>
           </div>
           <div>
-            <label class="lbl">الصف *</label>
+            <label for="ppGrade" class="lbl">الصف *</label>
             <select class="inp" id="ppGrade" onchange="ppAutoFillStudents()">
               <option value="">-- اختر --</option>
               ${state.grades.map(g=>`<option>${g}</option>`).join("")}
@@ -5619,39 +5619,39 @@ function renderMonitorPapers(el) {
         </div>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">رقم القاعة / اللجنة *</label>
+            <label for="ppHall" class="lbl">رقم القاعة / اللجنة *</label>
             <select class="inp" id="ppHall" onchange="ppAutoFillStudents()">
               <option value="">-- اختر اللجنة --</option>
               ${_sdbCommittees().map(c=>`<option value="${c}">${c}</option>`).join("")}
             </select>
           </div>
           <div>
-            <label class="lbl">التاريخ</label>
+            <label for="ppDate_d" class="lbl">التاريخ</label>
             ${hijriPicker("ppDate")}
           </div>
         </div>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">اسم الملاحظ المسلِّم</label>
+            <label for="ppObserver" class="lbl">اسم الملاحظ المسلِّم</label>
             <select class="inp" id="ppObserver">${teacherOptions()}</select>
           </div>
           <div>
-            <label class="lbl">عدد الطلاب الحاضرين <span style="color:var(--muted);font-weight:400">(تلقائي حسب اللجنة والصف، يمكن تعديله)</span></label>
+            <label for="ppStudents" class="lbl">عدد الطلاب الحاضرين <span style="color:var(--muted);font-weight:400">(تلقائي حسب اللجنة والصف، يمكن تعديله)</span></label>
             <input class="inp" id="ppStudents" type="number" min="0" placeholder="0"/>
           </div>
         </div>
         <div class="g2" style="margin-bottom:10px">
           <div>
-            <label class="lbl">عدد أوراق الأسئلة المستلمة *</label>
+            <label for="ppQCount" class="lbl">عدد أوراق الأسئلة المستلمة *</label>
             <input class="inp" id="ppQCount" type="number" min="0" placeholder="0"/>
           </div>
           <div>
-            <label class="lbl">عدد أوراق الإجابة المستلمة *</label>
+            <label for="ppACount" class="lbl">عدد أوراق الإجابة المستلمة *</label>
             <input class="inp" id="ppACount" type="number" min="0" placeholder="0"/>
           </div>
         </div>
         <div style="margin-bottom:10px">
-          <label class="lbl">حالة الأوراق</label>
+          <label for="ppStatus" class="lbl">حالة الأوراق</label>
           <select class="inp" id="ppStatus">
             <option value="سليمة">✅ سليمة — لا يوجد أي تلف أو نقص</option>
             <option value="ناقصة">⚠️ ناقصة — يوجد نقص في عدد الأوراق</option>
@@ -5660,7 +5660,7 @@ function renderMonitorPapers(el) {
           </select>
         </div>
         <div style="margin-bottom:14px">
-          <label class="lbl">ملاحظات إضافية</label>
+          <label for="ppNotes" class="lbl">ملاحظات إضافية</label>
           <textarea class="inp" id="ppNotes" rows="2" placeholder="أي ملاحظات على حالة الأوراق..." style="resize:vertical"></textarea>
         </div>
 
@@ -5927,13 +5927,13 @@ function renderMonitorDaily(el) {
       <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:10px">📌 معلومات أساسية</p>
       <div class="g2" style="margin-bottom:10px">
         <div>
-          <label class="lbl">اليوم</label>
+          <label for="dr_day" class="lbl">اليوم</label>
           <select class="inp" id="dr_day">
             ${WEEK_DAYS_AR.map(d=>`<option${d===todayDay?" selected":""}>${d}</option>`).join("")}
           </select>
         </div>
         <div>
-          <label class="lbl">التاريخ</label>
+          <label for="dr_date_d" class="lbl">التاريخ</label>
           ${hijriPicker("dr_date")}
         </div>
       </div>
@@ -5974,12 +5974,12 @@ function renderMonitorDaily(el) {
         <div style="background:#fff;border-radius:10px;padding:10px 13px;border:1.5px solid var(--border)" id="obs_wrap_${item.id}">
           <div style="display:flex;align-items:center;gap:10px">
             <div style="display:flex;gap:8px;margin-right:auto">
-              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#059669">
+              <label for="obs_${item.id}_yes" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#059669">
                 <input type="radio" name="obs_${item.id}" value="yes" id="obs_${item.id}_yes"
                   onclick="document.getElementById('obs_detail_${item.id}').style.display=${item.hasNote?'this.checked?\'block\':\'none\'':'\'none\''}"
                   style="accent-color:#059669;width:16px;height:16px"> نعم
               </label>
-              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#EF4444">
+              <label for="obs_${item.id}_no" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;font-weight:600;color:#EF4444">
                 <input type="radio" name="obs_${item.id}" value="no" id="obs_${item.id}_no" checked
                   onclick="document.getElementById('obs_detail_${item.id}').style.display='none'"
                   style="accent-color:#EF4444;width:16px;height:16px"> لا
@@ -5999,7 +5999,7 @@ function renderMonitorDaily(el) {
       <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:10px">✍️ التوقيع</p>
       <div class="g2">
         <div>
-          <label class="lbl">اسم مراقب اللجان</label>
+          <label for="dr_monitor_name" class="lbl">اسم مراقب اللجان</label>
           <input class="inp" id="dr_monitor_name" value="${currentUser.name}" placeholder="اسم المراقب"/>
         </div>
         <div>
@@ -6355,7 +6355,7 @@ function renderStudentsDB(el) {
       <p style="font-size:12px;color:var(--muted);margin-bottom:8px">نزّل النموذج، عبّئ بيانات الطلاب فيه (الاسم، رقم الطالب، الجوال، اللجنة، المرحلة)، ثم ارفعه هنا ليتم إضافة الطلاب تلقائيًا</p>
       <button class="btn" style="background:#065F46;color:#fff;width:100%;margin-bottom:10px" onclick="downloadStudentTemplate()">⬇️ تنزيل نموذج Excel</button>
       <input type="file" class="inp" id="sdb_file" accept=".xlsx,.xls" style="margin-bottom:8px" onchange="handleStudentXlsxFile(this)">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:8px;cursor:pointer">
+      <label for="sdb_file_replace" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-bottom:8px;cursor:pointer">
         <input type="checkbox" id="sdb_file_replace"> استبدال كامل قاعدة البيانات الحالية بهذا الملف (بدلاً من الإضافة)
       </label>
     </div>
@@ -6590,17 +6590,17 @@ function renderMonitorStudents(el) {
   <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:#DBEAFE">🧑‍🎓</span>تسجيل ملاحظة على طالب</p>
     <div class="g2" style="margin-bottom:10px">
-      <div><label class="lbl">رقم اللجنة / القاعة</label><select class="inp" id="sobs_hall" onchange="sobsRefreshStudentOptions()"><option value="">-- اختر اللجنة --</option>${_sdbCommittees().map(c=>`<option value="${c}">لجنة ${c}</option>`).join("")}</select></div>
-      <div><label class="lbl">اسم الطالب</label><select class="inp" id="sobs_name" onchange="sobsAutoGrade()" disabled><option value="">-- اختر اللجنة أولاً --</option></select></div>
+      <div><label for="sobs_hall" class="lbl">رقم اللجنة / القاعة</label><select class="inp" id="sobs_hall" onchange="sobsRefreshStudentOptions()"><option value="">-- اختر اللجنة --</option>${_sdbCommittees().map(c=>`<option value="${c}">لجنة ${c}</option>`).join("")}</select></div>
+      <div><label for="sobs_name" class="lbl">اسم الطالب</label><select class="inp" id="sobs_name" onchange="sobsAutoGrade()" disabled><option value="">-- اختر اللجنة أولاً --</option></select></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
-      <div><label class="lbl">الصف</label>
+      <div><label for="sobs_grade" class="lbl">الصف</label>
         <select class="inp" id="sobs_grade">
           <option value="">-- اختر الصف --</option>
           ${(state.grades||[]).map(g=>`<option>${g}</option>`).join("")}
         </select>
       </div>
-      <div><label class="lbl">نوع الملاحظة</label>
+      <div><label for="sobs_type" class="lbl">نوع الملاحظة</label>
         <select class="inp" id="sobs_type" onchange="document.getElementById('sobs_other_row').style.display=this.value==='مخالفة أخرى'?'block':'none'">
           <option value="">-- اختر --</option>
           ${STUDENT_OBS_TYPES.map(t=>`<option>${t}</option>`).join("")}
@@ -6608,11 +6608,11 @@ function renderMonitorStudents(el) {
       </div>
     </div>
     <div id="sobs_other_row" style="display:none;margin-bottom:10px">
-      <label class="lbl">تفاصيل المخالفة</label>
+      <label for="sobs_other" class="lbl">تفاصيل المخالفة</label>
       <input class="inp" id="sobs_other" placeholder="اكتب تفاصيل المخالفة..."/>
     </div>
     <div style="margin-bottom:12px">
-      <label class="lbl">ملاحظات إضافية (اختياري)</label>
+      <label for="sobs_note" class="lbl">ملاحظات إضافية (اختياري)</label>
       <textarea class="inp" id="sobs_note" rows="2" placeholder="أي تفاصيل إضافية..." style="resize:vertical"></textarea>
     </div>
     <button class="btn btn-navy btn-full" onclick="saveStudentObs()">💾 حفظ الملاحظة</button>
@@ -6643,13 +6643,13 @@ function renderMonitorStudents(el) {
   <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:#D1FAE5">👨‍🏫</span>تسجيل ملاحظة على ملاحظ</p>
     <div class="g2" style="margin-bottom:10px">
-      <div><label class="lbl">اسم الملاحظ</label>
+      <div><label for="tobs_name" class="lbl">اسم الملاحظ</label>
         <select class="inp" id="tobs_name">${teacherOptions()}</select>
       </div>
-      <div><label class="lbl">رقم اللجنة / القاعة</label><input class="inp" id="tobs_hall" placeholder="مثال: ٣" type="text"/></div>
+      <div><label for="tobs_hall" class="lbl">رقم اللجنة / القاعة</label><input class="inp" id="tobs_hall" placeholder="مثال: ٣" type="text"/></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
-      <div><label class="lbl">نوع الملاحظة</label>
+      <div><label for="tobs_type" class="lbl">نوع الملاحظة</label>
         <select class="inp" id="tobs_type" onchange="
           const isOther=this.value==='مخالفة أخرى';
           document.getElementById('tobs_other_row').style.display=isOther?'block':'none';
@@ -6658,18 +6658,18 @@ function renderMonitorStudents(el) {
           ${TEACHER_OBS_TYPES.map(t=>`<option>${t}</option>`).join("")}
         </select>
       </div>
-      <div><label class="lbl">الملاحظ البديل (إن وُجد)</label>
+      <div><label for="tobs_sub" class="lbl">الملاحظ البديل (إن وُجد)</label>
         <div id="tobs_sub_row">
           <select class="inp" id="tobs_sub">${teacherOptions()}</select>
         </div>
       </div>
     </div>
     <div id="tobs_other_row" style="display:none;margin-bottom:10px">
-      <label class="lbl">تفاصيل المخالفة</label>
+      <label for="tobs_other" class="lbl">تفاصيل المخالفة</label>
       <input class="inp" id="tobs_other" placeholder="اكتب تفاصيل المخالفة..."/>
     </div>
     <div style="margin-bottom:12px">
-      <label class="lbl">ملاحظات إضافية (اختياري)</label>
+      <label for="tobs_note" class="lbl">ملاحظات إضافية (اختياري)</label>
       <textarea class="inp" id="tobs_note" rows="2" placeholder="أي تفاصيل إضافية..." style="resize:vertical"></textarea>
     </div>
     <button class="btn btn-green btn-full" onclick="saveTeacherObs()">💾 حفظ الملاحظة</button>
@@ -6816,13 +6816,13 @@ function showPledgeForm(pledgeType) {
   const gradeOptions = state.grades.map(g=>`<option>${g}</option>`).join("");
 
   const buildField = field => {
-    if(field.type==="teacher_select") return `<div><label class="lbl">${field.label}</label><select class="inp" id="${field.id}">${teacherOptions()}</select></div>`;
-    if(field.type==="select") return `<div><label class="lbl">${field.label}</label><select class="inp" id="${field.id}"><option value="">-- اختر --</option>${(field.options||[]).map(o=>`<option>${o}</option>`).join("")}</select></div>`;
-    if(field.type==="textarea") return `<div style="grid-column:1/-1"><label class="lbl">${field.label}</label><textarea class="inp" id="${field.id}" rows="2" placeholder="${field.placeholder||""}" style="resize:vertical"></textarea></div>`;
-    if(field.type==="date") return `<div><label class="lbl">${field.label}</label>${hijriPicker(field.id)}</div>`;
-    if(field.type==="time") return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="time"/></div>`;
-    if(field.type==="number") return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="number" min="0" placeholder="${field.placeholder||"0"}"/></div>`;
-    return `<div><label class="lbl">${field.label}</label><input class="inp" id="${field.id}" placeholder="${field.placeholder||""}"/></div>`;
+    if(field.type==="teacher_select") return `<div><label for="${field.id}" class="lbl">${field.label}</label><select class="inp" id="${field.id}">${teacherOptions()}</select></div>`;
+    if(field.type==="select") return `<div><label for="${field.id}" class="lbl">${field.label}</label><select class="inp" id="${field.id}"><option value="">-- اختر --</option>${(field.options||[]).map(o=>`<option>${o}</option>`).join("")}</select></div>`;
+    if(field.type==="textarea") return `<div style="grid-column:1/-1"><label for="${field.id}" class="lbl">${field.label}</label><textarea class="inp" id="${field.id}" rows="2" placeholder="${field.placeholder||""}" style="resize:vertical"></textarea></div>`;
+    if(field.type==="date") return `<div><label for="${field.id}_d" class="lbl">${field.label}</label>${hijriPicker(field.id)}</div>`;
+    if(field.type==="time") return `<div><label for="${field.id}" class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="time"/></div>`;
+    if(field.type==="number") return `<div><label for="${field.id}" class="lbl">${field.label}</label><input class="inp" id="${field.id}" type="number" min="0" placeholder="${field.placeholder||"0"}"/></div>`;
+    return `<div><label for="${field.id}" class="lbl">${field.label}</label><input class="inp" id="${field.id}" placeholder="${field.placeholder||""}"/></div>`;
   };
 
   document.getElementById("pledgeFormContainer").innerHTML = `
@@ -6833,16 +6833,16 @@ function showPledgeForm(pledgeType) {
       <!-- بيانات الطالب -->
       <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">📌 بيانات الطالب</p>
       <div class="g2" style="margin-bottom:10px">
-        <div><label class="lbl">اللجنة</label><select class="inp" id="st_committee" onchange="pledgeRefreshStudentOptions()"><option value="">-- اختر اللجنة --</option>${_sdbCommittees().map(c=>`<option value="${c}">لجنة ${c}</option>`).join("")}</select></div>
-        <div><label class="lbl">اسم الطالب *</label><select class="inp" id="st_student_select" onchange="pledgeApplyStudentSelection()" disabled><option value="">-- اختر اللجنة أولاً --</option></select></div>
+        <div><label for="st_committee" class="lbl">اللجنة</label><select class="inp" id="st_committee" onchange="pledgeRefreshStudentOptions()"><option value="">-- اختر اللجنة --</option>${_sdbCommittees().map(c=>`<option value="${c}">لجنة ${c}</option>`).join("")}</select></div>
+        <div><label for="st_student_select" class="lbl">اسم الطالب *</label><select class="inp" id="st_student_select" onchange="pledgeApplyStudentSelection()" disabled><option value="">-- اختر اللجنة أولاً --</option></select></div>
       </div>
       <div class="g2" style="margin-bottom:10px">
         <input type="hidden" id="st_name"/>
-        <div><label class="lbl">السجل المدني</label><input class="inp" id="st_civil" placeholder="رقم السجل المدني" dir="ltr"/></div>
-        <div><label class="lbl">رقم الجلوس</label><input class="inp" id="st_seat" placeholder="رقم الجلوس"/></div>
-        <div><label class="lbl">الصف</label><select class="inp" id="st_grade"><option value="">-- اختر --</option>${gradeOptions}</select></div>
-        ${f.hasMaterial||!f.extraFields.find(x=>x.id==="subject")?`<div><label class="lbl">المادة</label><select class="inp" id="subject"><option value="">-- اختر --</option>${subjectOptions}</select></div>`:""}
-        <div><label class="lbl">التاريخ</label>${hijriPicker("st_date")}</div>
+        <div><label for="st_civil" class="lbl">السجل المدني</label><input class="inp" id="st_civil" placeholder="رقم السجل المدني" dir="ltr"/></div>
+        <div><label for="st_seat" class="lbl">رقم الجلوس</label><input class="inp" id="st_seat" placeholder="رقم الجلوس"/></div>
+        <div><label for="st_grade" class="lbl">الصف</label><select class="inp" id="st_grade"><option value="">-- اختر --</option>${gradeOptions}</select></div>
+        ${f.hasMaterial||!f.extraFields.find(x=>x.id==="subject")?`<div><label for="subject" class="lbl">المادة</label><select class="inp" id="subject"><option value="">-- اختر --</option>${subjectOptions}</select></div>`:""}
+        <div><label for="st_date_d" class="lbl">التاريخ</label>${hijriPicker("st_date")}</div>
       </div>
 
       <!-- الحقول الإضافية -->
@@ -6872,7 +6872,7 @@ function showPledgeForm(pledgeType) {
       ${f.hasMonitorSig?`
       <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:4px">👁 توقيع مراقب اللجنة</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div><label class="lbl">اسم مراقب اللجنة</label><input class="inp" id="monitor_name" value="${currentUser.name}" placeholder="اسم المراقب"/></div>
+        <div><label for="monitor_name" class="lbl">اسم مراقب اللجنة</label><input class="inp" id="monitor_name" value="${currentUser.name}" placeholder="اسم المراقب"/></div>
         <div><label class="lbl">&nbsp;</label>
           <div style="border:2px dashed #64748B;border-radius:8px;overflow:hidden;background:#fff;touch-action:none">
             <canvas id="sigMonitor" width="300" height="70" style="width:100%;height:70px;cursor:crosshair;display:block"></canvas>
@@ -7500,33 +7500,33 @@ function renderCtrlMinutes(el) {
       <div class="card-title" style="margin-bottom:12px"><span class="ct-icon">📅</span>بيانات المحضر</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:10px">
         <div>
-          <label class="lbl">اليوم</label>
-          <select class="inp" onchange="state.minutesData.hijriDay=this.value;saveMinutes()">
+          <label class="lbl" for="minutesHijriDay">اليوم</label>
+          <select class="inp" id="minutesHijriDay" onchange="state.minutesData.hijriDay=this.value;saveMinutes()">
             <option value="">-- اختر اليوم --</option>${dayOpts}
           </select>
         </div>
         <div>
-          <label class="lbl">رقم اليوم (هجري)</label>
-          <select class="inp" onchange="state.minutesData.hijriDayNum=this.value;saveMinutes()">
+          <label class="lbl" for="minutesHijriDayNum">رقم اليوم (هجري)</label>
+          <select class="inp" id="minutesHijriDayNum" onchange="state.minutesData.hijriDayNum=this.value;saveMinutes()">
             <option value="">-- اليوم --</option>${dayNumOpts}
           </select>
         </div>
         <div>
-          <label class="lbl">الشهر الهجري</label>
-          <select class="inp" onchange="state.minutesData.hijriMonth=this.value;saveMinutes()">
+          <label class="lbl" for="minutesHijriMonth">الشهر الهجري</label>
+          <select class="inp" id="minutesHijriMonth" onchange="state.minutesData.hijriMonth=this.value;saveMinutes()">
             <option value="">-- الشهر --</option>${monthOpts}
           </select>
         </div>
         <div>
-          <label class="lbl">السنة الهجرية</label>
-          <select class="inp" onchange="state.minutesData.hijriYear=this.value;saveMinutes()">
+          <label class="lbl" for="minutesHijriYear">السنة الهجرية</label>
+          <select class="inp" id="minutesHijriYear" onchange="state.minutesData.hijriYear=this.value;saveMinutes()">
             ${yearOpts}
           </select>
         </div>
       </div>
       <div>
-        <label class="lbl">اسم مدير المدرسة / رئيس لجنة الاختبارات</label>
-        <input class="inp" style="max-width:400px" placeholder="الاسم كاملاً" value="${md.principal||""}" oninput="state.minutesData.principal=this.value;saveMinutes()"/>
+        <label class="lbl" for="minutesPrincipal">اسم مدير المدرسة / رئيس لجنة الاختبارات</label>
+        <input class="inp" id="minutesPrincipal" style="max-width:400px" placeholder="الاسم كاملاً" value="${md.principal||""}" oninput="state.minutesData.principal=this.value;saveMinutes()"/>
       </div>
     </div>
 
@@ -7916,11 +7916,11 @@ function renderPrincipalCompose(el){
         <div style="display:flex;gap:10px;flex-wrap:wrap">${targetHtml}</div>
       </div>
       <div style="margin-bottom:14px">
-        <label class="lbl">عنوان الرسالة</label>
+        <label for="msgTitle" class="lbl">عنوان الرسالة</label>
         <input id="msgTitle" class="inp" placeholder="عنوان موضوع الرسالة..." oninput="updateMsgPreview()" style="font-size:14px"/>
       </div>
       <div style="margin-bottom:18px">
-        <label class="lbl">نص الرسالة</label>
+        <label for="msgBody" class="lbl">نص الرسالة</label>
         <textarea id="msgBody" class="inp" rows="5" placeholder="اكتب نص الرسالة هنا..." oninput="updateMsgPreview()" style="font-size:13px;line-height:1.7;resize:vertical"></textarea>
       </div>
       <div id="msgPreview" style="margin-bottom:18px"></div>
@@ -8094,15 +8094,15 @@ function renderAdminNotifications(el){
 
       <div class="g2" style="margin-bottom:14px">
         <div>
-          <label class="lbl">تصنيف التنبيه</label>
-          <select class="inp" onchange="adminNotifUpdate('type',this.value)">
+          <label class="lbl" for="adminNotifType">تصنيف التنبيه</label>
+          <select class="inp" id="adminNotifType" onchange="adminNotifUpdate('type',this.value)">
             <option value="">-- كل التصنيفات --</option>
             ${MSG_TYPES.map(t=>`<option value="${t.key}">${t.icon} ${t.label}</option>`).join("")}
           </select>
         </div>
         <div>
-          <label class="lbl">موجّه إلى</label>
-          <select class="inp" onchange="adminNotifUpdate('role',this.value)">
+          <label class="lbl" for="adminNotifRole">موجّه إلى</label>
+          <select class="inp" id="adminNotifRole" onchange="adminNotifUpdate('role',this.value)">
             <option value="">-- كل الحسابات --</option>
             ${Object.keys(ROLE_LABEL).map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join("")}
           </select>
