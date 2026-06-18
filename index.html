@@ -2101,7 +2101,9 @@ function renderAdminNew(el) {
   </div>`;
 }
 
+let _submitBundleInFlight = false;
 function submitNewBundle() {
+  if(_submitBundleInFlight) return;
   const subject    = document.getElementById("bf_subject").value;
   const grade      = document.getElementById("bf_grade").value;
   const count      = document.getElementById("bf_count").value;
@@ -2119,6 +2121,9 @@ function submitNewBundle() {
   const examEnd    = (document.getElementById("bf_end")||{value:""}).value||"";
   if(!subject) { toast("اختر المادة","err"); return; }
   if(!count||isNaN(count)||+count<1) { toast("أدخل عدد الأوراق","err"); return; }
+  const isDup = state.bundles.some(x=>x.subject===subject && x.grade===grade && x.examDate===examDate && x.examHall===examHall && +x.count===+count);
+  if(isDup && !confirm("يوجد مظروف مطابق لنفس المادة والصف والقاعة وتاريخ الاختبار. هل تريد إنشاء مظروف آخر بنفس البيانات؟")) return;
+  _submitBundleInFlight = true;
   const existingIds = new Set(state.bundles.map(x=>x.id));
   let barcode; do { barcode = `M${uid()}`; } while(state.bundles.some(x=>x.barcode===barcode));
   const b = {
@@ -2134,6 +2139,7 @@ function submitNewBundle() {
   _newBundleCreated = b;
   renderBundleSuccess(document.getElementById("pageContent"), b);
   toast("تم إنشاء المظروف وباركوده ✅");
+  _submitBundleInFlight = false;
 }
 
 function renderBundleSuccess(el, b) {
@@ -2682,8 +2688,8 @@ function renderStageSelector() {
     const next=i===b.stage+1;
     const c=sc(i);
     html+=`<button class="stage-item"
-      style="${done?`border-color:var(--border);background:var(--bg);`:next?`border-color:${c};background:${c}15`:""}"
-      ${done?"disabled":""}
+      style="${done?`border-color:var(--border);background:var(--bg);`:next?`border-color:${c};background:${c}15`:"opacity:.5"}"
+      ${done||!next?"disabled":""}
       onclick="if(!this.disabled){_confirmStg=${i};renderStageSelector()}">
       <div class="stage-num" style="background:${done?"var(--green)":next?c:"var(--border)"}">${done?"✓":i+1}</div>
       <span class="stage-item-label" style="${done?"color:var(--muted)":next?`color:${c};font-weight:700`:"color:var(--mid)"}">${s}</span>
@@ -2697,10 +2703,11 @@ function renderStageSelector() {
 function doAdvance() {
   if(_confirmStg===null||!_scanHit)return;
   const idx=_confirmStg;
-  const note=(document.getElementById("stageNote")||{value:""}).value||"";
-  const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
   const b=state.bundles.find(x=>x.id===_scanHit.id);
   if(!b)return;
+  if(idx!==b.stage+1) { toast("لا يمكن تخطي المراحل — يجب اعتماد المرحلة التالية بالترتيب","err"); _confirmStg=null; renderStageSelector(); return; }
+  const note=(document.getElementById("stageNote")||{value:""}).value||"";
+  const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
   b.stage=idx; b.log.push(entry);
   saveState();
   saveBundleToCloud(b);   // ← مزامنة فورية مع السحابة
