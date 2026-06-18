@@ -2706,6 +2706,9 @@ function doAdvance() {
   const b=state.bundles.find(x=>x.id===_scanHit.id);
   if(!b)return;
   if(idx!==b.stage+1) { toast("لا يمكن تخطي المراحل — يجب اعتماد المرحلة التالية بالترتيب","err"); _confirmStg=null; renderStageSelector(); return; }
+  if(idx===state.stages.length-1 && (!b.corrector||!b.reviewer)) {
+    if(!confirm("هذا المظروف سيُعتبر مكتملاً ولكن لم يتم تحديد المصحح و/أو المراجع. هل تريد المتابعة؟")) { _confirmStg=null; renderStageSelector(); return; }
+  }
   const note=(document.getElementById("stageNote")||{value:""}).value||"";
   const entry={stageIdx:idx, stageLabel:state.stages[idx], ts:nowISO(), user:currentUser.name, note};
   b.stage=idx; b.log.push(entry);
