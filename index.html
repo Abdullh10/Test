@@ -13,8 +13,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -471,6 +469,19 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
   .card{padding:16px}
   #appMain{padding:12px 8px}
   #appHeader{padding:0 14px}
+  /* رفع حد أدنى للخط على الجوال لتحسين القراءة (شارات الحالة والملاحظات الصغيرة) */
+  [style*="font-size:9px"],[style*="font-size:10px"]{font-size:11px!important}
+  .data-table{font-size:11px}
+  .data-table th,.data-table td{padding:7px 8px}
+}
+
+/* ── TOUCH TARGETS ───────────────────────────── */
+/* تكبير مساحة اللمس على الشاشات اللمسية فقط (لا يؤثر على تجربة الماوس/سطح المكتب) */
+@media(hover:none) and (pointer:coarse){
+  .btn{min-height:44px;padding:12px 20px}
+  .btn-sm{min-height:38px;padding:9px 14px}
+  .nav-btn{min-height:48px;padding:12px 14px}
+  .inp{min-height:44px}
 }
 </style>
 </head>
@@ -1599,6 +1610,23 @@ let state = {
 let currentUser = null;
 let currentPage = "";
 
+// تحميل مكتبات CDN الثقيلة (XLSX, jsQR) عند الحاجة الفعلية فقط بدل تحميلها
+// في كل صفحة لكل المستخدمين — يسرّع التحميل الأولي خصوصاً على بيانات الجوال
+const CDN_XLSX = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const CDN_JSQR = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+const _scriptLoadPromises = {};
+function loadScriptOnce(src) {
+  if (_scriptLoadPromises[src]) return _scriptLoadPromises[src];
+  _scriptLoadPromises[src] = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => { delete _scriptLoadPromises[src]; reject(new Error("فشل تحميل: " + src)); };
+    document.head.appendChild(s);
+  });
+  return _scriptLoadPromises[src];
+}
+
 const ROLE_LABEL  = { admin:"مدير النظام", controller:"الكنترول", notifier:"مسؤول التنبيهات", principal:"مدير المدرسة", monitor:"مراقب اللجان" };
 const ROLE_COLORS = { admin:["#92610A","#FEF3C7"], controller:["#1E40AF","#DBEAFE"], notifier:["#5B21B6","#EDE9FE"], principal:["#065F46","#D1FAE5"], monitor:["#9D174D","#FCE7F3"] };
 const TEACHER_ROLE_LABEL = { corrector:"مصحح 1", corrector2:"مصحح 2", reviewer:"مراجع 1", reviewer2:"مراجع 2", auditor:"مدقق 1", auditor2:"مدقق 2" };
@@ -2435,8 +2463,8 @@ async function startCamera() {
 
   // Check jsQR loaded
   if(typeof jsQR === "undefined") {
-    toast("مكتبة القراءة غير محملة — تحقق من الاتصال بالإنترنت","err");
-    return;
+    try { await loadScriptOnce(CDN_JSQR); }
+    catch(e) { toast("مكتبة القراءة غير محملة — تحقق من الاتصال بالإنترنت","err"); return; }
   }
 
   // Try advanced constraints first, fall back to simple
@@ -3927,10 +3955,10 @@ function pdfSchedule() {
 // ═══════════════════════════════════════════════
 
 // Build template as base64 using SheetJS (no server needed)
-function downloadTeacherTemplate() {
+async function downloadTeacherTemplate() {
   if(typeof XLSX === "undefined") {
-    toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err");
-    return;
+    try { await loadScriptOnce(CDN_XLSX); }
+    catch(e) { toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err"); return; }
   }
   const wb = XLSX.utils.book_new();
 
@@ -3979,8 +4007,11 @@ function handleXlsxFile(input) {
   input.value = "";
 }
 
-function processXlsxFile(file) {
-  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة","err"); return; }
+async function processXlsxFile(file) {
+  if(typeof XLSX === "undefined") {
+    try { await loadScriptOnce(CDN_XLSX); }
+    catch(e) { toast("مكتبة Excel غير محملة","err"); return; }
+  }
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -6388,8 +6419,11 @@ function sdbSetSpecialNeeds(id) {
   toast("تم تحديث الملاحظة ✅");
   _sdbRenderResults();
 }
-function downloadStudentTemplate() {
-  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err"); return; }
+async function downloadStudentTemplate() {
+  if(typeof XLSX === "undefined") {
+    try { await loadScriptOnce(CDN_XLSX); }
+    catch(e) { toast("مكتبة Excel غير محملة، تحقق من الاتصال بالإنترنت","err"); return; }
+  }
   const wb = XLSX.utils.book_new();
   const headers = ["اسم الطالب *","رقم الطالب","رقم الجوال *","اللجنة *","المرحلة"];
   const samples = [
@@ -6409,8 +6443,11 @@ function handleStudentXlsxFile(input) {
   if(file) processStudentXlsxFile(file);
   input.value = "";
 }
-function processStudentXlsxFile(file) {
-  if(typeof XLSX === "undefined") { toast("مكتبة Excel غير محملة","err"); return; }
+async function processStudentXlsxFile(file) {
+  if(typeof XLSX === "undefined") {
+    try { await loadScriptOnce(CDN_XLSX); }
+    catch(e) { toast("مكتبة Excel غير محملة","err"); return; }
+  }
   const replace = document.getElementById("sdb_file_replace").checked;
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -7154,37 +7191,6 @@ function printMonitorReport(id) {
 // ─────────────────────────────────────────────
 // مكتبة التوقيع الإلكتروني (canvas)
 // ─────────────────────────────────────────────
-function initSigCanvas(canvasId) {
-  const canvas = document.getElementById(canvasId);
-  if(!canvas) return;
-  const ctx = canvas.getContext("2d");
-  ctx.strokeStyle = "#0D1F3C";
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  let drawing = false;
-  let lastX = 0, lastY = 0;
-
-  function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    if(e.touches) {
-      return [(e.touches[0].clientX - rect.left)*scaleX, (e.touches[0].clientY - rect.top)*scaleY];
-    }
-    return [(e.clientX - rect.left)*scaleX, (e.clientY - rect.top)*scaleY];
-  }
-
-  canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); drawing=true; [lastX,lastY]=getPos(e); };
-  canvas.onmousemove = canvas.ontouchmove = e => {
-    if(!drawing) return; e.preventDefault();
-    const [x,y] = getPos(e);
-    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke();
-    [lastX,lastY]=[x,y];
-  };
-  canvas.onmouseup = canvas.ontouchend = canvas.onmouseleave = () => { drawing=false; };
-}
-
 function clearSigCanvas(canvasId) {
   const canvas = document.getElementById(canvasId);
   if(!canvas) return;
