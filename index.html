@@ -3553,7 +3553,7 @@ function renderCtrlReport(el) {
           <div style="display:flex;gap:7px;flex-wrap:wrap">
             ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('minutes','${a.id}','${a.label}','${dateStr}')">📨 إرسال للاعتماد</button>`:""}
             <button class="btn btn-navy btn-sm" onclick="printArchivedMinutes(${i})">🖨️ طباعة PDF</button>
-            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="if(confirm('حذف هذه النسخة؟')){state.minutesArchive.splice(${i},1);saveState();saveToCloud();renderCtrlReport(document.getElementById('pageContent'));toast('تم الحذف')}">✕ حذف</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteArchivedMinutes('${a.id}')">✕ حذف</button>
           </div>
         </div>`;
       }).join("");
@@ -3606,6 +3606,16 @@ function printArchivedMinutesById(id) {
   const idx = (state.minutesArchive||[]).findIndex(a=>a.id===id);
   if(idx<0) { toast("النسخة غير موجودة","err"); return; }
   printArchivedMinutes(idx);
+}
+
+function deleteArchivedMinutes(id) {
+  if(!confirm("حذف هذه النسخة؟")) return;
+  if(_hasPendingApproval("minutes", id) && !confirm("هذا المحضر بانتظار اعتماد مدير المدرسة — حذفه سيترك طلب الاعتماد بلا مستند. هل تريد الحذف رغم ذلك؟")) return;
+  state.minutesArchive = (state.minutesArchive||[]).filter(a=>a.id!==id);
+  _markDeleted(id);
+  saveState(); saveToCloud();
+  renderCtrlReport(document.getElementById("pageContent"));
+  toast("تم الحذف");
 }
 
 function printArchivedMinutes(archiveIdx) {
@@ -5042,6 +5052,18 @@ function generateSubjectsPDF() {
 const APPROVAL_DOC_LABELS = { minutes:"محضر فتح مظاريف", pledge:"تعهد / إقرار", daily:"تقرير يومي للمراقب" };
 const APPROVAL_DOC_ICONS  = { minutes:"📝", pledge:"📋", daily:"📊" };
 
+// يتحقق من أن المستند المرتبط باعتماد لا يزال موجوداً (لم يُحذف بعد إرساله للاعتماد)
+function _approvalDocExists(docType, docId) {
+  if(docType==="minutes") return (state.minutesArchive||[]).some(a=>a.id===docId);
+  if(docType==="pledge")  return (state.monitorReports||[]).some(r=>r.id===docId);
+  if(docType==="daily")   return (state.monitorDailyReports||[]).some(r=>r.id===docId);
+  return false;
+}
+// هل يوجد اعتماد معلّق (pending) مرتبط بهذا المستند؟ تُستخدم لتحذير المستخدم قبل حذف مستند بانتظار اعتماد المدير
+function _hasPendingApproval(docType, docId) {
+  return (state.approvals||[]).some(a=>a.docType===docType && a.docId===docId && a.status==="pending");
+}
+
 function submitForApproval(docType, docId, title, subtitle) {
   if(!state.approvals) state.approvals=[];
   const existing = state.approvals.find(a=>a.docType===docType && a.docId===docId);
@@ -5133,6 +5155,7 @@ function renderPrincipalApprovals(el) {
 }
 
 function viewApprovalDoc(docType, docId) {
+  if(!_approvalDocExists(docType, docId)) { toast("هذا المستند غير موجود — يبدو أنه تم حذفه","err"); return; }
   if(docType==="minutes") printArchivedMinutesById(docId);
   else if(docType==="pledge") printMonitorReport(docId);
   else if(docType==="daily") printDailyReport(docId);
@@ -5141,6 +5164,7 @@ function viewApprovalDoc(docType, docId) {
 function approveDocument(approvalId) {
   const a = (state.approvals||[]).find(x=>x.id===approvalId);
   if(!a) return;
+  if(!_approvalDocExists(a.docType, a.docId)) { toast("لا يمكن الاعتماد — المستند المرتبط بهذا الطلب تم حذفه","err"); _approvingId=null; renderPrincipalApprovals(document.getElementById("pageContent")); return; }
   const canvas = document.getElementById("apprSigCanvas");
   const sig = canvas ? canvas.toDataURL() : "";
   a.status="approved"; a.principalName=currentUser.name; a.principalSig=sig; a.decidedAt=nowISO();
@@ -5159,6 +5183,7 @@ function rejectDocument(approvalId) {
   if(reason===null) return;
   const a = (state.approvals||[]).find(x=>x.id===approvalId);
   if(!a) return;
+  // الرفض مسموح حتى لو حُذف المستند، فهو لا يفترض وجوده مثل الاعتماد
   a.status="rejected"; a.principalName=currentUser.name; a.decidedAt=nowISO(); a.rejectReason=reason||"";
   if(!state.inbox) state.inbox=[];
   state.inbox.push({ id:uid(), to: a.docType==="minutes"?"controller":"monitor", from:"مدير المدرسة", type:"urgent",
@@ -6031,6 +6056,7 @@ function deleteDailyReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
   var rec = (state.monitorDailyReports||[]).find(r=>r.id===id);
   if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
+  if(_hasPendingApproval("daily", id) && !confirm("هذا التقرير بانتظار اعتماد مدير المدرسة — حذفه سيترك طلب الاعتماد بلا مستند. هل تريد الحذف رغم ذلك؟")) return;
   state.monitorDailyReports=(state.monitorDailyReports||[]).filter(r=>r.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
@@ -6353,16 +6379,29 @@ function processStudentXlsxFile(file) {
         });
       }
       if(newRows.length===0) { toast("لم يتم العثور على بيانات طلاب في الملف","err"); return; }
+      let skipped = 0;
       if(replace) {
         // عند "استبدال الكل" نُسجِّل المعرفات القديمة كمحذوفة، وإلا فإن دمج البيانات
         // مع النسخة السحابية عند الحفظ سيُعيد إحياء السجلات المستبدلة
         (state.studentsDB||[]).forEach(s=>{ if(s.id) _markDeleted(s.id); });
         state.studentsDB = newRows;
       } else {
-        state.studentsDB = (state.studentsDB||[]).concat(newRows);
+        // تفادي تكرار الطالب نفسه عند استيراد نفس الملف مرتين بالخطأ — المطابقة
+        // برقم الهوية إن وُجد، وإلا بالاسم
+        const existing = state.studentsDB||[];
+        const existingSids = new Set(existing.filter(s=>s.sid).map(s=>s.sid));
+        const existingNames = new Set(existing.filter(s=>!s.sid).map(s=>s.name));
+        const toAdd = [];
+        newRows.forEach(r=>{
+          const isDup = r.sid ? existingSids.has(r.sid) : existingNames.has(r.name);
+          if(isDup) { skipped++; return; }
+          if(r.sid) existingSids.add(r.sid); else existingNames.add(r.name);
+          toAdd.push(r);
+        });
+        state.studentsDB = existing.concat(toAdd);
       }
       saveState(); saveToCloud();
-      toast(`تم استيراد ${newRows.length} طالب من الملف ✅`);
+      toast(`تم استيراد ${replace?newRows.length:newRows.length-skipped} طالب من الملف${skipped?` (تم تجاهل ${skipped} مكرر)`:""} ✅`);
       renderStudentsDB(document.getElementById("pageContent"));
     } catch(err) {
       console.error(err);
@@ -6875,6 +6914,7 @@ function deleteMonitorReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
   var rec = (state.monitorReports||[]).find(r=>r.id===id);
   if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
+  if(_hasPendingApproval("pledge", id) && !confirm("هذا المستند بانتظار اعتماد مدير المدرسة — حذفه سيترك طلب الاعتماد بلا مستند. هل تريد الحذف رغم ذلك؟")) return;
   state.monitorReports = (state.monitorReports||[]).filter(r=>r.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
