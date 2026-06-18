@@ -765,7 +765,11 @@ async function saveNotifLogToCloud(entry) {
   return ok;
 }
 
-async function loadFromCloud() {
+// fullSync=true (الافتراضي) يحمّل كل الجداول، ويُستخدم عند بدء تشغيل التطبيق فقط.
+// التحديثات الدورية (checkForCloudUpdates) تكتشف تغيّراً في جدول settings فقط،
+// فتمر fullSync=false لتفادي إعادة تحميل bundles/notif_log دون داعٍ في كل فحص
+async function loadFromCloud(fullSync) {
+  if(fullSync === undefined) fullSync = true;
   var dot = document.getElementById("loadingMsg");
   if(dot) dot.style.display="block";
   try {
@@ -791,17 +795,19 @@ async function loadFromCloud() {
     DEFAULT_USERS.forEach(function(du){
       if((state._deletedIds||[]).indexOf(du.id)===-1 && !state.users.find(function(u){ return u.id===du.id; })) state.users.push({...du});
     });
-    // Load bundles
-    var brows = await sbGet("bundles");
-    if(brows && brows.length) {
-      var delSet = state._deletedIds||[];
-      state.bundles = brows.filter(function(r){ return delSet.indexOf(r.id)===-1; })
-        .sort(function(a,b){ return new Date(a.created_at)-new Date(b.created_at); }).map(function(r){ return r.data; });
-    }
-    // Load notifLog
-    var nrows = await sbGet("notif_log");
-    if(nrows && nrows.length) {
-      state.notifLog = nrows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); }).map(function(r){ return r.data; });
+    if(fullSync) {
+      // Load bundles
+      var brows = await sbGet("bundles");
+      if(brows && brows.length) {
+        var delSet = state._deletedIds||[];
+        state.bundles = brows.filter(function(r){ return delSet.indexOf(r.id)===-1; })
+          .sort(function(a,b){ return new Date(a.created_at)-new Date(b.created_at); }).map(function(r){ return r.data; });
+      }
+      // Load notifLog
+      var nrows = await sbGet("notif_log");
+      if(nrows && nrows.length) {
+        state.notifLog = nrows.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); }).map(function(r){ return r.data; });
+      }
     }
   } catch(e){ console.warn("loadFromCloud:",e.message); }
   finally {
@@ -847,7 +853,8 @@ async function applyCloudUpdate(silent) {
   // يُنفَّذ ضمن نفس طابور المزامنة المستخدَم للحفظ، لمنع تحميل بيانات سحابية
   // أثناء عملية حفظ قيد التنفيذ، وهو ما قد يتسبب باستبدال البيانات المُحمَّلة حديثاً
   // ببيانات محلية أقدم عند اكتمال الحفظ المتأخر
-  _cloudSaveQueue = _cloudSaveQueue.then(loadFromCloud, loadFromCloud);
+  var _bgLoad = function(){ return loadFromCloud(false); };
+  _cloudSaveQueue = _cloudSaveQueue.then(_bgLoad, _bgLoad);
   await _cloudSaveQueue;
   renderNav();
   // لا تُعِد رسم الصفحة الحالية إذا كان المستخدم يكتب داخل حقل إدخال،
