@@ -645,7 +645,7 @@ function saveToCloud() {
 // حقول مشتركة بين عدة مستخدمين (تقارير، تعهدات، اعتمادات، إلخ) — يتم دمجها مع
 // آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
 // تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
-var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users"];
+var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB"];
 // عدد النسخ السابقة المحفوظة في سجل الأرشيف السحابي (يُستخدم للاسترجاع عند الأخطاء)
 var _HISTORY_LIMIT = 20;
 
@@ -6329,7 +6329,14 @@ function processStudentXlsxFile(file) {
         });
       }
       if(newRows.length===0) { toast("لم يتم العثور على بيانات طلاب في الملف","err"); return; }
-      state.studentsDB = replace ? newRows : (state.studentsDB||[]).concat(newRows);
+      if(replace) {
+        // عند "استبدال الكل" نُسجِّل المعرفات القديمة كمحذوفة، وإلا فإن دمج البيانات
+        // مع النسخة السحابية عند الحفظ سيُعيد إحياء السجلات المستبدلة
+        (state.studentsDB||[]).forEach(s=>{ if(s.id) _markDeleted(s.id); });
+        state.studentsDB = newRows;
+      } else {
+        state.studentsDB = (state.studentsDB||[]).concat(newRows);
+      }
       saveState(); saveToCloud();
       toast(`تم استيراد ${newRows.length} طالب من الملف ✅`);
       renderStudentsDB(document.getElementById("pageContent"));
@@ -6354,6 +6361,7 @@ function sdbAddStudent() {
 }
 function sdbDelete(id) {
   state.studentsDB = state.studentsDB.filter(s=>s.id!==id);
+  _markDeleted(id);
   saveState(); saveToCloud();
   renderStudentsDB(document.getElementById("pageContent"));
 }
