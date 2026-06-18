@@ -654,6 +654,16 @@ function _markDeleted(id) {
   if(id && state._deletedIds.indexOf(id)===-1) state._deletedIds.push(id);
 }
 
+// يحدد ما إذا كان المراقب الحالي يملك صلاحية رؤية/التعامل مع سجل معيّن — يمنع
+// تداخل المراقبين في بيانات لجان غيرهم. غير المراقبين (admin/principal/controller) يرون كل شيء.
+function _monitorVisible(record) {
+  if(!currentUser || currentUser.role!=="monitor") return true;
+  if(record.monitorName === currentUser.name) return true;
+  if(!currentUser.assignedCommittees || !currentUser.assignedCommittees.length) return true;
+  if(record.hall) return currentUser.assignedCommittees.includes(record.hall);
+  return false;
+}
+
 function _mergeById(cloudArr, localArr, deletedSet) {
   var map = {};
   (cloudArr||[]).forEach(function(item){ if(item && item.id) map[item.id] = item; });
@@ -722,6 +732,12 @@ async function saveBundleToCloud(b) {
 
 async function deleteBundleFromCloud(id) {
   return await sbDelete("bundles", id);
+}
+
+async function saveNotifLogToCloud(entry) {
+  var ok = await sbUpsert("notif_log", {id:entry.id, data:entry, created_at:new Date().toISOString()});
+  if(ok) showSyncDot(true);
+  return ok;
 }
 
 async function loadFromCloud() {
@@ -2860,12 +2876,14 @@ function sendNotif() {
 
   // Save to log
   // notifLog saved after push
-  state.notifLog.unshift({
+  const _logEntry={
     id:uid(), ts:nowISO(), type:_selType,
     typeLabel:(nt&&nt.label), typeColor:(nt&&nt.color), typeIcon:(nt&&nt.icon),
     teachers, message:msg, bundle, sentBy:currentUser.name, waMsg:fullMsg,
-  });
+  };
+  state.notifLog.unshift(_logEntry);
   saveState();
+  saveNotifLogToCloud(_logEntry);
   toast(`📲 جاهز للإرسال لـ ${teachers.length} معلم عبر واتساب`,"wa");
 
   // Open WA for first teacher, rest open in tabs
@@ -5277,7 +5295,7 @@ function generatePrincipalPDF() {
 // ═══════════════════════════════════════════════
 
 function renderMonitorCommittees(el) {
-  const notes = state.monitorNotes || [];
+  const notes = (state.monitorNotes || []).filter(_monitorVisible);
   const schedule = (state.examSchedule || []).sort((a,b) => (a.date||"").localeCompare(b.date||""));
 
   el.innerHTML = `
@@ -5396,6 +5414,8 @@ function saveMonitorNote() {
 }
 
 function deleteMonitorNote(id) {
+  var rec = (state.monitorNotes||[]).find(n=>n.id===id);
+  if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
   state.monitorNotes = (state.monitorNotes||[]).filter(n=>n.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
@@ -5407,7 +5427,7 @@ function deleteMonitorNote(id) {
 // عد الأوراق
 // ─────────────────────────────────────────────
 function renderMonitorPapers(el) {
-  const reports = (state.monitorReports||[]).filter(r=>r.type==="papers");
+  const reports = (state.monitorReports||[]).filter(r=>r.type==="papers").filter(_monitorVisible);
 
   el.innerHTML = `
   <div class="page-wrap">
@@ -5726,7 +5746,7 @@ const DAILY_OBS_ITEMS = [
 const WEEK_DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 
 function renderMonitorDaily(el) {
-  const reports = (state.monitorDailyReports||[]).slice().reverse();
+  const reports = (state.monitorDailyReports||[]).filter(_monitorVisible).slice().reverse();
   const gradeOptions = (state.grades||[]).map(g=>`<option value="${g}">${g}</option>`).join("");
   const subjectOptions = (state.subjects||[]).map(s=>`<option value="${s}">${s}</option>`).join("");
   const todayDay = WEEK_DAYS_AR[new Date().getDay()];
@@ -5974,6 +5994,8 @@ function saveMonitorDailyReport() {
 
 function deleteDailyReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
+  var rec = (state.monitorDailyReports||[]).find(r=>r.id===id);
+  if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
   state.monitorDailyReports=(state.monitorDailyReports||[]).filter(r=>r.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
@@ -6346,7 +6368,7 @@ function sdbBulkImport() {
 }
 
 function renderMonitorStudents(el) {
-  const obs = (state.monitorStudentObs||[]).slice().reverse();
+  const obs = (state.monitorStudentObs||[]).filter(_monitorVisible).slice().reverse();
   const studentObs = obs.filter(o=>o.targetType==="student");
   const teacherObs = obs.filter(o=>o.targetType==="teacher");
 
@@ -6541,6 +6563,8 @@ function saveTeacherObs() {
 }
 
 function deleteStudentObs(id) {
+  var rec = (state.monitorStudentObs||[]).find(o=>o.id===id);
+  if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
   state.monitorStudentObs = (state.monitorStudentObs||[]).filter(o=>o.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
@@ -6735,7 +6759,7 @@ function saveMonitorPledge(pledgeType) {
 // تقارير المراقب
 // ─────────────────────────────────────────────
 function renderMonitorReports(el) {
-  const reports = state.monitorReports || [];
+  const reports = (state.monitorReports || []).filter(_monitorVisible);
 
   el.innerHTML = `
   <div class="page-wrap">
@@ -6806,6 +6830,8 @@ function renderMonitorStats(el) {
 
 function deleteMonitorReport(id) {
   if(!confirm("حذف هذا التقرير؟")) return;
+  var rec = (state.monitorReports||[]).find(r=>r.id===id);
+  if(rec && !_monitorVisible(rec)) { toast("لا تملك صلاحية حذف هذا السجل","err"); return; }
   state.monitorReports = (state.monitorReports||[]).filter(r=>r.id!==id);
   _markDeleted(id);
   saveState(); saveToCloud();
