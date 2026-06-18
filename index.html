@@ -2301,10 +2301,41 @@ function adminDeleteAllBundles() {
   renderAdminList(document.getElementById("pageContent"));
 }
 
+let _editOverlayPrevFocus = null;
+let _editOverlayKeyHandler = null;
+
+function _openEditOverlay() {
+  const overlay = document.getElementById("editOverlay");
+  if(!overlay) return;
+  _editOverlayPrevFocus = document.activeElement;
+  const focusable = overlay.querySelectorAll('input, select, textarea, button');
+  if(focusable.length) focusable[0].focus();
+  _editOverlayKeyHandler = function(e) {
+    if(e.key === "Escape") { closeEditOverlay(); return; }
+    if(e.key === "Tab") {
+      const f = Array.from(overlay.querySelectorAll('input, select, textarea, button')).filter(el=>!el.disabled);
+      if(!f.length) return;
+      const first = f[0], last = f[f.length-1];
+      if(e.shiftKey && document.activeElement===first) { e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  document.addEventListener("keydown", _editOverlayKeyHandler);
+}
+
+function closeEditOverlay() {
+  const overlay = document.getElementById("editOverlay");
+  if(overlay) overlay.remove();
+  if(_editOverlayKeyHandler) { document.removeEventListener("keydown", _editOverlayKeyHandler); _editOverlayKeyHandler = null; }
+  if(_editOverlayPrevFocus && typeof _editOverlayPrevFocus.focus === "function") _editOverlayPrevFocus.focus();
+  _editOverlayPrevFocus = null;
+}
+
 function adminEditBundle(id) {
   if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   const b = state.bundles.find(x=>x.id===id);
   if(!b)return;
+  closeEditOverlay();
   const overlay = document.createElement("div");
   overlay.className="overlay";
   overlay.id="editOverlay";
@@ -2376,10 +2407,11 @@ function adminEditBundle(id) {
     </div>
     <div class="row">
       <button class="btn btn-navy" style="flex:1" onclick="saveEditBundle('${b.id}')">💾 حفظ</button>
-      <button class="btn btn-mid" style="flex:1" onclick="document.getElementById('editOverlay').remove()">إلغاء</button>
+      <button class="btn btn-mid" style="flex:1" onclick="closeEditOverlay()">إلغاء</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  _openEditOverlay();
 }
 
 function saveEditBundle(id) {
@@ -2402,7 +2434,7 @@ function saveEditBundle(id) {
   b.examEnd    = (document.getElementById("eb_end")||{value:""}).value||b.examEnd||"";
   saveState();
   saveBundleToCloud(b);
-  document.getElementById("editOverlay").remove();
+  closeEditOverlay();
   toast("تم حفظ التعديلات ✅");
   renderAdminList(document.getElementById("pageContent"));
 }
