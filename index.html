@@ -1792,7 +1792,7 @@ function migrateMonitorAccounts() {
   ["U6","U7"].forEach(id=>{
     const u = state.users.find(x=>x.id===id);
     if(u && (u.username==="monitor2"||u.username==="monitor3") && (u.name==="المراقب الثاني"||u.name==="المراقب الثالث")) {
-      state.users = state.users.filter(x=>x.id!==id); changed=true;
+      state.users = state.users.filter(x=>x.id!==id); _markDeleted(id); changed=true;
     }
   });
   if(changed) { saveState(); if(typeof saveToCloud==="function") saveToCloud(); }
@@ -3377,26 +3377,33 @@ function generateUserPassword() {
   if(inp) inp.value = pass;
   toast("تم توليد كلمة مرور قوية — انسخها الآن لتسليمها للمستخدم قبل إضافة الحساب","ok");
 }
+let _addUserInFlight = false;
 async function addUser() {
   if(!currentUser || currentUser.role!=="admin") { toast("إضافة الحسابات مخصصة لمدير النظام فقط","err"); return; }
+  if(_addUserInFlight) return;
   const name=(document.getElementById("nu_name")||{value:""}).value.trim();
   const username=(document.getElementById("nu_user")||{value:""}).value.trim();
   const password=(document.getElementById("nu_pass")||{value:""}).value;
   const role=(document.getElementById("nu_role")||{value:""}).value;
   if(!name||!username||!password){ toast("أكمل البيانات","err"); return; }
   if(state.users.find(u=>u.username===username)){ toast("اسم المستخدم موجود مسبقاً","err"); return; }
-  const newUser = { id:"U"+uid(), name, username, role };
-  await setUserPassword(newUser, password);
-  if(role==="monitor"){
-    const raw=(document.getElementById("nu_committees")||{value:""}).value.trim();
-    if(raw) newUser.assignedCommittees = raw.split(",").map(c=>c.trim()).filter(Boolean);
+  _addUserInFlight = true;
+  try {
+    const newUser = { id:"U"+uid(), name, username, role };
+    await setUserPassword(newUser, password);
+    if(role==="monitor"){
+      const raw=(document.getElementById("nu_committees")||{value:""}).value.trim();
+      if(raw) newUser.assignedCommittees = raw.split(",").map(c=>c.trim()).filter(Boolean);
+    }
+    state.users.push(newUser);
+    saveState();
+    if(typeof saveToCloud==="function") { try{ saveToCloud(); }catch(e){} }
+    toast("تم إضافة الحساب ✅");
+    renderSTabContent();
+    renderLoginDemos();
+  } finally {
+    _addUserInFlight = false;
   }
-  state.users.push(newUser);
-  saveState();
-  if(typeof saveToCloud==="function") { try{ saveToCloud(); }catch(e){} }
-  toast("تم إضافة الحساب ✅");
-  renderSTabContent();
-  renderLoginDemos();
 }
 
 
@@ -7836,6 +7843,13 @@ function sendPrincipalMsg(){
 }
 
 // ─── sent box (principal) ────────────────────────
+function deletePrincipalMessage(id){
+  if(!confirm("حذف هذه الرسالة؟")) return;
+  state.principalMessages=(state.principalMessages||[]).filter(m=>m.id!==id);
+  _markDeleted(id);
+  saveState(); saveToCloud();
+  renderPrincipalSent(document.getElementById("pageContent"));
+}
 function renderPrincipalSent(el){
   const msgs=(state.principalMessages||[]);
   const newReplies=msgs.filter(m=>(m.replies||[]).some(r=>!r.readByPrincipal)).length;
@@ -7949,6 +7963,14 @@ function renderAdminNotifications(el){
   </div>`;
   _adminNotifRenderResults();
 }
+function clearMyInbox(){
+  if(!confirm("حذف جميع الرسائل الواردة؟")) return;
+  (state.inbox||[]).filter(m=>m.to===currentUser.role).forEach(m=>_markDeleted(m.id));
+  state.inbox=state.inbox.filter(m=>m.to!==currentUser.role);
+  saveState(); saveToCloud();
+  renderInbox(document.getElementById("pageContent"));
+  toast("تم مسح صندوق الوارد");
+}
 function renderInbox(el){
   if(!state.inbox) state.inbox=[];
   const myMsgs=state.inbox.filter(m=>m.to===currentUser.role)
@@ -7973,7 +7995,7 @@ function renderInbox(el){
         </div>`}
       ${myMsgs.length>0?`<div style="margin-top:14px;text-align:left">
         <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)"
-          onclick="if(confirm('حذف جميع الرسائل الواردة؟')){state.inbox=state.inbox.filter(m=>m.to!=='${currentUser.role}');saveState();saveToCloud();renderInbox(document.getElementById('pageContent'));toast('تم مسح صندوق الوارد')}">🗑️ مسح الكل</button>
+          onclick="clearMyInbox()">🗑️ مسح الكل</button>
       </div>`:""}
     </div>
   </div>`;
@@ -8022,7 +8044,7 @@ function _renderMsgCard(m, mi, view){
       ${replies.length>0?`<span style="background:${mt.color}20;color:${mt.color};border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;border:1px solid ${mt.color}40">${replies.length} ${replies.length===1?'رد':'ردود'}</span>`:""}
       ${newReplies>0?`<span style="background:#059669;color:#fff;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:800">↩️ رد جديد</span>`:""}
       <span style="margin-right:auto;font-size:11px;color:var(--muted)">${fmt(m.ts)}</span>
-      ${!isInbox?`<button class="del-btn" title="حذف" onclick="if(confirm('حذف هذه الرسالة؟')){state.principalMessages.splice(${mi},1);saveState();saveToCloud();renderPrincipalSent(document.getElementById('pageContent'))}">✕</button>`:""}
+      ${!isInbox?`<button class="del-btn" title="حذف" onclick="deletePrincipalMessage('${m.id}')">✕</button>`:""}
     </div>
 
     <!-- ── original message body ── -->
