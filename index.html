@@ -565,6 +565,12 @@ const LOGO_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAPoCAYAAABN
 function esc(v) {
   return String(v==null?"":v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+// تعقيم قيمة قبل وضعها داخل سلسلة جافاسكربت بأحد أحرف الاقتباس المفردة
+// (مثل onclick="fn('${v}')") — يمنع كسر السلسلة بإدخال علامة اقتباس أو شَرَطة معكوسة.
+// يُستخدم دائماً مع esc() حوله أيضاً لتعقيم سياق سمة HTML المحيطة: esc(escJs(v))
+function escJs(v) {
+  return String(v==null?"":v).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+}
 
 // كلمات المرور تُخزَّن مُجزّأة (PBKDF2-SHA256) ولا تُحفظ كنص صريح بعد اليوم
 const PW_ITERATIONS = 50000;
@@ -2232,7 +2238,7 @@ function renderBundleSuccess(el, b) {
       📌 اطبع هذا الباركود وألصقه على المظروف
     </div>
     <div class="row" style="gap:8px">
-      <button class="btn btn-navy" style="flex:1;box-shadow:var(--sh2)" onclick="printBundle('${b.barcode}','${b.subject}','${b.count}')">🖨️ طباعة</button>
+      <button class="btn btn-navy" style="flex:1;box-shadow:var(--sh2)" onclick="printBundle('${esc(escJs(b.barcode))}','${esc(escJs(b.subject))}','${b.count}')">🖨️ طباعة</button>
       <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo(currentUser&&currentUser.role==='controller'?'ctrl_new':'admin_new')">➕ مظروف آخر</button>
     </div>
   </div>`;
@@ -3802,7 +3808,7 @@ function renderCtrlReport(el) {
           <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1">
             ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${esc(b.barcode)}</span>`;}).join("")}
           </div>
-          <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
+          <button class="btn btn-navy btn-sm" onclick="generatePDF('${esc(escJs(subj))}')">📄 PDF</button>
         </div>`;
       }).join("")}`}
     </div>
@@ -3915,12 +3921,12 @@ function renderFormPrintPanel(t) {
     <label class="lbl">اللجان (اتركها بلا تحديد لطباعة الجميع)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${committees.length===0?`<p class="empty" style="padding:6px 0">لا توجد لجان مسجلة</p>`:committees.map(c=>`
-      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.committees.includes(c)?"var(--navy)":"var(--border)"};background:${f.committees.includes(c)?"var(--navy)":"#fff"};color:${f.committees.includes(c)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','committees','${esc(c)}')">${esc(c)}</button>`).join("")}
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.committees.includes(c)?"var(--navy)":"var(--border)"};background:${f.committees.includes(c)?"var(--navy)":"#fff"};color:${f.committees.includes(c)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','committees','${esc(escJs(c))}')">${esc(c)}</button>`).join("")}
     </div>
     <label class="lbl">الصفوف (اتركها بلا تحديد لطباعة جميع المراحل — ستُصنَّف وتُميَّز كل مرحلة بلون مستقل تلقائياً)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${grades.map(g=>`
-      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.grades.includes(g)?"var(--navy)":"var(--border)"};background:${f.grades.includes(g)?"var(--navy)":"#fff"};color:${f.grades.includes(g)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','grades','${esc(g)}')">${esc(g)}</button>`).join("")}
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.grades.includes(g)?"var(--navy)":"var(--border)"};background:${f.grades.includes(g)?"var(--navy)":"#fff"};color:${f.grades.includes(g)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','grades','${esc(escJs(g))}')">${esc(g)}</button>`).join("")}
     </div>`;
   } else {
     const roles = [...new Set((state.teachers||[]).map(x=>x.role).filter(Boolean))];
@@ -3928,14 +3934,14 @@ function renderFormPrintPanel(t) {
     <label class="lbl">المهام (اتركها بلا تحديد لطباعة الجميع)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${roles.length===0?`<p class="empty" style="padding:6px 0">لا توجد مهام مسجلة</p>`:roles.map(r=>`
-      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.roles.includes(r)?"var(--navy)":"var(--border)"};background:${f.roles.includes(r)?"var(--navy)":"#fff"};color:${f.roles.includes(r)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','roles','${esc(r)}')">${esc(TEACHER_ROLE_LABEL[r]||r)}</button>`).join("")}
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.roles.includes(r)?"var(--navy)":"var(--border)"};background:${f.roles.includes(r)?"var(--navy)":"#fff"};color:${f.roles.includes(r)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','roles','${esc(escJs(r))}')">${esc(TEACHER_ROLE_LABEL[r]||r)}</button>`).join("")}
     </div>`;
   }
   const subjectsHTML = (state.subjects||[]).length>0 ? `
     <label class="lbl">${t.source==="teachers"?"المواد (اتركها بلا تحديد لطباعة الجميع)":"المادة (تظهر في عنوان النموذج — اختياري)"}</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${state.subjects.map(s=>`
-      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.subjects.includes(s)?"var(--navy)":"var(--border)"};background:${f.subjects.includes(s)?"var(--navy)":"#fff"};color:${f.subjects.includes(s)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','subjects','${esc(s)}')">${esc(s)}</button>`).join("")}
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.subjects.includes(s)?"var(--navy)":"var(--border)"};background:${f.subjects.includes(s)?"var(--navy)":"#fff"};color:${f.subjects.includes(s)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','subjects','${esc(escJs(s))}')">${esc(s)}</button>`).join("")}
     </div>` : "";
   return `
   ${filterHTML}
@@ -4908,7 +4914,7 @@ function renderPrincipalDashboard(el) {
           const col = PALETTE[idx%PALETTE.length];
           return `
           <button onclick="
-            _prinView='subject';_prinSubject='${subj.replace(/'/g,"\\'")}';_prinGradeFilter='';
+            _prinView='subject';_prinSubject='${esc(escJs(subj))}';_prinGradeFilter='';
             renderPrincipalDashboard(document.getElementById('pageContent'))
           " style="
             display:flex;align-items:center;gap:12px;width:100%;text-align:right;
@@ -5045,7 +5051,7 @@ function renderPrinSubject(el) {
       background:${!_prinGradeFilter?"var(--navy)":"#fff"};color:${!_prinGradeFilter?"#fff":"var(--mid)"};
       cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">الكل</button>
     ${grades.map(g=>`
-    <button onclick="_prinGradeFilter='${g}';renderPrincipalDashboard(document.getElementById('pageContent'))"
+    <button onclick="_prinGradeFilter='${esc(escJs(g))}';renderPrincipalDashboard(document.getElementById('pageContent'))"
       style="padding:5px 12px;border-radius:99px;border:1.5px solid ${_prinGradeFilter===g?"var(--navy)":"var(--border)"};
       background:${_prinGradeFilter===g?"var(--navy)":"#fff"};color:${_prinGradeFilter===g?"#fff":"var(--mid)"};
       cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">${esc(g)}</button>`).join("")}
