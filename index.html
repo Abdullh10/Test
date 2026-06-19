@@ -5883,6 +5883,17 @@ function teacherOptions(addEmpty=true) {
 
 const PLEDGE_FORMS = [
   {
+    key:"custom_open", icon:"🖊️", label:"نموذج مفتوح (تعهد/إقرار غير موجود)", color:"#0F172A", category:"نموذج مفتوح",
+    title:"نموذج مفتوح", isCustomForm:true,
+    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
+    textTemplate: d=>d.st_text||"",
+    hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
+    extraFields:[
+      {id:"st_custom_title", label:"عنوان النموذج", placeholder:"مثال: تعهد بعدم ..."},
+      {id:"st_text", label:"نص التعهد / الإقرار بالكامل", type:"textarea", placeholder:"اكتب نص التعهد أو الإقرار كاملاً هنا..."},
+    ]
+  },
+  {
     key:"iqrar_general", icon:"📝", label:"إقرار", color:"#64748B", category:"إقرارات",
     title:"إقرار",
     subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
@@ -7023,7 +7034,7 @@ function showPledgeForm(pledgeType) {
       <div class="g2" style="margin-bottom:10px">${f.extraFields.map(buildField).join("")}</div>` : ""}
 
       <!-- نص التعهد -->
-      ${f.textTemplate?`
+      ${f.textTemplate && !f.isCustomForm?`
       <div style="background:#fff;border-right:4px solid ${f.color};border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.9;color:var(--dark)">
         <p style="font-weight:700;color:${f.color};margin-bottom:6px">نص التعهد / الإقرار:</p>
         <p id="pledgeTextPreview">أتعهد أنا الطالب / ${f.title}</p>
@@ -7100,8 +7111,15 @@ function saveMonitorPledge(pledgeType) {
     if(sc){const ctx=sc.getContext("2d");if(!ctx.getImageData(0,0,sc.width,sc.height).data.some(x=>x!==0)){toast("الرجاء إضافة توقيع الطالب","err");return;}}
   }
 
+  if(f.isCustomForm) {
+    const customTitle = (document.getElementById("st_custom_title")||{}).value||"";
+    const customText  = (document.getElementById("st_text")||{}).value||"";
+    if(!customTitle.trim()) { toast("أدخل عنوان النموذج أولاً","err"); return; }
+    if(!customText.trim())  { toast("أدخل نص التعهد / الإقرار أولاً","err"); return; }
+  }
+
   // جمع البيانات
-  const allIds = ["st_name","st_civil","st_seat","st_grade","subject","st_text","st_violation","st_vtype","st_semester","st_vrep","st_observer_name","st_observer1","st_observer2","st_supervisor","st_paragraphs","st_deducted","st_teacher","st_arrtime","st_starttime","st_delay_reason","st_delay_rep","st_decision","st_reason","monitor_name"];
+  const allIds = ["st_name","st_civil","st_seat","st_grade","subject","st_custom_title","st_text","st_violation","st_vtype","st_semester","st_vrep","st_observer_name","st_observer1","st_observer2","st_supervisor","st_paragraphs","st_deducted","st_teacher","st_arrtime","st_starttime","st_delay_reason","st_delay_rep","st_decision","st_reason","monitor_name"];
   const data = {};
   allIds.forEach(id=>{ const el=document.getElementById(id); if(el) data[id]=el.value; });
   data.st_date = hijriVal("st_date");
@@ -7110,7 +7128,7 @@ function saveMonitorPledge(pledgeType) {
   const sigMonitor = f.hasMonitorSig ? (document.getElementById("sigMonitor")||{}).toDataURL?.() || "" : "";
 
   state.monitorReports.push({
-    id:uid(), type:pledgeType, pledgeTitle:f.title,
+    id:uid(), type:pledgeType, pledgeTitle:(f.isCustomForm && data.st_custom_title.trim()) || f.title,
     studentName:data.st_name||"", studentCivil:data.st_civil||"", studentSeat:data.st_seat||"",
     grade:data.st_grade||"", subject:data.subject||"", date:data.st_date||"",
     monitorName:data.monitor_name||currentUser.name,
