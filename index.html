@@ -1650,6 +1650,7 @@ let currentPage = "";
 // في كل صفحة لكل المستخدمين — يسرّع التحميل الأولي خصوصاً على بيانات الجوال
 const CDN_XLSX = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
 const CDN_JSQR = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+const CDN_QRGEN = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
 const _scriptLoadPromises = {};
 function loadScriptOnce(src) {
   if (_scriptLoadPromises[src]) return _scriptLoadPromises[src];
@@ -1755,18 +1756,20 @@ function toast(msg, type="ok") {
   _toastTimer = setTimeout(()=>el.classList.remove("show"), 3200);
 }
 
-function makeQR(value, size=130) {
-  const h = value.split("").reduce((a,c)=>(a*31+c.charCodeAt(0))|0,0);
-  const N=9, cell=Math.floor(size/N);
-  const sz = cell*N;
-  let rects = `<rect width="${sz}" height="${sz}" fill="#fff"/>`;
-  for(let k=0;k<N*N;k++){
-    const r=Math.floor(k/N), c=k%N;
-    const corner=(r<3&&c<3)||(r<3&&c>5)||(r>5&&c<3);
-    if(corner||!!(Math.abs(h)>>(k%29)&1))
-      rects+=`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="#111"/>`;
+// يولّد باركود QR حقيقي قابل للقراءة (يحمّل مكتبة qrcode-generator عند الحاجة فقط)
+async function renderQRInto(containerId, value, cellSize=5, margin=8) {
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  container.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:20px">⏳ يتم إنشاء الباركود...</div>`;
+  try {
+    await loadScriptOnce(CDN_QRGEN);
+    const qr = qrcode(0, "M");
+    qr.addData(value);
+    qr.make();
+    container.innerHTML = qr.createSvgTag({ cellSize, margin });
+  } catch(e) {
+    container.innerHTML = `<div style="font-size:12px;color:var(--red);padding:20px">⚠️ تعذّر إنشاء الباركود — تحقق من الاتصال بالإنترنت</div>`;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">${rects}</svg>`;
 }
 
 function phoneToWA(phone) {
@@ -2210,7 +2213,7 @@ function renderBundleSuccess(el, b) {
     <div style="font-size:48px;margin-bottom:8px">✅</div>
     <h3 style="color:var(--green);font-size:18px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:22px">✓</span>تم إنشاء المظروف بنجاح</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
-    <div id="printArea" class="qr-wrap">${makeQR(b.barcode,150)}</div>
+    <div id="printArea" class="qr-wrap"></div>
     <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${b.barcode}</p>
     <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;text-align:right">
       ${corrT?`✏️ مصحح 1: <strong>${corrT.name}</strong>&nbsp;&nbsp;`:""}
@@ -2228,9 +2231,10 @@ function renderBundleSuccess(el, b) {
       <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo(currentUser&&currentUser.role==='controller'?'ctrl_new':'admin_new')">➕ مظروف آخر</button>
     </div>
   </div>`;
+  renderQRInto("printArea", b.barcode, 5, 8);
 }
 
-function printBundle(barcode, subject, count) {
+async function printBundle(barcode, subject, count) {
   const pa = document.getElementById("printArea");
   pa.style.display="block";
   pa.innerHTML = `
@@ -2238,9 +2242,10 @@ function printBundle(barcode, subject, count) {
       <img src="${LOGO_SRC}" alt="شعار" style="width:100px;height:100px;object-fit:contain;margin:0 auto 8px;display:block"/>
       <h2 style="margin-bottom:8px">${state.schoolName}</h2>
       <p style="font-size:14px;margin-bottom:16px">${subject} · ${count} ورقة</p>
-      ${makeQR(barcode,180)}
+      <div id="printQRBox" class="qr-wrap" style="margin:0 auto 10px"></div>
       <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${barcode}</p>
     </div>`;
+  await renderQRInto("printQRBox", barcode, 6, 8);
   window.print();
   setTimeout(()=>{ pa.style.display="none"; pa.innerHTML=""; }, 1000);
 }
@@ -2275,7 +2280,7 @@ function renderAdminBundleList() {
     div.className="bundle-card";
     div.style.cursor="default";
     div.innerHTML=`
-      <div class="bundle-icon" style="background:${color}20">${makeQR(b.barcode,42).replace('<svg','<svg style="border-radius:4px"')}</div>
+      <div class="bundle-icon" style="background:${color}20">📦</div>
       <div class="bundle-info">
         <div class="row" style="flex-wrap:wrap;gap:5px">
           <span class="bundle-name">${b.subject}</span>
