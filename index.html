@@ -2234,6 +2234,13 @@ function renderBundleSuccess(el, b) {
   renderQRInto("printArea", b.barcode, 5, 8);
 }
 
+// يطبع باركود مظروف موجود مسبقاً (مثلاً لإعادة طباعة باركود ضائع أو تالف) بالبحث عنه عبر معرّفه
+function printBundleById(id) {
+  const b = state.bundles.find(x=>x.id===id);
+  if(!b) { toast("لم يتم العثور على المظروف","err"); return; }
+  printBundle(b.barcode, b.subject, b.count);
+}
+
 async function printBundle(barcode, subject, count) {
   const pa = document.getElementById("printArea");
   pa.style.display="block";
@@ -2295,6 +2302,7 @@ function renderAdminBundleList() {
       </div>
       <div class="bundle-actions">
         <span class="bundle-badge" style="background:${color}20;color:${color};border-color:${color}50">${stageName}</span>
+        <button class="btn btn-sm" style="background:var(--mid);color:#fff" onclick="printBundleById('${b.id}')">🖨️</button>
         <button class="btn btn-sm" style="background:var(--navy);color:#fff" onclick="adminEditBundle('${b.id}')">✏️</button>
         <button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="adminDeleteBundle('${b.id}')">🗑️</button>
       </div>`;
@@ -2846,6 +2854,7 @@ function renderCtrlList(el) {
         <th>عدد الورق</th>
         <th>الباركود</th>
         <th>الحالة</th>
+        <th>طباعة</th>
       </tr></thead>
       <tbody id="ctrlBundleList"></tbody>
     </table>
@@ -2871,6 +2880,9 @@ function renderCtrlList(el) {
             <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
           </div>
         </div>
+      </td>
+      <td data-label="طباعة">
+        <button class="btn btn-sm" style="background:var(--mid);color:#fff" onclick="event.stopPropagation();printBundleById('${b.id}')">🖨️ طباعة</button>
       </td>`;
     container.appendChild(tr);
   });
