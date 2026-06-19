@@ -680,7 +680,7 @@ function saveToCloud() {
 // حقول مشتركة بين عدة مستخدمين (تقارير، تعهدات، اعتمادات، إلخ) — يتم دمجها مع
 // آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
 // تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
-var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers","formTemplates"];
+var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers","formTemplates","studentCustomFields","teacherCustomFields"];
 // عدد النسخ السابقة المحفوظة في سجل الأرشيف السحابي (يُستخدم للاسترجاع عند الأخطاء)
 var _HISTORY_LIMIT = 20;
 
@@ -744,6 +744,7 @@ async function _doSaveToCloud() {
     stages:state.stages, teachers:state.teachers,
     users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
     monitorReports:state.monitorReports||[], monitorNotes:state.monitorNotes||[], monitorStudentObs:state.monitorStudentObs||[], monitorDailyReports:state.monitorDailyReports||[], approvals:state.approvals||[], studentsDB:state.studentsDB||[], absenceLog:state.absenceLog||[],
+    formTemplates:state.formTemplates||[], studentCustomFields:state.studentCustomFields||[], teacherCustomFields:state.teacherCustomFields||[],
     _deletedIds: state._deletedIds||[]
   };
 
@@ -1642,6 +1643,8 @@ let state = {
   principalMessages: [], // [{id,...}] رسائل موجهة لمدير المدرسة
   minutesArchive: [], // [{id,...}] أرشيف محاضر فتح المظاريف المعتمدة
   formTemplates: [], // [{id,title,source:"students"|"teachers",groupByCommittee,columns:[{type:"field"|"blank",key,label}],createdAt}]
+  studentCustomFields: [], // [{id,label}] حقول مخصصة إضافية لبيانات الطلاب (رقم الجلوس، السجل المدني...) — القيم تُخزَّن في s.custom[id]
+  teacherCustomFields: [], // [{id,label}] حقول مخصصة إضافية لبيانات المعلمين (التخصص الدقيق...) — القيم تُخزَّن في t.custom[id]
 };
 
 let currentUser = null;
@@ -3196,7 +3199,7 @@ function renderSettings(el) {
   if(!_editStages) _editStages=[...state.stages];
   el.innerHTML=`
   <div class="s-tabs">
-    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["users","👥 حسابات"],["phone","📱 واتساب"],["history","🕓 النسخ السابقة"]].map(([k,l])=>`
+    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["customFields","🧩 حقول مخصصة"],["users","👥 حسابات"],["phone","📱 واتساب"],["history","🕓 النسخ السابقة"]].map(([k,l])=>`
     <button class="sTab${_sTab===k?" active":""}" onclick="switchSTab('${k}')">${l}</button>`).join("")}
   </div>
   <div id="sTabContent"></div>`;
@@ -3214,6 +3217,7 @@ function renderSTabContent() {
     case "grades":   renderSGrades(el);    break;
     case "stages":   renderSStages(el);    break;
     case "teachers": renderSTeachers(el);  break;
+    case "customFields": renderSCustomFields(el); break;
     case "users":    renderSUsers(el);     break;
     case "phone":    renderSPhone(el);     break;
     case "history":  renderSHistory(el);   break;
@@ -3327,6 +3331,7 @@ function renderSTeachers(el) {
         </div>
         <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
         <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
+        ${(state.teacherCustomFields||[]).length>0?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="teacherEditCustomFields('${t.id}')" title="الحقول المخصصة">🧩</button>`:""}
         <button class="del-btn" onclick="deleteTeacher('${t.id}')">×</button>
       </div>`).join("")}
     </div>
@@ -3350,6 +3355,7 @@ function renderSTeachers(el) {
         <option value="auditor2">مدقق 2</option>
       </select>
     </div>
+    ${(state.teacherCustomFields||[]).map(d=>`<input class="inp" id="nt_cf_${d.id}" placeholder="${esc(d.label)} (اختياري)" style="margin-bottom:8px">`).join("")}
     <button class="btn btn-navy btn-full" onclick="addTeacher()">➕ إضافة معلم</button>
   </div>
 
@@ -3393,7 +3399,12 @@ function addTeacher() {
   const subject=(document.getElementById("nt_subject")||{value:""}).value;
   const role  = (document.getElementById("nt_role")||{value:""}).value;
   if(!name||!phone){ toast("أدخل الاسم ورقم الواتساب","err"); return; }
-  state.teachers.push({ id:"T"+uid(), name, phone, subject, role });
+  const custom = {};
+  (state.teacherCustomFields||[]).forEach(d=>{
+    const inp = document.getElementById("nt_cf_"+d.id);
+    if(inp) custom[d.id] = inp.value.trim();
+  });
+  state.teachers.push({ id:"T"+uid(), name, phone, subject, role, custom });
   saveState();
   saveToCloud();
   toast("تم إضافة المعلم ✅");
@@ -3403,6 +3414,62 @@ function deleteTeacher(id) {
   if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
   state.teachers = state.teachers.filter(x=>x.id!==id);
   _markDeleted(id);
+  saveState(); saveToCloud();
+  renderSTabContent();
+}
+function teacherEditCustomFields(id) {
+  const t = state.teachers.find(x=>x.id===id);
+  if(!t) return;
+  const custom = t.custom || {};
+  for(const d of (state.teacherCustomFields||[])) {
+    const val = prompt(`${d.label} لـ "${t.name}":`, custom[d.id]||"");
+    if(val===null) return;
+    custom[d.id] = val.trim();
+  }
+  t.custom = custom;
+  saveState(); saveToCloud();
+  toast("تم تحديث الحقول المخصصة ✅");
+  renderSTabContent();
+}
+
+function renderSCustomFields(el) {
+  const renderGroup = (target, title, icon) => {
+    const defs = state[target]||[];
+    return `
+    <div class="card">
+      <p class="card-title"><span class="ct-icon">${icon}</span>${title}</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">حقول إضافية غير موجودة في البيانات الأساسية (مثل رقم الجلوس أو التخصص الدقيق) — تُضاف تلقائياً أيضاً عند رفع ملف Excel يحتوي على عمود بهذا الاسم، وتصبح متاحة كخيار بيانات في تبويب "نماذج".</p>
+      ${defs.length===0?`<p class="empty" style="padding:6px 0">لا توجد حقول مخصصة بعد</p>`:`
+      <div style="margin-bottom:10px">
+        ${defs.map(d=>`
+        <div class="list-item">
+          <span class="li-text">${esc(d.label)}</span>
+          <button class="del-btn" onclick="deleteCustomField('${target}','${d.id}')">×</button>
+        </div>`).join("")}
+      </div>`}
+      <div class="row">
+        <input class="inp" id="newCF_${target}" placeholder="اسم الحقل الجديد (مثال: رقم الجلوس)" style="flex:1"/>
+        <button class="btn btn-navy" onclick="addCustomField('${target}')">إضافة</button>
+      </div>
+    </div>`;
+  };
+  el.innerHTML = renderGroup("studentCustomFields","حقول مخصصة لبيانات الطلاب","👨‍🎓")
+    + renderGroup("teacherCustomFields","حقول مخصصة لبيانات المعلمين","👩‍🏫");
+}
+function addCustomField(target) {
+  const inp = document.getElementById("newCF_"+target);
+  const label = (inp&&inp.value||"").trim();
+  if(!label) { toast("اكتب اسم الحقل","err"); return; }
+  const list = state[target]||(state[target]=[]);
+  if(list.some(d=>d.label===label)) { toast("هذا الحقل موجود مسبقاً","err"); return; }
+  list.push({id:uid(), label});
+  saveState(); saveToCloud();
+  toast("تمت إضافة الحقل ✅");
+  renderSTabContent();
+}
+function deleteCustomField(target, id) {
+  if(!confirm("حذف هذا الحقل؟ ستبقى القيم المُدخلة سابقاً مخزّنة لكنها لن تظهر بعد الآن.")) return;
+  state[target] = (state[target]||[]).filter(d=>d.id!==id);
   saveState(); saveToCloud();
   renderSTabContent();
 }
@@ -3459,7 +3526,7 @@ async function restoreHistorySnapshot(idx) {
   const history = await loadCloudHistory();
   const snap = history[idx];
   if(!snap){ toast("تعذر العثور على النسخة","err"); return; }
-  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","_deletedIds"];
+  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","studentCustomFields","teacherCustomFields","_deletedIds"];
   keys.forEach(function(k){ if(snap.data[k]!==undefined) state[k]=snap.data[k]; });
   saveState();
   await saveToCloud();
@@ -3767,6 +3834,13 @@ const FORM_FIELD_OPTIONS = {
     {key:"note",    label:"ملاحظة"},
   ],
 };
+// يضيف الحقول المخصصة (التي يعرّفها مسؤول النظام) إلى قائمة الحقول الثابتة أعلاه،
+// لتظهر كخيارات بيانات حقيقية في مصمم النماذج دون أي تعديل يدوي
+function _formFieldOptionsFor(source) {
+  const base = FORM_FIELD_OPTIONS[source] || [];
+  const defs = source==="students" ? (state.studentCustomFields||[]) : source==="teachers" ? (state.teacherCustomFields||[]) : [];
+  return base.concat(defs.map(d=>({key:"custom_"+d.id, label:d.label})));
+}
 let _formsView = "list";      // "list" | "builder"
 let _formEditing = null;      // draft template object while building
 let _formPrintOpenId = null;  // id of template whose print panel is expanded
@@ -3923,7 +3997,7 @@ function formBuilderSetSource(src) {
 }
 function formBuilderAddFieldColumn(key) {
   if(!key) return;
-  const opt = (FORM_FIELD_OPTIONS[_formEditing.source]||[]).find(o=>o.key===key);
+  const opt = _formFieldOptionsFor(_formEditing.source).find(o=>o.key===key);
   if(!opt) return;
   _formEditing.columns.push({id:uid(), type:"field", key:opt.key, label:opt.label});
   renderFormBuilder(document.getElementById("pageContent"));
@@ -3953,7 +4027,7 @@ function formBuilderSetGroupByCommittee(v) { _formEditing.groupByCommittee = !!v
 function renderFormBuilder(el) {
   const d = _formEditing;
   const usedKeys = d.columns.filter(c=>c.type==="field").map(c=>c.key);
-  const available = (FORM_FIELD_OPTIONS[d.source]||[]).filter(o=>!usedKeys.includes(o.key));
+  const available = _formFieldOptionsFor(d.source).filter(o=>!usedKeys.includes(o.key));
   el.innerHTML = `
   <div class="page-wrap">
     <div class="card">
@@ -4040,6 +4114,7 @@ function deleteFormTemplate(id) {
 
 function _formFieldValue(row, key) {
   if(key==="role") return TEACHER_ROLE_LABEL[row.role]||row.role||"—";
+  if(key.indexOf("custom_")===0) return (row.custom && row.custom[key.slice(7)]) || "—";
   return row[key]||"—";
 }
 
@@ -4571,6 +4646,16 @@ async function processXlsxFile(file) {
         toast("الأعمدة المطلوبة غير موجودة: الاسم، الدور، رقم الجوال","err"); return;
       }
 
+      // أي عمود إضافي غير معروف بالأعمدة الثابتة أعلاه يُعامل كحقل مخصص للمعلمين
+      const knownIdx = new Set(Object.values(colMap));
+      const extraCols = hRow.map((h,i)=>({h,i})).filter(c=>c.h && !knownIdx.has(c.i));
+      const cfDefs = state.teacherCustomFields||(state.teacherCustomFields=[]);
+      let addedCFs = 0;
+      extraCols.forEach(c=>{
+        if(!cfDefs.find(d=>d.label===c.h)) { cfDefs.push({id:uid(), label:c.h}); addedCFs++; }
+      });
+      window._teacherImportAddedCFs = addedCFs;
+
       // Parse data rows
       const ROLE_MAP = {
         "مصحح":"corrector","مصحح 1":"corrector","corrector":"corrector",
@@ -4597,7 +4682,12 @@ async function processXlsxFile(file) {
         let p=phone.replace(/\s/g,"");
         if(p.startsWith("05"))    p="+966"+p.slice(1);
         if(p.startsWith("5")&&p.length===9) p="+966"+p;
-        parsed.push({id:"T"+uid(), name, role, phone:p, subject, note});
+        const custom = {};
+        extraCols.forEach(c=>{
+          const def = cfDefs.find(d=>d.label===c.h);
+          custom[def.id] = String(row[c.i]||"").trim();
+        });
+        parsed.push({id:"T"+uid(), name, role, phone:p, subject, note, custom});
       }
 
       renderUploadPreview(parsed, errors);
@@ -4681,7 +4771,9 @@ function confirmBulkImport(teachers) {
   saveState();
   saveToCloud();
   window._parsedTeachers=null;
-  toast(`✅ تم استيراد ${added} معلم${skipped>0?" · تم تجاهل "+skipped+" مكرر":""}`);
+  const addedCFs = window._teacherImportAddedCFs||0;
+  window._teacherImportAddedCFs = 0;
+  toast(`✅ تم استيراد ${added} معلم${skipped>0?" · تم تجاهل "+skipped+" مكرر":""}${addedCFs?` · أُضيف ${addedCFs} حقل مخصص جديد تلقائياً`:""}`);
   renderSTabContent();
 }
 
@@ -6886,6 +6978,7 @@ function renderStudentsDB(el) {
             ${state.grades.map(g=>`<option value="${g}">${g}</option>`).join("")}
           </select>
         </div>
+        ${(state.studentCustomFields||[]).map(d=>`<input class="inp" id="sdb_cf_${d.id}" placeholder="${esc(d.label)} (اختياري)">`).join("")}
         <button class="btn btn-navy btn-full" onclick="sdbAddStudent()">➕ إضافة الطالب</button>
       </div>
     </div>
@@ -6920,6 +7013,7 @@ function _sdbRenderResults() {
           <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${s.committee||"—"}</span>
           <a href="tel:+${s.phone}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${s.phone||"—"}</a>
           ${isAdmin?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="sdbSetSpecialNeeds('${s.id}')" title="ملاحظة خاصة">🏷️</button>`:""}
+          ${isAdmin&&(state.studentCustomFields||[]).length>0?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="sdbEditCustomFields('${s.id}')" title="الحقول المخصصة">🧩</button>`:""}
           ${isAdmin?`<button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>`:""}
         </div>`).join("")}
         ${list.length>200?`<p style="font-size:11px;color:var(--muted);text-align:center;padding:6px">تم عرض أول 200 نتيجة فقط — استخدم البحث لتضييق النتائج</p>`:""}
@@ -6934,6 +7028,20 @@ function sdbSetSpecialNeeds(id) {
   s.specialNeeds = val.trim();
   saveState(); saveToCloud();
   toast("تم تحديث الملاحظة ✅");
+  _sdbRenderResults();
+}
+function sdbEditCustomFields(id) {
+  const s = (state.studentsDB||[]).find(x=>x.id===id);
+  if(!s) return;
+  const custom = s.custom || {};
+  for(const d of (state.studentCustomFields||[])) {
+    const val = prompt(`${d.label} لـ "${s.name}":`, custom[d.id]||"");
+    if(val===null) return; // إلغاء يوقف التعديل بالكامل دون حفظ أي تغيير
+    custom[d.id] = val.trim();
+  }
+  s.custom = custom;
+  saveState(); saveToCloud();
+  toast("تم تحديث الحقول المخصصة ✅");
   _sdbRenderResults();
 }
 async function downloadStudentTemplate() {
@@ -6966,6 +7074,7 @@ async function processStudentXlsxFile(file) {
     catch(e) { toast("مكتبة Excel غير محملة","err"); return; }
   }
   const replace = document.getElementById("sdb_file_replace").checked;
+  if(replace && !confirm(`⚠️ سيتم حذف جميع بيانات الطلاب الحالية (${(state.studentsDB||[]).length} طالب) واستبدالها بالكامل ببيانات هذا الملف، ولا يمكن التراجع المباشر — فقط عبر "النسخ السابقة" في إعدادات النظام. هل تريد الاستمرار؟`)) return;
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -6992,17 +7101,33 @@ async function processStudentXlsxFile(file) {
       });
       if(colMap.name===undefined) { toast("لم يتم العثور على عمود اسم الطالب","err"); return; }
 
+      // أي عمود إضافي في الملف غير معروف بالأعمدة الثابتة أعلاه يُعامل كحقل مخصص:
+      // يُربط بحقل مخصص موجود بنفس الاسم، أو يُنشأ تلقائياً حقل جديد بهذا الاسم
+      const knownIdx = new Set(Object.values(colMap));
+      const extraCols = hRow.map((h,i)=>({h,i})).filter(c=>c.h && !knownIdx.has(c.i));
+      const cfDefs = state.studentCustomFields||(state.studentCustomFields=[]);
+      let addedCFs = 0;
+      extraCols.forEach(c=>{
+        if(!cfDefs.find(d=>d.label===c.h)) { cfDefs.push({id:uid(), label:c.h}); addedCFs++; }
+      });
+
       const newRows=[];
       for(let i=headerRow+1;i<rows.length;i++){
         const row = rows[i];
         const name = String(row[colMap.name]||"").trim();
         if(!name) continue;
+        const custom = {};
+        extraCols.forEach(c=>{
+          const def = cfDefs.find(d=>d.label===c.h);
+          custom[def.id] = String(row[c.i]||"").trim();
+        });
         newRows.push({
           id:uid(), name,
           sid: colMap.sid!==undefined ? String(row[colMap.sid]||"").trim() : "",
           phone: colMap.phone!==undefined ? String(row[colMap.phone]||"").trim() : "",
           committee: colMap.committee!==undefined ? String(row[colMap.committee]||"").trim() : "",
           grade: colMap.grade!==undefined ? String(row[colMap.grade]||"").trim() : "",
+          custom,
         });
       }
       if(newRows.length===0) { toast("لم يتم العثور على بيانات طلاب في الملف","err"); return; }
@@ -7028,7 +7153,7 @@ async function processStudentXlsxFile(file) {
         state.studentsDB = existing.concat(toAdd);
       }
       saveState(); saveToCloud();
-      toast(`تم استيراد ${replace?newRows.length:newRows.length-skipped} طالب من الملف${skipped?` (تم تجاهل ${skipped} مكرر)`:""} ✅`);
+      toast(`تم استيراد ${replace?newRows.length:newRows.length-skipped} طالب من الملف${skipped?` (تم تجاهل ${skipped} مكرر)`:""}${addedCFs?` · أُضيف ${addedCFs} حقل مخصص جديد تلقائياً`:""} ✅`);
       renderStudentsDB(document.getElementById("pageContent"));
     } catch(err) {
       console.error(err);
@@ -7044,7 +7169,12 @@ function sdbAddStudent() {
   const committee = document.getElementById("sdb_committeeIn").value.trim();
   const grade = document.getElementById("sdb_gradeIn").value;
   if(!name) { toast("أدخل اسم الطالب","err"); return; }
-  state.studentsDB.push({id:uid(), name, sid, phone, committee, grade});
+  const custom = {};
+  (state.studentCustomFields||[]).forEach(d=>{
+    const inp = document.getElementById("sdb_cf_"+d.id);
+    if(inp) custom[d.id] = inp.value.trim();
+  });
+  state.studentsDB.push({id:uid(), name, sid, phone, committee, grade, custom});
   saveState(); saveToCloud();
   toast("تمت إضافة الطالب ✅");
   renderStudentsDB(document.getElementById("pageContent"));
