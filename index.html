@@ -3770,10 +3770,22 @@ const FORM_FIELD_OPTIONS = {
 let _formsView = "list";      // "list" | "builder"
 let _formEditing = null;      // draft template object while building
 let _formPrintOpenId = null;  // id of template whose print panel is expanded
-let _formPrintFilters = {};   // {[templateId]: {committees,grades,roles,subjects,dayLabel,dateText,extraInfo}}
+let _formPrintFilters = {};   // {[templateId]: {committees,grades,roles,subjects,dayLabel,dayNum,month,year,extraInfo}}
+const FORM_BLANK_PRESETS = ["التوقيع","السجل المدني","رقم الجلوس","زمن الخروج","ملاحظات"];
+const GRADE_COLOR_PALETTE = [
+  {band:"#DCEBFF", row:"#F0F7FF"},
+  {band:"#D7F5E3", row:"#F1FBF5"},
+  {band:"#FCEFD1", row:"#FFF8EA"},
+  {band:"#FBE0EE", row:"#FEF2F8"},
+  {band:"#E6E0FB", row:"#F4F1FE"},
+];
+function _gradeColorPair(grade) {
+  const idx = (state.grades||[]).indexOf(grade);
+  return GRADE_COLOR_PALETTE[(idx>=0?idx:0) % GRADE_COLOR_PALETTE.length];
+}
 
 function _formPrintFiltersFor(id) {
-  if(!_formPrintFilters[id]) _formPrintFilters[id] = {committees:[],grades:[],roles:[],subjects:[],dayLabel:"",dateText:"",extraInfo:""};
+  if(!_formPrintFilters[id]) _formPrintFilters[id] = {committees:[],grades:[],roles:[],subjects:[],dayLabel:"",dayNum:"",month:"",year:"",extraInfo:""};
   return _formPrintFilters[id];
 }
 
@@ -3831,44 +3843,52 @@ function renderFormPrintPanel(t) {
       ${committees.length===0?`<p class="empty" style="padding:6px 0">لا توجد لجان مسجلة</p>`:committees.map(c=>`
       <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.committees.includes(c)?"var(--navy)":"var(--border)"};background:${f.committees.includes(c)?"var(--navy)":"#fff"};color:${f.committees.includes(c)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','committees','${esc(c)}')">${esc(c)}</button>`).join("")}
     </div>
-    <label class="lbl">الصفوف (اتركها بلا تحديد لطباعة الجميع)</label>
+    <label class="lbl">الصفوف (اتركها بلا تحديد لطباعة جميع المراحل — ستُصنَّف وتُميَّز كل مرحلة بلون مستقل تلقائياً)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${grades.map(g=>`
       <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.grades.includes(g)?"var(--navy)":"var(--border)"};background:${f.grades.includes(g)?"var(--navy)":"#fff"};color:${f.grades.includes(g)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','grades','${esc(g)}')">${esc(g)}</button>`).join("")}
     </div>`;
   } else {
     const roles = [...new Set((state.teachers||[]).map(x=>x.role).filter(Boolean))];
-    const subjects = [...new Set((state.teachers||[]).map(x=>x.subject).filter(Boolean))];
     filterHTML = `
     <label class="lbl">المهام (اتركها بلا تحديد لطباعة الجميع)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
       ${roles.length===0?`<p class="empty" style="padding:6px 0">لا توجد مهام مسجلة</p>`:roles.map(r=>`
       <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.roles.includes(r)?"var(--navy)":"var(--border)"};background:${f.roles.includes(r)?"var(--navy)":"#fff"};color:${f.roles.includes(r)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','roles','${esc(r)}')">${esc(TEACHER_ROLE_LABEL[r]||r)}</button>`).join("")}
-    </div>
-    ${subjects.length>0?`
-    <label class="lbl">المواد (اتركها بلا تحديد لطباعة الجميع)</label>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      ${subjects.map(s=>`
-      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.subjects.includes(s)?"var(--navy)":"var(--border)"};background:${f.subjects.includes(s)?"var(--navy)":"#fff"};color:${f.subjects.includes(s)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','subjects','${esc(s)}')">${esc(s)}</button>`).join("")}
-    </div>`:""}`;
+    </div>`;
   }
+  const subjectsHTML = (state.subjects||[]).length>0 ? `
+    <label class="lbl">${t.source==="teachers"?"المواد (اتركها بلا تحديد لطباعة الجميع)":"المادة (تظهر في عنوان النموذج — اختياري)"}</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${state.subjects.map(s=>`
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.subjects.includes(s)?"var(--navy)":"var(--border)"};background:${f.subjects.includes(s)?"var(--navy)":"#fff"};color:${f.subjects.includes(s)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','subjects','${esc(s)}')">${esc(s)}</button>`).join("")}
+    </div>` : "";
   return `
   ${filterHTML}
-  <div class="g2" style="margin-bottom:12px">
-    <div>
-      <label class="lbl">اليوم (اختياري)</label>
-      <select class="inp" onchange="_formPrintFiltersFor('${t.id}').dayLabel=this.value">
-        <option value="">-- اختر --</option>
-        ${HIJRI_DAYS.map(d=>`<option value="${d}"${f.dayLabel===d?" selected":""}>${d}</option>`).join("")}
-      </select>
-    </div>
-    <div>
-      <label class="lbl">التاريخ (اختياري)</label>
-      <input class="inp" type="text" placeholder="مثال: ١٢/١١/١٤٤٧هـ" value="${esc(f.dateText)}" onchange="_formPrintFiltersFor('${t.id}').dateText=this.value">
-    </div>
+  ${subjectsHTML}
+  <label class="lbl">اليوم والتاريخ (اختياري — هجري)</label>
+  <div class="g2" style="margin-bottom:8px">
+    <select class="inp" onchange="_formPrintFiltersFor('${t.id}').dayLabel=this.value">
+      <option value="">-- اليوم --</option>
+      ${HIJRI_DAYS.map(d=>`<option value="${d}"${f.dayLabel===d?" selected":""}>${d}</option>`).join("")}
+    </select>
+    <select class="inp" onchange="_formPrintFiltersFor('${t.id}').dayNum=this.value">
+      <option value="">-- اليوم بالشهر --</option>
+      ${getHijriDays().map(d=>`<option value="${d}"${f.dayNum===d?" selected":""}>${toArabicNum(d)}</option>`).join("")}
+    </select>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <select class="inp" onchange="_formPrintFiltersFor('${t.id}').month=this.value">
+      <option value="">-- الشهر --</option>
+      ${getHijriMonths().map(m=>`<option value="${m}"${f.month===m?" selected":""}>${m}</option>`).join("")}
+    </select>
+    <select class="inp" onchange="_formPrintFiltersFor('${t.id}').year=this.value">
+      <option value="">-- السنة --</option>
+      ${getHijriYears().map(y=>`<option value="${y}"${f.year===y?" selected":""}>${y}هـ</option>`).join("")}
+    </select>
   </div>
   <label class="lbl">معلومات إضافية تظهر أسفل عنوان النموذج (اختياري)</label>
-  <input class="inp" type="text" placeholder="مثال: مادة الرياضيات — الفترة الصباحية" value="${esc(f.extraInfo)}" style="margin-bottom:14px" onchange="_formPrintFiltersFor('${t.id}').extraInfo=this.value">
+  <input class="inp" type="text" placeholder="مثال: الفترة الصباحية" value="${esc(f.extraInfo)}" style="margin-bottom:14px" onchange="_formPrintFiltersFor('${t.id}').extraInfo=this.value">
   <button class="btn btn-navy btn-full" onclick="generateFormPrint('${t.id}')">🖨️ إنشاء وطباعة</button>`;
 }
 
@@ -3908,11 +3928,12 @@ function formBuilderAddFieldColumn(key) {
   _formEditing.columns.push({id:uid(), type:"field", key:opt.key, label:opt.label});
   renderFormBuilder(document.getElementById("pageContent"));
 }
-function formBuilderAddBlankColumn() {
-  const label = (document.getElementById("formBlankColLabel")||{}).value || "";
+function formBuilderAddBlankColumn(preset) {
+  const label = preset || (document.getElementById("formBlankColLabel")||{}).value || "";
   if(!label.trim()) { toast("اكتب اسم الخانة اليدوية","err"); return; }
   _formEditing.columns.push({id:uid(), type:"blank", key:"", label:label.trim()});
-  document.getElementById("formBlankColLabel").value = "";
+  const inp = document.getElementById("formBlankColLabel");
+  if(inp) inp.value = "";
   renderFormBuilder(document.getElementById("pageContent"));
 }
 function formBuilderMoveColumn(i, dir) {
@@ -3972,8 +3993,11 @@ function renderFormBuilder(el) {
         </div>
         <div>
           <label class="lbl">إضافة خانة يدوية (تُطبع فارغة لتعبّأ بخط اليد)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${FORM_BLANK_PRESETS.map(p=>`<button type="button" class="tag" style="cursor:pointer;background:#FEF3C7;color:#92400E;border:1px dashed #92400E" onclick="formBuilderAddBlankColumn('${p}')">+ ${p}</button>`).join("")}
+          </div>
           <div style="display:flex;gap:6px">
-            <input class="inp" id="formBlankColLabel" type="text" placeholder="مثال: السجل المدني، التوقيع...">
+            <input class="inp" id="formBlankColLabel" type="text" placeholder="أو اكتب اسم خانة مخصصة...">
             <button type="button" class="btn btn-navy" onclick="formBuilderAddBlankColumn()">+ إضافة</button>
           </div>
         </div>
@@ -4042,12 +4066,39 @@ function generateFormPrint(id) {
   if(rows.length===0) { toast("لا توجد بيانات مطابقة للفلاتر المحددة","err"); return; }
 
   const colHeaders = `<th style="width:34px;text-align:center">م</th>` + t.columns.map(c=>`<th>${esc(c.label)}</th>`).join("");
+  const totalCols = t.columns.length+1;
   const blankCell = `<div style="height:22px;border-bottom:1px solid #999;margin:0 4px"></div>`;
-  function rowCells(r) {
+  function rowCells(r, bg) {
+    const bgStyle = bg ? `background:${bg};` : "";
     return t.columns.map(c=>{
-      if(c.type==="blank") return `<td style="padding:6px 8px">${blankCell}</td>`;
-      return `<td style="padding:7px 9px">${esc(_formFieldValue(r,c.key))}</td>`;
+      if(c.type==="blank") return `<td style="padding:6px 8px;${bgStyle}">${blankCell}</td>`;
+      return `<td style="padding:7px 9px;${bgStyle}">${esc(_formFieldValue(r,c.key))}</td>`;
     }).join("");
+  }
+  // يبني صفوف جدول الطلاب مرتّبة حسب الصف ثم اللجنة ثم الاسم، ويميّز كل مرحلة بلون خفيف عند تعدد الصفوف داخل نفس الجدول
+  function buildStudentTbody(rowsForTable) {
+    const gradeOrder = state.grades||[];
+    const sorted = [...rowsForTable].sort((a,b)=>{
+      const ga=gradeOrder.indexOf(a.grade), gb=gradeOrder.indexOf(b.grade);
+      const gc = (ga===-1&&gb===-1) ? String(a.grade||"").localeCompare(String(b.grade||"")) : (ga===-1?1:gb===-1?-1:ga-gb);
+      if(gc!==0) return gc;
+      const cc=_sdbCommitteeCompare(a.committee,b.committee);
+      if(cc!==0) return cc;
+      return String(a.name||"").localeCompare(String(b.name||""));
+    });
+    const multiGrade = new Set(sorted.map(r=>r.grade||"")).size>1;
+    let html="", serial=0, lastGrade;
+    sorted.forEach(r=>{
+      if(multiGrade && r.grade!==lastGrade) {
+        lastGrade = r.grade;
+        const pair = _gradeColorPair(r.grade);
+        html += `<tr><td colspan="${totalCols}" style="background:${pair.band};font-weight:800;color:#0B1D3A;padding:7px 9px;border:1px solid #ccd">الصف: ${esc(r.grade||"غير محدد")}</td></tr>`;
+      }
+      serial++;
+      const bg = multiGrade ? _gradeColorPair(r.grade).row : (serial%2===0?"#f6f7fb":"#fff");
+      html += `<tr><td style="text-align:center;padding:7px 9px;background:${bg}">${serial}</td>${rowCells(r,bg)}</tr>`;
+    });
+    return html;
   }
 
   let tablesHtml;
@@ -4060,9 +4111,15 @@ function generateFormPrint(id) {
         <h3 style="font-size:14px;font-weight:800;color:#0B1D3A;margin-bottom:8px;border-right:3px solid #C8911F;padding-right:8px">اللجنة: ${esc(ck)} <span style="font-weight:400;font-size:12px;color:#64748b">(${groups[ck].length})</span></h3>
         <table>
           <thead><tr>${colHeaders}</tr></thead>
-          <tbody>${groups[ck].map((r,i)=>`<tr><td style="text-align:center;padding:7px 9px">${i+1}</td>${rowCells(r)}</tr>`).join("")}</tbody>
+          <tbody>${buildStudentTbody(groups[ck])}</tbody>
         </table>
       </div>`).join("");
+  } else if(t.source==="students") {
+    tablesHtml = `
+    <table>
+      <thead><tr>${colHeaders}</tr></thead>
+      <tbody>${buildStudentTbody(rows)}</tbody>
+    </table>`;
   } else {
     tablesHtml = `
     <table>
@@ -4072,7 +4129,9 @@ function generateFormPrint(id) {
   }
 
   const schoolName = state.schoolName||"";
-  const dateLine = (f.dayLabel||f.dateText) ? `<p class="sub">${esc(f.dayLabel)} ${esc(f.dateText)}</p>` : "";
+  const dateNum = [f.dayNum?toArabicNum(f.dayNum):"", f.month||"", f.year?f.year+"هـ":""].filter(Boolean).join("/");
+  const dateLine = (f.dayLabel||dateNum) ? `<p class="sub">${esc(f.dayLabel)}${f.dayLabel&&dateNum?" الموافق ":""}${esc(dateNum)}</p>` : "";
+  const subjectsLine = (t.source==="students" && f.subjects.length>0) ? `<p class="sub">المادة: ${esc(f.subjects.join("، "))}</p>` : "";
 
   const win = window.open("","_blank","width=1000,height=800");
   win.document.write(`<!DOCTYPE html>
@@ -4103,6 +4162,7 @@ function generateFormPrint(id) {
     <h1>${esc(t.title)}</h1>
     <p class="sub">${esc(schoolName)}</p>
     ${dateLine}
+    ${subjectsLine}
     ${f.extraInfo?`<p class="sub">${esc(f.extraInfo)}</p>`:""}
   </div>
   <img src="${LOGO_SRC}" class="logo" alt="" style="opacity:0.1"/>
