@@ -680,7 +680,7 @@ function saveToCloud() {
 // حقول مشتركة بين عدة مستخدمين (تقارير، تعهدات، اعتمادات، إلخ) — يتم دمجها مع
 // آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
 // تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
-var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers"];
+var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers","formTemplates"];
 // عدد النسخ السابقة المحفوظة في سجل الأرشيف السحابي (يُستخدم للاسترجاع عند الأخطاء)
 var _HISTORY_LIMIT = 20;
 
@@ -1641,6 +1641,7 @@ let state = {
   inbox: [], // [{id,to,from,type,title,body,ts,read}] رسائل واردة للكنترول/المدير
   principalMessages: [], // [{id,...}] رسائل موجهة لمدير المدرسة
   minutesArchive: [], // [{id,...}] أرشيف محاضر فتح المظاريف المعتمدة
+  formTemplates: [], // [{id,title,source:"students"|"teachers",groupByCommittee,columns:[{type:"field"|"blank",key,label}],createdAt}]
 };
 
 let currentUser = null;
@@ -1676,7 +1677,7 @@ const NOTIFY_TYPES = [
 ];
 const PAGES = {
   admin:      [ {k:"admin_new", icon:"✦", label:"مظروف جديد"}, {k:"admin_list",icon:"📦",label:"المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"admin_notifications",icon:"🔔",label:"كل التنبيهات"}, {k:"settings",icon:"⚙",label:"الإعدادات"} ],
-  controller: [ {k:"ctrl_new",icon:"✦",label:"مظروف جديد"}, {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
+  controller: [ {k:"ctrl_new",icon:"✦",label:"مظروف جديد"}, {k:"ctrl_scan",icon:"📡",label:"مسح الباركود"}, {k:"ctrl_list",icon:"📋",label:"المظاريف"}, {k:"ctrl_schedule",icon:"📅",label:"جدول الاختبارات"}, {k:"ctrl_report",icon:"📄",label:"تقارير PDF"}, {k:"ctrl_minutes",icon:"📝",label:"محضر فتح المظاريف"}, {k:"ctrl_forms",icon:"🗂️",label:"نماذج"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   notifier:   [ {k:"notif_send",icon:"💬",label:"إرسال تنبيه"}, {k:"notif_absence",icon:"🧑‍🎓",label:"رصد غياب الطلاب"}, {k:"notif_log",icon:"📜",label:"سجل التنبيهات"}, {k:"inbox",icon:"🔔",label:"تنبيهات"} ],
   principal:  [ {k:"principal_report",icon:"📈",label:"التقارير"}, {k:"principal_approvals",icon:"✅",label:"اعتماد المستندات"}, {k:"principal_archive",icon:"🗄",label:"الأرشيف النهائي"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"principal_compose",icon:"✉️",label:"إرسال رسالة"}, {k:"principal_sent",icon:"📤",label:"الرسائل المُرسَلة"}, {k:"inbox",icon:"🔔",label:"الوارد"} ],
   monitor:    [ {k:"monitor_committees",icon:"👁",label:"متابعة اللجان"}, {k:"monitor_papers",icon:"📄",label:"عد الأوراق"}, {k:"monitor_students",icon:"🧑‍🎓",label:"متابعة الطلاب"}, {k:"monitor_daily",icon:"📊",label:"تقرير يومي"}, {k:"monitor_pledge",icon:"📋",label:"التعهدات"}, {k:"monitor_reports",icon:"🗂",label:"تقارير المراقب"}, {k:"students_db",icon:"🔍",label:"قاعدة بيانات الطلاب"}, {k:"monitor_stats",icon:"📈",label:"إحصائياتي"} ],
@@ -2027,6 +2028,7 @@ function navigateTo(page) {
     case "notif_absence": renderNotifAbsence(el); break;
     case "ctrl_schedule":renderCtrlSchedule(el);  break;
     case "ctrl_report":  renderCtrlReport(el);    break;
+    case "ctrl_forms":   renderCtrlForms(el);     break;
     case "principal_report":    renderPrincipalReport(el);    break;
     case "principal_approvals": renderPrincipalApprovals(el); break;
     case "principal_archive":   renderPrincipalArchive(el);   break;
@@ -3457,7 +3459,7 @@ async function restoreHistorySnapshot(idx) {
   const history = await loadCloudHistory();
   const snap = history[idx];
   if(!snap){ toast("تعذر العثور على النسخة","err"); return; }
-  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","_deletedIds"];
+  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","_deletedIds"];
   keys.forEach(function(k){ if(snap.data[k]!==undefined) state[k]=snap.data[k]; });
   saveState();
   await saveToCloud();
@@ -3744,6 +3746,376 @@ function printArchivedMinutesById(id) {
   const idx = (state.minutesArchive||[]).findIndex(a=>a.id===id);
   if(idx<0) { toast("النسخة غير موجودة","err"); return; }
   printArchivedMinutes(idx);
+}
+
+// ═══════════════════════════════════════════════
+// CONTROLLER — نماذج (مصمم نماذج مرن: معلمون/طلاب)
+// ═══════════════════════════════════════════════
+const FORM_FIELD_OPTIONS = {
+  students: [
+    {key:"name",      label:"اسم الطالب"},
+    {key:"sid",       label:"رقم الطالب"},
+    {key:"committee", label:"اللجنة"},
+    {key:"grade",     label:"الصف"},
+    {key:"phone",     label:"رقم الجوال"},
+  ],
+  teachers: [
+    {key:"name",    label:"اسم المعلم"},
+    {key:"role",    label:"المهمة"},
+    {key:"subject", label:"المادة"},
+    {key:"phone",   label:"رقم الجوال"},
+    {key:"note",    label:"ملاحظة"},
+  ],
+};
+let _formsView = "list";      // "list" | "builder"
+let _formEditing = null;      // draft template object while building
+let _formPrintOpenId = null;  // id of template whose print panel is expanded
+let _formPrintFilters = {};   // {[templateId]: {committees,grades,roles,subjects,dayLabel,dateText,extraInfo}}
+
+function _formPrintFiltersFor(id) {
+  if(!_formPrintFilters[id]) _formPrintFilters[id] = {committees:[],grades:[],roles:[],subjects:[],dayLabel:"",dateText:"",extraInfo:""};
+  return _formPrintFilters[id];
+}
+
+function renderCtrlForms(el) {
+  if(_formsView==="builder") { renderFormBuilder(el); return; }
+  const templates = state.formTemplates||[];
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title"><span class="ct-icon">🗂️</span>نماذج مخصصة
+        <span style="margin-right:auto;font-size:11px;color:var(--muted);font-weight:400">${templates.length} نموذج</span>
+      </p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">صمّم أي نموذج تطبعه (كشوف مناداة، استلام كتب، توقيعات...) وتُسحب فيه بيانات المعلمين أو الطلاب تلقائياً، مع إمكانية إضافة خانات يدوية فارغة لتعبّأ بخط اليد.</p>
+      <button class="btn btn-navy btn-full" onclick="openFormBuilder()">+ نموذج جديد</button>
+    </div>
+    ${templates.length===0 ? `<p class="empty">لا توجد نماذج محفوظة بعد</p>` : templates.map(t=>renderFormTemplateCard(t)).join("")}
+  </div>`;
+}
+
+function renderFormTemplateCard(t) {
+  const sourceLabel = t.source==="teachers" ? "معلمون" : "طلاب";
+  const printOpen = _formPrintOpenId===t.id;
+  return `
+  <div class="card" id="formCard_${t.id}">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="width:40px;height:40px;background:linear-gradient(135deg,var(--navy),var(--navy3));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📋</div>
+      <div style="flex:1;min-width:160px">
+        <p style="font-weight:800;color:var(--navy);font-size:14px">${esc(t.title)}</p>
+        <p style="font-size:11px;color:var(--muted)">المصدر: ${sourceLabel} · ${t.columns.length} خانة${t.groupByCommittee?" · مجمّع حسب اللجنة":""}</p>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn btn-navy btn-sm" onclick="toggleFormPrintPanel('${t.id}')">🖨️ طباعة</button>
+        <button class="btn btn-outline btn-sm" onclick="openFormBuilder('${t.id}')">✏️ تعديل</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteFormTemplate('${t.id}')">✕ حذف</button>
+      </div>
+    </div>
+    ${printOpen ? `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">${renderFormPrintPanel(t)}</div>` : ""}
+  </div>`;
+}
+
+function toggleFormPrintPanel(id) {
+  _formPrintOpenId = _formPrintOpenId===id ? null : id;
+  renderCtrlForms(document.getElementById("pageContent"));
+}
+
+function renderFormPrintPanel(t) {
+  const f = _formPrintFiltersFor(t.id);
+  let filterHTML = "";
+  if(t.source==="students") {
+    const committees = _sdbCommittees();
+    const grades = state.grades||[];
+    filterHTML = `
+    <label class="lbl">اللجان (اتركها بلا تحديد لطباعة الجميع)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${committees.length===0?`<p class="empty" style="padding:6px 0">لا توجد لجان مسجلة</p>`:committees.map(c=>`
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.committees.includes(c)?"var(--navy)":"var(--border)"};background:${f.committees.includes(c)?"var(--navy)":"#fff"};color:${f.committees.includes(c)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','committees','${esc(c)}')">${esc(c)}</button>`).join("")}
+    </div>
+    <label class="lbl">الصفوف (اتركها بلا تحديد لطباعة الجميع)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${grades.map(g=>`
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.grades.includes(g)?"var(--navy)":"var(--border)"};background:${f.grades.includes(g)?"var(--navy)":"#fff"};color:${f.grades.includes(g)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','grades','${esc(g)}')">${esc(g)}</button>`).join("")}
+    </div>`;
+  } else {
+    const roles = [...new Set((state.teachers||[]).map(x=>x.role).filter(Boolean))];
+    const subjects = [...new Set((state.teachers||[]).map(x=>x.subject).filter(Boolean))];
+    filterHTML = `
+    <label class="lbl">المهام (اتركها بلا تحديد لطباعة الجميع)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${roles.length===0?`<p class="empty" style="padding:6px 0">لا توجد مهام مسجلة</p>`:roles.map(r=>`
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.roles.includes(r)?"var(--navy)":"var(--border)"};background:${f.roles.includes(r)?"var(--navy)":"#fff"};color:${f.roles.includes(r)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','roles','${esc(r)}')">${esc(TEACHER_ROLE_LABEL[r]||r)}</button>`).join("")}
+    </div>
+    ${subjects.length>0?`
+    <label class="lbl">المواد (اتركها بلا تحديد لطباعة الجميع)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${subjects.map(s=>`
+      <button type="button" class="tag" style="cursor:pointer;border:1.5px solid ${f.subjects.includes(s)?"var(--navy)":"var(--border)"};background:${f.subjects.includes(s)?"var(--navy)":"#fff"};color:${f.subjects.includes(s)?"#fff":"var(--text)"}" onclick="_formToggleFilter('${t.id}','subjects','${esc(s)}')">${esc(s)}</button>`).join("")}
+    </div>`:""}`;
+  }
+  return `
+  ${filterHTML}
+  <div class="g2" style="margin-bottom:12px">
+    <div>
+      <label class="lbl">اليوم (اختياري)</label>
+      <select class="inp" onchange="_formPrintFiltersFor('${t.id}').dayLabel=this.value">
+        <option value="">-- اختر --</option>
+        ${HIJRI_DAYS.map(d=>`<option value="${d}"${f.dayLabel===d?" selected":""}>${d}</option>`).join("")}
+      </select>
+    </div>
+    <div>
+      <label class="lbl">التاريخ (اختياري)</label>
+      <input class="inp" type="text" placeholder="مثال: ١٢/١١/١٤٤٧هـ" value="${esc(f.dateText)}" onchange="_formPrintFiltersFor('${t.id}').dateText=this.value">
+    </div>
+  </div>
+  <label class="lbl">معلومات إضافية تظهر أسفل عنوان النموذج (اختياري)</label>
+  <input class="inp" type="text" placeholder="مثال: مادة الرياضيات — الفترة الصباحية" value="${esc(f.extraInfo)}" style="margin-bottom:14px" onchange="_formPrintFiltersFor('${t.id}').extraInfo=this.value">
+  <button class="btn btn-navy btn-full" onclick="generateFormPrint('${t.id}')">🖨️ إنشاء وطباعة</button>`;
+}
+
+function _formToggleFilter(id, kind, value) {
+  const f = _formPrintFiltersFor(id);
+  f[kind] = f[kind].includes(value) ? f[kind].filter(x=>x!==value) : [...f[kind], value];
+  renderCtrlForms(document.getElementById("pageContent"));
+}
+
+function openFormBuilder(id) {
+  if(id) {
+    const t = (state.formTemplates||[]).find(x=>x.id===id);
+    if(!t) { toast("النموذج غير موجود","err"); return; }
+    _formEditing = JSON.parse(JSON.stringify(t));
+  } else {
+    _formEditing = {id:uniqueUid(new Set((state.formTemplates||[]).map(x=>x.id))), title:"", source:"students", groupByCommittee:false, columns:[], createdAt:Date.now()};
+  }
+  _formsView = "builder";
+  renderCtrlForms(document.getElementById("pageContent"));
+}
+function closeFormBuilder() {
+  _formEditing = null;
+  _formsView = "list";
+  renderCtrlForms(document.getElementById("pageContent"));
+}
+function formBuilderSetSource(src) {
+  if(_formEditing.columns.length>0 && !confirm("تغيير المصدر سيحذف الخانات الحالية. متابعة؟")) return;
+  _formEditing.source = src;
+  _formEditing.columns = [];
+  if(src==="teachers") _formEditing.groupByCommittee = false;
+  renderFormBuilder(document.getElementById("pageContent"));
+}
+function formBuilderAddFieldColumn(key) {
+  if(!key) return;
+  const opt = (FORM_FIELD_OPTIONS[_formEditing.source]||[]).find(o=>o.key===key);
+  if(!opt) return;
+  _formEditing.columns.push({id:uid(), type:"field", key:opt.key, label:opt.label});
+  renderFormBuilder(document.getElementById("pageContent"));
+}
+function formBuilderAddBlankColumn() {
+  const label = (document.getElementById("formBlankColLabel")||{}).value || "";
+  if(!label.trim()) { toast("اكتب اسم الخانة اليدوية","err"); return; }
+  _formEditing.columns.push({id:uid(), type:"blank", key:"", label:label.trim()});
+  document.getElementById("formBlankColLabel").value = "";
+  renderFormBuilder(document.getElementById("pageContent"));
+}
+function formBuilderMoveColumn(i, dir) {
+  const j = i+dir;
+  if(j<0 || j>=_formEditing.columns.length) return;
+  const cols = _formEditing.columns;
+  [cols[i], cols[j]] = [cols[j], cols[i]];
+  renderFormBuilder(document.getElementById("pageContent"));
+}
+function formBuilderRemoveColumn(i) {
+  _formEditing.columns.splice(i,1);
+  renderFormBuilder(document.getElementById("pageContent"));
+}
+function formBuilderSetTitle(v) { _formEditing.title = v; }
+function formBuilderSetGroupByCommittee(v) { _formEditing.groupByCommittee = !!v; }
+
+function renderFormBuilder(el) {
+  const d = _formEditing;
+  const usedKeys = d.columns.filter(c=>c.type==="field").map(c=>c.key);
+  const available = (FORM_FIELD_OPTIONS[d.source]||[]).filter(o=>!usedKeys.includes(o.key));
+  el.innerHTML = `
+  <div class="page-wrap">
+    <div class="card">
+      <p class="card-title"><span class="ct-icon">🗂️</span>${(state.formTemplates||[]).some(x=>x.id===d.id)?"تعديل نموذج":"نموذج جديد"}</p>
+      <label class="lbl">عنوان النموذج *</label>
+      <input class="inp" id="formTitleInput" type="text" placeholder="مثال: كشف مناداة لجان الاختبار" value="${esc(d.title)}" style="margin-bottom:14px" onchange="formBuilderSetTitle(this.value)">
+      <label class="lbl">مصدر البيانات</label>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button type="button" class="btn ${d.source==="students"?"btn-navy":"btn-outline"}" style="flex:1" onclick="formBuilderSetSource('students')">👨‍🎓 طلاب</button>
+        <button type="button" class="btn ${d.source==="teachers"?"btn-navy":"btn-outline"}" style="flex:1" onclick="formBuilderSetSource('teachers')">👩‍🏫 معلمون</button>
+      </div>
+      ${d.source==="students"?`
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;font-size:13px;color:var(--navy);font-weight:600">
+        <input type="checkbox" ${d.groupByCommittee?"checked":""} onchange="formBuilderSetGroupByCommittee(this.checked)"> تجميع الصفوف حسب اللجنة (جدول مستقل لكل لجنة)
+      </label>`:""}
+
+      <label class="lbl">أعمدة النموذج (بالترتيب)</label>
+      ${d.columns.length===0?`<p class="empty" style="padding:10px 0">لم تُضف أي خانة بعد</p>`:`
+      <div style="margin-bottom:14px">
+        ${d.columns.map((c,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+          <span class="tag" style="background:${c.type==="field"?"var(--purBg)":"#FEF3C7"};color:${c.type==="field"?"var(--purple)":"#92400E"}">${c.type==="field"?"بيانات":"يدوي"}</span>
+          <span style="flex:1;font-size:13px;font-weight:700;color:var(--navy)">${esc(c.label)}</span>
+          <button type="button" class="btn btn-outline btn-sm" ${i===0?"disabled":""} onclick="formBuilderMoveColumn(${i},-1)">▲</button>
+          <button type="button" class="btn btn-outline btn-sm" ${i===d.columns.length-1?"disabled":""} onclick="formBuilderMoveColumn(${i},1)">▼</button>
+          <button type="button" class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="formBuilderRemoveColumn(${i})">✕</button>
+        </div>`).join("")}
+      </div>`}
+
+      <div class="g2" style="margin-bottom:10px">
+        <div>
+          <label class="lbl">إضافة خانة بيانات (تُسحب تلقائياً)</label>
+          <select class="inp" id="formFieldColSelect" onchange="formBuilderAddFieldColumn(this.value); this.value=''">
+            <option value="">-- اختر حقلاً لإضافته --</option>
+            ${available.map(o=>`<option value="${o.key}">${o.label}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">إضافة خانة يدوية (تُطبع فارغة لتعبّأ بخط اليد)</label>
+          <div style="display:flex;gap:6px">
+            <input class="inp" id="formBlankColLabel" type="text" placeholder="مثال: السجل المدني، التوقيع...">
+            <button type="button" class="btn btn-navy" onclick="formBuilderAddBlankColumn()">+ إضافة</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:16px;gap:8px">
+        <button class="btn btn-navy" style="flex:1" onclick="saveFormTemplate()">✓ حفظ النموذج</button>
+        <button class="btn btn-outline" style="flex:1" onclick="closeFormBuilder()">إلغاء</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveFormTemplate() {
+  const d = _formEditing;
+  const titleInput = document.getElementById("formTitleInput");
+  if(titleInput) d.title = titleInput.value;
+  if(!d.title.trim()) { toast("اكتب عنوان النموذج","err"); return; }
+  if(d.columns.length===0) { toast("أضف خانة واحدة على الأقل","err"); return; }
+  const list = state.formTemplates||(state.formTemplates=[]);
+  const idx = list.findIndex(x=>x.id===d.id);
+  if(idx>=0) list[idx] = d; else list.push(d);
+  saveState(); saveToCloud();
+  _formsView = "list";
+  _formEditing = null;
+  renderCtrlForms(document.getElementById("pageContent"));
+  toast("تم حفظ النموذج ✅");
+}
+
+function deleteFormTemplate(id) {
+  if(!confirm("حذف هذا النموذج؟")) return;
+  state.formTemplates = (state.formTemplates||[]).filter(x=>x.id!==id);
+  _markDeleted(id);
+  delete _formPrintFilters[id];
+  if(_formPrintOpenId===id) _formPrintOpenId = null;
+  saveState(); saveToCloud();
+  renderCtrlForms(document.getElementById("pageContent"));
+  toast("تم الحذف");
+}
+
+function _formFieldValue(row, key) {
+  if(key==="role") return TEACHER_ROLE_LABEL[row.role]||row.role||"—";
+  return row[key]||"—";
+}
+
+function generateFormPrint(id) {
+  const t = (state.formTemplates||[]).find(x=>x.id===id);
+  if(!t) { toast("النموذج غير موجود","err"); return; }
+  const f = _formPrintFiltersFor(id);
+
+  let rows;
+  if(t.source==="students") {
+    rows = (state.studentsDB||[]).filter(s=>
+      (f.committees.length===0 || f.committees.includes(s.committee)) &&
+      (f.grades.length===0 || f.grades.includes(s.grade))
+    ).sort((a,b)=>{
+      const cc=_sdbCommitteeCompare(a.committee,b.committee);
+      return cc!==0 ? cc : String(a.name||"").localeCompare(String(b.name||""));
+    });
+  } else {
+    rows = (state.teachers||[]).filter(x=>
+      (f.roles.length===0 || f.roles.includes(x.role)) &&
+      (f.subjects.length===0 || f.subjects.includes(x.subject))
+    ).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  }
+  if(rows.length===0) { toast("لا توجد بيانات مطابقة للفلاتر المحددة","err"); return; }
+
+  const colHeaders = `<th style="width:34px;text-align:center">م</th>` + t.columns.map(c=>`<th>${esc(c.label)}</th>`).join("");
+  const blankCell = `<div style="height:22px;border-bottom:1px solid #999;margin:0 4px"></div>`;
+  function rowCells(r) {
+    return t.columns.map(c=>{
+      if(c.type==="blank") return `<td style="padding:6px 8px">${blankCell}</td>`;
+      return `<td style="padding:7px 9px">${esc(_formFieldValue(r,c.key))}</td>`;
+    }).join("");
+  }
+
+  let tablesHtml;
+  if(t.source==="students" && t.groupByCommittee) {
+    const groups = {};
+    rows.forEach(r=>{ const k=r.committee||"بدون لجنة"; (groups[k]=groups[k]||[]).push(r); });
+    const committeeKeys = Object.keys(groups).sort(_sdbCommitteeCompare);
+    tablesHtml = committeeKeys.map((ck,gi)=>`
+      <div style="${gi>0?"page-break-before:always;":""}margin-bottom:18px">
+        <h3 style="font-size:14px;font-weight:800;color:#0B1D3A;margin-bottom:8px;border-right:3px solid #C8911F;padding-right:8px">اللجنة: ${esc(ck)} <span style="font-weight:400;font-size:12px;color:#64748b">(${groups[ck].length})</span></h3>
+        <table>
+          <thead><tr>${colHeaders}</tr></thead>
+          <tbody>${groups[ck].map((r,i)=>`<tr><td style="text-align:center;padding:7px 9px">${i+1}</td>${rowCells(r)}</tr>`).join("")}</tbody>
+        </table>
+      </div>`).join("");
+  } else {
+    tablesHtml = `
+    <table>
+      <thead><tr>${colHeaders}</tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr><td style="text-align:center;padding:7px 9px">${i+1}</td>${rowCells(r)}</tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const schoolName = state.schoolName||"";
+  const dateLine = (f.dayLabel||f.dateText) ? `<p class="sub">${esc(f.dayLabel)} ${esc(f.dateText)}</p>` : "";
+
+  const win = window.open("","_blank","width=1000,height=800");
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>${esc(t.title)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:24px 30px;color:#0B1D3A;font-size:13px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:3px solid #0B1D3A;padding-bottom:14px}
+  .logo{width:80px;height:80px;object-fit:contain}
+  .center-head{text-align:center;flex:1;padding:0 10px}
+  .center-head h1{font-size:18px;font-weight:800;margin-bottom:4px}
+  .center-head .sub{font-size:12px;color:#444;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
+  th{background:#0B1D3A;color:#fff;padding:9px 7px;text-align:right;font-weight:700}
+  td{padding:7px 7px;border:1px solid #ccd;vertical-align:middle}
+  tr:nth-child(even) td{background:#f6f7fb}
+  .no-print{margin-top:18px;text-align:center}
+  @media print{.no-print{display:none}body{padding:16px 20px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
+  <div class="center-head">
+    <h1>${esc(t.title)}</h1>
+    <p class="sub">${esc(schoolName)}</p>
+    ${dateLine}
+    ${f.extraInfo?`<p class="sub">${esc(f.extraInfo)}</p>`:""}
+  </div>
+  <img src="${LOGO_SRC}" class="logo" alt="" style="opacity:0.1"/>
+</div>
+${tablesHtml}
+<div class="no-print">
+  <button onclick="window.print()" style="padding:10px 28px;background:#0B1D3A;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">🖨️ طباعة / حفظ PDF</button>
+  &nbsp;
+  <button onclick="window.close()" style="padding:10px 18px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+  toast("تم فتح النموذج للطباعة ✅");
 }
 
 function deleteArchivedMinutes(id) {
