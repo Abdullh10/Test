@@ -2066,14 +2066,14 @@ function renderAdminNew(el) {
         <label for="bf_subject" class="lbl">المادة *</label>
         <select class="inp" id="bf_subject">
           <option value="">-- اختر المادة --</option>
-          ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+          ${state.subjects.map(s=>`<option>${esc(s)}</option>`).join("")}
         </select>
       </div>
       <div>
         <label for="bf_grade" class="lbl">الصف الدراسي</label>
         <select class="inp" id="bf_grade">
           <option value="">-- اختياري --</option>
-          ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+          ${state.grades.map(g=>`<option>${esc(g)}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -2087,21 +2087,21 @@ function renderAdminNew(el) {
         <label for="bf_corrector" class="lbl">المصحح 1 *</label>
         <select class="inp" id="bf_corrector">
           <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
       <div>
         <label for="bf_reviewer" class="lbl">المراجع 1 *</label>
         <select class="inp" id="bf_reviewer">
           <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
       <div>
         <label for="bf_auditor" class="lbl">المدقق 1 *</label>
         <select class="inp" id="bf_auditor">
           <option value="">-- اختر --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -2110,21 +2110,21 @@ function renderAdminNew(el) {
         <label for="bf_corrector2" class="lbl" style="color:var(--muted)">المصحح 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_corrector2">
           <option value="">-- لا يوجد --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
       <div>
         <label for="bf_reviewer2" class="lbl" style="color:var(--muted)">المراجع 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_reviewer2">
           <option value="">-- لا يوجد --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
       <div>
         <label for="bf_auditor2" class="lbl" style="color:var(--muted)">المدقق 2 <span style="font-size:10px;font-weight:400">(اختياري)</span></label>
         <select class="inp" id="bf_auditor2">
           <option value="">-- لا يوجد --</option>
-          ${state.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}
+          ${state.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -2217,16 +2217,16 @@ function renderBundleSuccess(el, b) {
   <div class="card" style="text-align:center">
     <div style="font-size:48px;margin-bottom:8px">✅</div>
     <h3 style="color:var(--green);font-size:18px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:22px">✓</span>تم إنشاء المظروف بنجاح</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${b.subject}${b.grade?" — "+b.grade:""} · ${b.count} ورقة</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${esc(b.subject)}${b.grade?" — "+esc(b.grade):""} · ${b.count} ورقة</p>
     <div id="printArea" class="qr-wrap"></div>
-    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${b.barcode}</p>
+    <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${esc(b.barcode)}</p>
     <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;text-align:right">
-      ${corrT?`✏️ مصحح 1: <strong>${corrT.name}</strong>&nbsp;&nbsp;`:""}
-      ${corrT2?`✏️ مصحح 2: <strong>${corrT2.name}</strong>&nbsp;&nbsp;`:""}
-      ${revT?`🔍 مراجع 1: <strong>${revT.name}</strong>&nbsp;&nbsp;`:""}
-      ${revT2?`🔍 مراجع 2: <strong>${revT2.name}</strong>&nbsp;&nbsp;`:""}
-      ${audT?`🔏 مدقق 1: <strong>${audT.name}</strong>&nbsp;&nbsp;`:""}
-      ${audT2?`🔏 مدقق 2: <strong>${audT2.name}</strong>`:""}
+      ${corrT?`✏️ مصحح 1: <strong>${esc(corrT.name)}</strong>&nbsp;&nbsp;`:""}
+      ${corrT2?`✏️ مصحح 2: <strong>${esc(corrT2.name)}</strong>&nbsp;&nbsp;`:""}
+      ${revT?`🔍 مراجع 1: <strong>${esc(revT.name)}</strong>&nbsp;&nbsp;`:""}
+      ${revT2?`🔍 مراجع 2: <strong>${esc(revT2.name)}</strong>&nbsp;&nbsp;`:""}
+      ${audT?`🔏 مدقق 1: <strong>${esc(audT.name)}</strong>&nbsp;&nbsp;`:""}
+      ${audT2?`🔏 مدقق 2: <strong>${esc(audT2.name)}</strong>`:""}
     </div>
     <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:18px">
       📌 اطبع هذا الباركود وألصقه على المظروف
@@ -2252,10 +2252,10 @@ async function printBundle(barcode, subject, count) {
   pa.innerHTML = `
     <div style="font-family:'Tajawal',Arial,sans-serif;direction:rtl;text-align:center">
       <img src="${LOGO_SRC}" alt="شعار" style="width:100px;height:100px;object-fit:contain;margin:0 auto 8px;display:block"/>
-      <h2 style="margin-bottom:8px">${state.schoolName}</h2>
-      <p style="font-size:14px;margin-bottom:16px">${subject} · ${count} ورقة</p>
+      <h2 style="margin-bottom:8px">${esc(state.schoolName)}</h2>
+      <p style="font-size:14px;margin-bottom:16px">${esc(subject)} · ${count} ورقة</p>
       <div id="printQRBox" class="qr-wrap" style="margin:0 auto 10px"></div>
-      <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${barcode}</p>
+      <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${esc(barcode)}</p>
     </div>`;
   await renderQRInto("printQRBox", barcode, 6, 8);
   window.print();
@@ -2295,11 +2295,11 @@ function renderAdminBundleList() {
       <div class="bundle-icon" style="background:${color}20">📦</div>
       <div class="bundle-info">
         <div class="row" style="flex-wrap:wrap;gap:5px">
-          <span class="bundle-name">${b.subject}</span>
-          ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${b.grade}</span>`:""}
+          <span class="bundle-name">${esc(b.subject)}</span>
+          ${b.grade?`<span style="font-size:11px;color:var(--muted)">— ${esc(b.grade)}</span>`:""}
           <span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span>
         </div>
-        <p class="bundle-meta">${b.barcode}${corrT?" · ✏️ "+corrT.name:""}</p>
+        <p class="bundle-meta">${esc(b.barcode)}${corrT?" · ✏️ "+esc(corrT.name):""}</p>
         <div class="bundle-progress">
           <div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${color}"></div></div>
           <span style="font-size:10px;color:var(--muted)">${Math.max(0,b.stage+1)}/${state.stages.length}</span>
@@ -2378,47 +2378,47 @@ function adminEditBundle(id) {
   overlay.id="editOverlay";
   overlay.innerHTML=`
   <div class="modal">
-    <p class="modalTitle">✏️ تعديل المظروف — ${b.barcode}</p>
+    <p class="modalTitle">✏️ تعديل المظروف — ${esc(b.barcode)}</p>
     <label for="eb_subject" class="lbl">المادة</label>
     <select class="inp" id="eb_subject" style="margin-bottom:10px">
-      ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${s}</option>`).join("")}
+      ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${esc(s)}</option>`).join("")}
     </select>
     <label for="eb_grade" class="lbl">الصف</label>
     <select class="inp" id="eb_grade" style="margin-bottom:10px">
       <option value="">-- اختياري --</option>
-      ${state.grades.map(g=>`<option${g===b.grade?" selected":""}>${g}</option>`).join("")}
+      ${state.grades.map(g=>`<option${g===b.grade?" selected":""}>${esc(g)}</option>`).join("")}
     </select>
     <label for="eb_count" class="lbl">عدد الأوراق</label>
     <input class="inp" id="eb_count" type="number" value="${b.count}" style="margin-bottom:10px"/>
     <label for="eb_corrector" class="lbl">المصحح 1</label>
     <select class="inp" id="eb_corrector" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <label for="eb_corrector2" class="lbl" style="color:var(--muted)">المصحح 2 (اختياري)</label>
     <select class="inp" id="eb_corrector2" style="margin-bottom:10px">
       <option value="">-- لا يوجد --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector2?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.corrector2?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <label for="eb_reviewer" class="lbl">المراجع 1</label>
     <select class="inp" id="eb_reviewer" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <label for="eb_reviewer2" class="lbl" style="color:var(--muted)">المراجع 2 (اختياري)</label>
     <select class="inp" id="eb_reviewer2" style="margin-bottom:10px">
       <option value="">-- لا يوجد --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer2?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.reviewer2?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <label for="eb_auditor" class="lbl">المدقق 1</label>
     <select class="inp" id="eb_auditor" style="margin-bottom:8px">
       <option value="">-- اختر --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <label for="eb_auditor2" class="lbl" style="color:var(--muted)">المدقق 2 (اختياري)</label>
     <select class="inp" id="eb_auditor2" style="margin-bottom:16px">
       <option value="">-- لا يوجد --</option>
-      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor2?" selected":""}>${t.name}</option>`).join("")}
+      ${state.teachers.map(t=>`<option value="${t.id}"${t.id===b.auditor2?" selected":""}>${esc(t.name)}</option>`).join("")}
     </select>
     <p style="font-size:12px;font-weight:700;color:var(--mid);margin:8px 0 6px">📅 بيانات الاختبار</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -2650,10 +2650,10 @@ function scanFrame() {
         _scanHit=b; _confirmStg=null;
         document.getElementById("scanErr").innerHTML="";
         renderScanResult();
-        toast("✅ تم مسح الباركود: " + val);
+        toast("✅ تم مسح الباركود: " + esc(val));
       } else {
-        document.getElementById("scanErr").innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${val}</p>`;
-        toast("الباركود غير معروف: " + val,"err");
+        document.getElementById("scanErr").innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${esc(val)}</p>`;
+        toast("الباركود غير معروف: " + esc(val),"err");
       }
       return;
     }
@@ -2698,7 +2698,7 @@ function doScan() {
   const errEl = document.getElementById("scanErr");
   if(!b) {
     _scanHit=null;
-    if(errEl) errEl.innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${v}</p>`;
+    if(errEl) errEl.innerHTML=`<p style="color:var(--red);font-weight:700;font-size:13px;margin-top:8px">⚠️ لا يوجد مظروف بالرقم: ${esc(v)}</p>`;
     document.getElementById("scanResult").innerHTML="";
     return;
   }
@@ -2742,15 +2742,15 @@ function renderScanResult() {
     </div>
     <!-- Info -->
     <div class="info-grid">
-      <div class="info-cell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
+      <div class="info-cell"><p class="k">المادة</p><p class="v">${esc(b.subject)}</p></div>
       <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
       <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
-      <div class="info-cell"><p class="k">✏️ مصحح 1</p><p class="v">${corrT?corrT.name:"—"}</p></div>
-      ${corrT2?`<div class="info-cell"><p class="k">✏️ مصحح 2</p><p class="v">${corrT2.name}</p></div>`:""}
-      <div class="info-cell"><p class="k">🔍 مراجع 1</p><p class="v">${revT?revT.name:"—"}</p></div>
-      ${revT2?`<div class="info-cell"><p class="k">🔍 مراجع 2</p><p class="v">${revT2.name}</p></div>`:""}
-      <div class="info-cell"><p class="k">🔏 مدقق 1</p><p class="v">${audT?audT.name:"—"}</p></div>
-      ${audT2?`<div class="info-cell"><p class="k">🔏 مدقق 2</p><p class="v">${audT2.name}</p></div>`:""}
+      <div class="info-cell"><p class="k">✏️ مصحح 1</p><p class="v">${corrT?esc(corrT.name):"—"}</p></div>
+      ${corrT2?`<div class="info-cell"><p class="k">✏️ مصحح 2</p><p class="v">${esc(corrT2.name)}</p></div>`:""}
+      <div class="info-cell"><p class="k">🔍 مراجع 1</p><p class="v">${revT?esc(revT.name):"—"}</p></div>
+      ${revT2?`<div class="info-cell"><p class="k">🔍 مراجع 2</p><p class="v">${esc(revT2.name)}</p></div>`:""}
+      <div class="info-cell"><p class="k">🔏 مدقق 1</p><p class="v">${audT?esc(audT.name):"—"}</p></div>
+      ${audT2?`<div class="info-cell"><p class="k">🔏 مدقق 2</p><p class="v">${esc(audT2.name)}</p></div>`:""}
       ${b.note?`<div class="info-cell"><p class="k">ملاحظة</p><p class="v">${esc(b.note)}</p></div>`:""}
       ${b.examDate?`<div class="info-cell"><p class="k">📅 يوم الاختبار</p><p class="v">${b.examDay||""} ${inputDateToHijri(b.examDate)}</p></div>`:""}
       ${b.examStart?`<div class="info-cell"><p class="k">⏰ وقت الاختبار</p><p class="v">${b.examStart}${b.examEnd?" — "+b.examEnd:""}</p></div>`:""}
@@ -2873,8 +2873,8 @@ function renderCtrlList(el) {
     tr.className="bundleRow";
     tr.onclick=()=>{ _scanHit=b; _confirmStg=null; navigateTo("ctrl_scan"); setTimeout(()=>{ const inp=document.getElementById("scanInput"); if(inp)inp.value=b.barcode; renderScanResult(); },50); };
     tr.innerHTML=`
-      <td data-label="المادة"><span class="bundle-name">${b.subject}</span></td>
-      <td data-label="الصف">${b.grade||"—"}</td>
+      <td data-label="المادة"><span class="bundle-name">${esc(b.subject)}</span></td>
+      <td data-label="الصف">${esc(b.grade)||"—"}</td>
       <td data-label="عدد الورق"><span class="tag" style="background:var(--blueBg);color:var(--blue)">${b.count} ورقة</span></td>
       <td data-label="الباركود"><span class="bundle-meta" style="margin:0">${b.barcode}</span></td>
       <td data-label="الحالة" class="statusCell">
@@ -3019,8 +3019,8 @@ function updatePreview() {
     <p style="font-size:11px;font-weight:700;color:var(--mid);margin-bottom:6px">معاينة الرسالة</p>
     <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:1px solid ${(nt&&nt.color)||"var(--border)"}40">
       <p style="font-weight:800;color:${(nt&&nt.color)};font-size:13px;margin-bottom:4px">${(nt&&nt.icon)} ${(nt&&nt.label)}</p>
-      <p style="font-size:13px;color:var(--text);margin-bottom:4px">${msg}</p>
-      <p style="font-size:11px;color:var(--muted)">إلى: ${names}</p>
+      <p style="font-size:13px;color:var(--text);margin-bottom:4px">${esc(msg)}</p>
+      <p style="font-size:11px;color:var(--muted)">إلى: ${esc(names)}</p>
     </div>
   </div>`;
 }
@@ -3119,7 +3119,7 @@ function renderNotifAbsence(el) {
         ${hijriPicker("ab_date")}
         <select class="inp" id="ab_committee" onchange="abRefreshStudentChecklist()">
           <option value="">-- اختر اللجنة --</option>
-          ${_sdbCommittees().map(c=>`<option value="${c}">لجنة ${c}</option>`).join("")}
+          ${_sdbCommittees().map(c=>`<option value="${esc(c)}">لجنة ${esc(c)}</option>`).join("")}
         </select>
         <div id="ab_studentsBox" style="border:1px solid var(--border);border-radius:10px;padding:10px;max-height:220px;overflow-y:auto">
           <p style="font-size:12px;color:var(--muted);text-align:center;padding:8px">اختر اللجنة أولاً لعرض طلابها</p>
@@ -3137,7 +3137,7 @@ function renderNotifAbsence(el) {
           ${log.map(r=>`
           <div style="background:var(--bg);border-radius:10px;padding:11px 13px;border-right:3px solid #5B21B6">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-              <span style="font-size:12px;font-weight:800;color:var(--navy)">${r.grade||"—"} ${r.committee?" | لجنة "+r.committee:""}</span>
+              <span style="font-size:12px;font-weight:800;color:var(--navy)">${esc(r.grade)||"—"} ${r.committee?" | لجنة "+esc(r.committee):""}</span>
               <span style="font-size:11px;color:var(--muted)">${r.date||""}</span>
             </div>
             <p style="font-size:12px;color:var(--text);white-space:pre-line;line-height:1.7">${esc(r.names)}</p>
@@ -3228,7 +3228,7 @@ function renderSGeneral(el) {
   el.innerHTML=`
   <div class="card">
     <p class="card-title">🏫 اسم المدرسة / المؤسسة</p>
-    <input class="inp" id="s_school" value="${state.schoolName}" style="margin-bottom:12px"/>
+    <input class="inp" id="s_school" value="${esc(state.schoolName)}" style="margin-bottom:12px"/>
     <div class="row" style="flex-wrap:wrap;gap:8px">
     <button class="btn btn-navy" onclick="
       state.schoolName=document.getElementById('s_school').value||state.schoolName;
@@ -3261,7 +3261,7 @@ function renderSSubjects(el) {
     <div id="subjectList">
       ${state.subjects.map((s,i)=>`
       <div class="list-item">
-        <span class="li-text">${s}</span>
+        <span class="li-text">${esc(s)}</span>
         <button class="del-btn" onclick="state.subjects.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
@@ -3281,7 +3281,7 @@ function renderSGrades(el) {
     <div>
       ${state.grades.map((g,i)=>`
       <div class="list-item">
-        <span class="li-text">${g}</span>
+        <span class="li-text">${esc(g)}</span>
         <button class="del-btn" onclick="state.grades.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
@@ -3304,7 +3304,7 @@ function renderSStages(el) {
       ${_editStages.map((s,i)=>`
       <div class="row" style="margin-bottom:6px">
         <div class="stage-num" style="background:${sc(i)};width:26px;height:26px;flex-shrink:0">${i+1}</div>
-        <input class="inp" value="${s}" style="flex:1;margin:0" onchange="_editStages[${i}]=this.value"/>
+        <input class="inp" value="${esc(s)}" style="flex:1;margin:0" onchange="_editStages[${i}]=this.value"/>
         <button class="del-btn" onclick="_editStages.splice(${i},1);renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
@@ -3326,11 +3326,11 @@ function renderSTeachers(el) {
       ${state.teachers.map(t=>`
       <div class="list-item" style="flex-wrap:wrap;gap:6px">
         <div style="flex:1;min-width:120px">
-          <span style="font-weight:700;color:var(--navy);font-size:13px">${t.name}</span>
-          <span style="font-size:11px;color:var(--muted);margin-right:5px">${t.subject}</span>
+          <span style="font-weight:700;color:var(--navy);font-size:13px">${esc(t.name)}</span>
+          <span style="font-size:11px;color:var(--muted);margin-right:5px">${esc(t.subject)}</span>
         </div>
-        <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||t.role}</span>
-        <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${t.phone}</span>
+        <span class="tag" style="background:var(--purBg);color:var(--purple)">${TEACHER_ROLE_LABEL[t.role]||esc(t.role)}</span>
+        <span style="font-size:11px;color:var(--wa);font-family:monospace;direction:ltr">${esc(t.phone)}</span>
         ${(state.teacherCustomFields||[]).length>0?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="teacherEditCustomFields('${t.id}')" title="الحقول المخصصة">🧩</button>`:""}
         <button class="del-btn" onclick="deleteTeacher('${t.id}')">×</button>
       </div>`).join("")}
@@ -3344,7 +3344,7 @@ function renderSTeachers(el) {
     <div class="g2" style="margin-bottom:12px">
       <select class="inp" id="nt_subject">
         <option value="">-- المادة --</option>
-        ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+        ${state.subjects.map(s=>`<option>${esc(s)}</option>`).join("")}
       </select>
       <select class="inp" id="nt_role">
         <option value="corrector">مصحح 1</option>
@@ -3552,8 +3552,8 @@ function renderSUsers(el) {
         const[col,bg]=ROLE_COLORS[u.role]||["#888","#eee"];
         return `<div class="list-item" style="flex-wrap:wrap;gap:6px">
           <div style="flex:1">
-            <span style="font-weight:700;color:var(--navy);font-size:13px">${u.name}</span>
-            <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${u.username}</span>
+            <span style="font-weight:700;color:var(--navy);font-size:13px">${esc(u.name)}</span>
+            <span style="font-size:11px;color:var(--muted);margin-right:5px;font-family:monospace">${esc(u.username)}</span>
           </div>
           <span class="tag" style="background:${bg};color:${col}">${ROLE_LABEL[u.role]||u.role}</span>
           ${u.role==="monitor"?`<span class="tag" style="background:#F1F5F9;color:#334155">${u.assignedCommittees&&u.assignedCommittees.length?"لجان: "+u.assignedCommittees.join("، "):"كل اللجان"}</span>
@@ -3672,12 +3672,12 @@ function renderCtrlSchedule(el) {
           const stageName=b.stage<0?"جديد":state.stages[b.stage]||"—";
           const color=b.stage<0?"var(--muted)":sc(b.stage);
           return `<tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
-            <td style="padding:9px 12px;font-weight:700;color:var(--navy)">${b.subject}</td>
-            <td style="padding:9px 12px;color:var(--mid)">${b.grade||"—"}</td>
-            <td style="padding:9px 12px;color:var(--mid)">${b.examDay||"—"}</td>
+            <td style="padding:9px 12px;font-weight:700;color:var(--navy)">${esc(b.subject)}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${esc(b.grade)||"—"}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${esc(b.examDay)||"—"}</td>
             <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${inputDateToHijri(b.examDate)}</td>
             <td style="padding:9px 12px;color:var(--mid);direction:ltr;text-align:right">${b.examStart||"—"}${b.examEnd?" — "+b.examEnd:""}</td>
-            <td style="padding:9px 12px;color:var(--mid)">${b.examHall||"—"}</td>
+            <td style="padding:9px 12px;color:var(--mid)">${esc(b.examHall)||"—"}</td>
             <td style="padding:9px 12px;text-align:center;font-weight:700;color:var(--navy)">${b.count}</td>
             <td style="padding:9px 12px"><span style="background:${color}20;color:${color};border:1px solid ${color}50;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap">${stageName}</span></td>
           </tr>`;
@@ -3753,7 +3753,7 @@ function renderCtrlReport(el) {
         <div style="background:var(--bg);border-radius:10px;padding:13px 16px;margin-bottom:8px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="width:40px;height:40px;background:linear-gradient(135deg,var(--navy),var(--navy3));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📝</div>
           <div style="flex:1;min-width:160px">
-            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${a.label} ${apprBadge}</p>
+            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${esc(a.label)} ${apprBadge}</p>
             <p style="font-size:11px;color:var(--muted)">${dateStr} · ${rowCount} مادة</p>
             <p style="font-size:10px;color:var(--faint)">حُفظ: ${savedDate}</p>
           </div>
@@ -3796,11 +3796,11 @@ function renderCtrlReport(el) {
         return `
         <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="flex:1;min-width:150px">
-            <p style="font-weight:800;color:var(--navy);font-size:13px">${subj}</p>
+            <p style="font-weight:800;color:var(--navy);font-size:13px">${esc(subj)}</p>
             <p style="font-size:11px;color:var(--muted)">${bs.length} مظروف · ${bs.reduce((a,b)=>a+b.count,0)} ورقة · مكتمل: ${doneCount}</p>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1">
-            ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${b.barcode}</span>`;}).join("")}
+            ${bs.map(b=>{const c=b.stage<0?"var(--muted)":sc(b.stage);return `<span style="background:${c}20;color:${c};border:1px solid ${c}50;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${esc(b.barcode)}</span>`;}).join("")}
           </div>
           <button class="btn btn-navy btn-sm" onclick="generatePDF('${subj}')">📄 PDF</button>
         </div>`;
@@ -4274,11 +4274,11 @@ function printArchivedMinutes(archiveIdx) {
       `<div style="width:120px;height:48px;border-bottom:1px solid #bbb;margin:auto"></div>`;
     return `<tr>
       <td style="text-align:center;padding:8px 5px">${i+1}</td>
-      <td style="padding:8px 7px;font-weight:700">${r.subject||"—"}</td>
-      <td style="padding:8px 7px">${r.grade||"—"}</td>
-      <td style="padding:8px 7px;direction:ltr;text-align:center">${r.time||":"}</td>
-      <td style="padding:8px 7px">${r.teacherName||"—"}</td>
-      <td style="padding:8px 7px">${r.notes||""}</td>
+      <td style="padding:8px 7px;font-weight:700">${esc(r.subject)||"—"}</td>
+      <td style="padding:8px 7px">${esc(r.grade)||"—"}</td>
+      <td style="padding:8px 7px;direction:ltr;text-align:center">${esc(r.time)||":"}</td>
+      <td style="padding:8px 7px">${esc(r.teacherName)||"—"}</td>
+      <td style="padding:8px 7px">${esc(r.notes)||""}</td>
       <td style="padding:5px;text-align:center">${sigImg}</td>
     </tr>`;
   }).join("");
@@ -4288,7 +4288,7 @@ function printArchivedMinutes(archiveIdx) {
       `<div style="width:140px;height:52px;border-bottom:1px solid #bbb;margin:auto"></div>`;
     return `<tr>
       <td style="text-align:center;padding:8px 5px">${i+1}</td>
-      <td style="padding:8px 10px;font-weight:700">${c.name||"—"}</td>
+      <td style="padding:8px 10px;font-weight:700">${esc(c.name)||"—"}</td>
       <td style="padding:5px;text-align:center">${sigImg}</td>
     </tr>`;
   }).join("");
@@ -4302,7 +4302,7 @@ function printArchivedMinutes(archiveIdx) {
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<title>${a.label}</title>
+<title>${esc(a.label)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:28px 36px;color:#0B1D3A;font-size:13px}
@@ -4325,7 +4325,7 @@ function printArchivedMinutes(archiveIdx) {
 <div class="header">
   <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
   <div class="center-head">
-    <h1>${a.label}</h1>
+    <h1>${esc(a.label)}</h1>
     <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
     <h2 style="margin-top:2px">${schoolName}</h2>
     <span class="badge">📁 نسخة محفوظة — ${savedDate}</span>
@@ -4366,7 +4366,7 @@ function printArchivedMinutes(archiveIdx) {
 <div class="footer-sig">
   <p>والله الموفق،،،</p>
   <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
-  <p style="margin-top:3px">${a.principal||""}</p>
+  <p style="margin-top:3px">${esc(a.principal)||""}</p>
 </div>
 
 <div class="no-print" style="text-align:center;margin-top:20px">
@@ -4402,16 +4402,16 @@ function generatePDF(subjectFilter) {
     // mini progress bar (text-based)
     const bar="█".repeat(Math.round(pct/10))+"░".repeat(10-Math.round(pct/10));
     return `<tr style="border-bottom:1px solid #e5e7eb;background:${i%2===0?"#fff":"#f9fafb"}">
-      <td style="padding:8px 10px;font-family:monospace;font-size:11px">${b.barcode}</td>
-      <td style="padding:8px 10px;font-weight:700">${b.subject}</td>
-      <td style="padding:8px 10px">${b.grade||"—"}</td>
+      <td style="padding:8px 10px;font-family:monospace;font-size:11px">${esc(b.barcode)}</td>
+      <td style="padding:8px 10px;font-weight:700">${esc(b.subject)}</td>
+      <td style="padding:8px 10px">${esc(b.grade)||"—"}</td>
       <td style="padding:8px 10px;text-align:center">${b.count}</td>
-      <td style="padding:8px 10px">${b.examDay||""}${b.examDate?" "+inputDateToHijri(b.examDate):""}</td>
-      <td style="padding:8px 10px">${b.examHall||"—"}</td>
-      <td style="padding:8px 10px">${corrT?corrT.name:"—"}</td>
-      <td style="padding:8px 10px">${revT?revT.name:"—"}</td>
-      <td style="padding:8px 10px">${audT?audT.name:"—"}</td>
-      <td style="padding:8px 10px;font-size:11px;font-weight:700;color:${b.stage<0?"#64748b":"#0D1F3C"}">${stageName}</td>
+      <td style="padding:8px 10px">${esc(b.examDay)||""}${b.examDate?" "+inputDateToHijri(b.examDate):""}</td>
+      <td style="padding:8px 10px">${esc(b.examHall)||"—"}</td>
+      <td style="padding:8px 10px">${corrT?esc(corrT.name):"—"}</td>
+      <td style="padding:8px 10px">${revT?esc(revT.name):"—"}</td>
+      <td style="padding:8px 10px">${audT?esc(audT.name):"—"}</td>
+      <td style="padding:8px 10px;font-size:11px;font-weight:700;color:${b.stage<0?"#64748b":"#0D1F3C"}">${esc(stageName)}</td>
       <td style="padding:8px 10px;font-size:10px;font-family:monospace;direction:ltr;color:#64748b">${bar} ${pct}%</td>
       <td style="padding:8px 10px;font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA-u-ca-islamic-umalqura"):"—"}</td>
     </tr>`;
@@ -4421,7 +4421,7 @@ function generatePDF(subjectFilter) {
   const logSection = bundles.filter(b=>b.log.length>0).map(b=>`
     <div style="margin-bottom:20px;page-break-inside:avoid">
       <h4 style="font-size:13px;color:#0D1F3C;margin-bottom:6px;border-right:3px solid #C8911F;padding-right:8px">
-        ${b.barcode} — ${b.subject}${b.grade?" ("+b.grade+")":""} · ${b.count} ورقة
+        ${esc(b.barcode)} — ${esc(b.subject)}${b.grade?" ("+esc(b.grade)+")":""} · ${b.count} ورقة
         ${b.examDate?` · 📅 ${b.examDay||""} ${inputDateToHijri(b.examDate)}`:""}
       </h4>
       <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -4435,10 +4435,10 @@ function generatePDF(subjectFilter) {
         <tbody>
           ${b.log.map((e,i)=>`<tr style="border-bottom:1px solid #e5e7eb">
             <td style="padding:5px 8px;color:#64748b">${i+1}</td>
-            <td style="padding:5px 8px;font-weight:700">${e.stageLabel}</td>
+            <td style="padding:5px 8px;font-weight:700">${esc(e.stageLabel)}</td>
             <td style="padding:5px 8px;direction:ltr;text-align:right;color:#64748b">${new Date(e.ts).toLocaleString("ar-SA",{dateStyle:"short",timeStyle:"short"})}</td>
-            <td style="padding:5px 8px">${e.user}</td>
-            <td style="padding:5px 8px;color:#64748b;font-style:italic">${e.note||"—"}</td>
+            <td style="padding:5px 8px">${esc(e.user)}</td>
+            <td style="padding:5px 8px;color:#64748b;font-style:italic">${esc(e.note)||"—"}</td>
           </tr>`).join("")}
         </tbody>
       </table>
@@ -4449,7 +4449,7 @@ function generatePDF(subjectFilter) {
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<title>${title}</title>
+<title>${esc(title)}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
@@ -4482,8 +4482,8 @@ function generatePDF(subjectFilter) {
   <div class="header">
     <img src="${LOGO_SRC}" alt="شعار" style="width:110px;height:110px;object-fit:contain;flex-shrink:0"/>
     <div style="flex:1">
-      <h1>${state.schoolName}</h1>
-      <p class="sub">${title}</p>
+      <h1>${esc(state.schoolName)}</h1>
+      <p class="sub">${esc(title)}</p>
       <p class="sub">تاريخ التقرير: ${printDate}</p>
     </div>
     <div class="badge">${bundles.length} مظروف</div>
@@ -4533,8 +4533,8 @@ function generatePDF(subjectFilter) {
 
   <!-- FOOTER -->
   <div class="footer">
-    <span>${state.schoolName} — نظام تتبع مظاريف الاختبارات</span>
-    <span>طُبع بواسطة: ${currentUser.name} — ${printDate}</span>
+    <span>${esc(state.schoolName)} — نظام تتبع مظاريف الاختبارات</span>
+    <span>طُبع بواسطة: ${esc(currentUser.name)} — ${printDate}</span>
   </div>
 
   <!-- PRINT BUTTON -->
@@ -4676,7 +4676,7 @@ async function processXlsxFile(file) {
         if(!name&&!phone) continue; // empty row
         const role = ROLE_MAP[roleRaw];
         if(!name)  { errors.push(`صف ${i+1}: الاسم مفقود`); continue; }
-        if(!role)  { errors.push(`صف ${i+1} (${name}): الدور "${roleRaw}" غير معروف — استخدم: مصحح 1 / مصحح 2 / مراجع 1 / مراجع 2 / مدقق 1 / مدقق 2`); continue; }
+        if(!role)  { errors.push(`صف ${i+1} (${esc(name)}): الدور "${esc(roleRaw)}" غير معروف — استخدم: مصحح 1 / مصحح 2 / مراجع 1 / مراجع 2 / مدقق 1 / مدقق 2`); continue; }
         if(!phone) { errors.push(`صف ${i+1} (${name}): رقم الجوال مفقود`); continue; }
         // Normalize phone
         let p=phone.replace(/\s/g,"");
@@ -4742,10 +4742,10 @@ function renderUploadPreview(parsed, errors) {
       ${parsed.map((t,i)=>`
       <tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
         <td style="padding:7px 10px;color:var(--muted)">${i+1}</td>
-        <td style="padding:7px 10px;font-weight:700;color:var(--navy)">${t.name}</td>
+        <td style="padding:7px 10px;font-weight:700;color:var(--navy)">${esc(t.name)}</td>
         <td style="padding:7px 10px"><span style="background:${ROLE_COLOR_MAP[t.role]||"#eee"};color:var(--navy);padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700">${ROLE_LABEL_MAP[t.role]||t.role}</span></td>
-        <td style="padding:7px 10px;font-family:monospace;font-size:11px;direction:ltr;text-align:right;color:var(--wa)">${t.phone}</td>
-        <td style="padding:7px 10px;color:var(--mid)">${t.subject||"—"}</td>
+        <td style="padding:7px 10px;font-family:monospace;font-size:11px;direction:ltr;text-align:right;color:var(--wa)">${esc(t.phone)}</td>
+        <td style="padding:7px 10px;color:var(--mid)">${esc(t.subject)||"—"}</td>
       </tr>`).join("")}
     </tbody>
   </table>
@@ -4923,7 +4923,7 @@ function renderPrincipalDashboard(el) {
               display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">📚</div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-                <span style="font-weight:700;color:var(--navy);font-size:14px">${subj}</span>
+                <span style="font-weight:700;color:var(--navy);font-size:14px">${esc(subj)}</span>
                 <span style="font-size:11px;background:${bg};color:${c};padding:2px 9px;border-radius:99px;font-weight:800">${p}%</span>
               </div>
               <div style="display:flex;gap:10px;margin-bottom:6px;font-size:11px;color:var(--muted)">
@@ -4950,9 +4950,9 @@ function renderPrincipalDashboard(el) {
     <div style="display:flex;gap:10px;margin-bottom:9px;align-items:flex-start">
       <div style="width:8px;height:8px;border-radius:50%;background:${sc(e.stageIdx||0)};margin-top:4px;flex-shrink:0"></div>
       <div style="flex:1">
-        <span style="font-size:12px;font-weight:700;color:var(--text)">${e.stageLabel}</span>
-        <span style="font-size:11px;color:var(--muted)"> · ${e.subject}</span>
-        <br/><span style="font-size:10px;color:var(--muted)">${fmt(e.ts)} — ${e.user}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${esc(e.stageLabel)}</span>
+        <span style="font-size:11px;color:var(--muted)"> · ${esc(e.subject)}</span>
+        <br/><span style="font-size:10px;color:var(--muted)">${fmt(e.ts)} — ${esc(e.user)}</span>
       </div>
     </div>`).join("")}
   </div>`:""}`;
@@ -5004,7 +5004,7 @@ function renderPrinSubject(el) {
       → لوحة المتابعة
     </button>
     <span style="color:var(--border);font-size:16px">/</span>
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">${subj}</span>
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">${esc(subj)}</span>
   </div>
 
   <!-- Subject header -->
@@ -5012,7 +5012,7 @@ function renderPrinSubject(el) {
     <div style="width:52px;height:52px;background:rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📚</div>
     <div style="flex:1">
       <p style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;letter-spacing:.3px">تفاصيل المادة</p>
-      <p style="color:#fff;font-size:20px;font-weight:800;margin:3px 0 8px">${subj}</p>
+      <p style="color:#fff;font-size:20px;font-weight:800;margin:3px 0 8px">${esc(subj)}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <span class="stage-pill">📦 ${total} مظروف</span>
         <span class="stage-pill">📄 ${totalPapers} ورقة</span>
@@ -5048,7 +5048,7 @@ function renderPrinSubject(el) {
     <button onclick="_prinGradeFilter='${g}';renderPrincipalDashboard(document.getElementById('pageContent'))"
       style="padding:5px 12px;border-radius:99px;border:1.5px solid ${_prinGradeFilter===g?"var(--navy)":"var(--border)"};
       background:${_prinGradeFilter===g?"var(--navy)":"#fff"};color:${_prinGradeFilter===g?"#fff":"var(--mid)"};
-      cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">${g}</button>`).join("")}
+      cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">${esc(g)}</button>`).join("")}
   </div>`:""}
 
   <!-- Progress bar across stages -->
@@ -5057,7 +5057,7 @@ function renderPrinSubject(el) {
     ${stageDist.map(s=>`
     <div style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-        <span style="font-size:11px;color:var(--mid);font-weight:600;flex:1">${s.idx+1}. ${s.name}</span>
+        <span style="font-size:11px;color:var(--mid);font-weight:600;flex:1">${s.idx+1}. ${esc(s.name)}</span>
         <span style="font-size:12px;font-weight:800;color:${s.count>0?s.color:"var(--faint)"};min-width:28px;text-align:left">${s.count}</span>
       </div>
       <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
@@ -5090,7 +5090,7 @@ function renderPrinSubject(el) {
       <tbody>
         ${Object.values(tMap).sort((a,b)=>b.bundles-a.bundles).map(d=>`
         <tr>
-          <td style="font-weight:700;color:var(--navy)">${d.name}</td>
+          <td style="font-weight:700;color:var(--navy)">${esc(d.name)}</td>
           <td><span style="background:var(--purBg);color:var(--purple);padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${d.role}</span></td>
           <td style="text-align:center;font-weight:700">${d.bundles}</td>
           <td style="text-align:center;color:var(--mid)">${d.papers}</td>
@@ -5130,11 +5130,11 @@ function renderPrinSubject(el) {
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                <span style="font-family:monospace;font-size:13px;font-weight:800;color:var(--navy)">${b.barcode}</span>
-                <span style="font-size:11px;background:${color}20;color:${color};padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid ${color}40">${stageName}</span>
+                <span style="font-family:monospace;font-size:13px;font-weight:800;color:var(--navy)">${esc(b.barcode)}</span>
+                <span style="font-size:11px;background:${color}20;color:${color};padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid ${color}40">${esc(stageName)}</span>
               </div>
               <div style="font-size:11px;color:var(--muted);margin-bottom:5px">
-                ${b.grade?`${b.grade} · `:""}${b.count} ورقة${corrT?` · ✏️ ${corrT.name}`:""}
+                ${b.grade?`${esc(b.grade)} · `:""}${b.count} ورقة${corrT?` · ✏️ ${esc(corrT.name)}`:""}
                 ${lastLog?` · 🕒 ${fmt(lastLog.ts)}`:""}
               </div>
               <div style="height:4px;background:var(--border);border-radius:99px;overflow:hidden">
@@ -5184,10 +5184,10 @@ function renderPrinBundle(el) {
     </button>
     <span style="color:var(--border);">/</span>
     <button onclick="principalBack('subject')" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r8);padding:5px 11px;cursor:pointer;font-size:11px;font-weight:700;color:var(--mid);font-family:inherit">
-      ${b.subject}
+      ${esc(b.subject)}
     </button>
     <span style="color:var(--border);">/</span>
-    <span style="font-size:11px;font-weight:700;color:var(--navy);font-family:monospace">${b.barcode}</span>
+    <span style="font-size:11px;font-weight:700;color:var(--navy);font-family:monospace">${esc(b.barcode)}</span>
   </div>
 
   <!-- Bundle header -->
@@ -5196,8 +5196,8 @@ function renderPrinBundle(el) {
       display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${isDone?"✅":"📦"}</div>
     <div style="flex:1">
       <p style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;letter-spacing:.3px">باركود المظروف</p>
-      <p style="color:#fff;font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin:3px 0 8px">${b.barcode}</p>
-      <span class="stage-pill">${stageName}</span>
+      <p style="color:#fff;font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin:3px 0 8px">${esc(b.barcode)}</p>
+      <span class="stage-pill">${esc(stageName)}</span>
     </div>
   </div>
 
@@ -5205,8 +5205,8 @@ function renderPrinBundle(el) {
   <div class="card" style="margin-bottom:14px">
     <p class="card-title"><span class="ct-icon" style="background:var(--bg)">📋</span>بيانات المظروف</p>
     <div class="info-grid">
-      <div class="info-cell"><p class="k">المادة</p><p class="v">${b.subject}</p></div>
-      <div class="info-cell"><p class="k">الصف</p><p class="v">${b.grade||"—"}</p></div>
+      <div class="info-cell"><p class="k">المادة</p><p class="v">${esc(b.subject)}</p></div>
+      <div class="info-cell"><p class="k">الصف</p><p class="v">${esc(b.grade)||"—"}</p></div>
       <div class="info-cell"><p class="k">عدد الأوراق</p><p class="v">${b.count} ورقة</p></div>
       <div class="info-cell"><p class="k">التقدم</p><p class="v" style="color:${color}">${pct}%</p></div>
       ${b.examDate?`<div class="info-cell"><p class="k">📅 تاريخ الاختبار</p><p class="v">${b.examDay||""} ${inputDateToHijri(b.examDate)}</p></div>`:""}
@@ -5231,10 +5231,10 @@ function renderPrinBundle(el) {
       <div style="display:flex;align-items:center;gap:10px;background:${bg};border-radius:var(--r8);padding:9px 12px">
         <span style="font-size:16px">${icon}</span>
         <div style="flex:1">
-          <span style="font-weight:700;color:${col};font-size:13px">${t.name}</span>
+          <span style="font-weight:700;color:${col};font-size:13px">${esc(t.name)}</span>
           <span style="font-size:11px;color:${col}88;margin-right:6px">${role}</span>
         </div>
-        <span style="font-size:11px;color:${col};background:rgba(255,255,255,.6);padding:2px 8px;border-radius:99px;font-family:monospace">${t.phone}</span>
+        <span style="font-size:11px;color:${col};background:rgba(255,255,255,.6);padding:2px 8px;border-radius:99px;font-family:monospace">${esc(t.phone)}</span>
       </div>`).join("")}
     </div>
   </div>
@@ -5264,7 +5264,7 @@ function renderPrinBundle(el) {
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
               <span style="font-size:12px;font-weight:${isCurrent||isCompleted?700:400};color:${textCol}">
-                ${isCompleted?"✓ ":isCurrent?"▶ ":"  "}${i+1}. ${s}
+                ${isCompleted?"✓ ":isCurrent?"▶ ":"  "}${i+1}. ${esc(s)}
               </span>
               ${isCurrent?`<span style="font-size:10px;background:${stageColor};color:#fff;padding:2px 8px;border-radius:99px;font-weight:700">المرحلة الحالية</span>`:""}
               ${isCompleted&&!isCurrent?`<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:99px;font-weight:700">✓ منجزة</span>`:""}
@@ -5467,7 +5467,7 @@ function renderPrincipalReport(el) {
       </div>
       <div style="flex:1">
         <p style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:6px">نسبة الإنجاز الكلية</p>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${state.schoolName}</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">${esc(state.schoolName)}</p>
         ${bar(pct, pctColor(pct), 10)}
         <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
           <span style="font-size:11px;color:#059669;font-weight:700">✅ ${done} مكتمل</span>
@@ -5511,10 +5511,10 @@ function renderPrincipalReport(el) {
           return `<div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;border:1px solid var(--border)">
             <div style="width:10px;height:10px;border-radius:50%;background:${stageColor};flex-shrink:0"></div>
             <div style="flex:1">
-              <span style="font-weight:700;color:var(--navy);font-size:13px">${b.subject}</span>
-              <span style="font-size:11px;color:var(--muted);margin-right:6px">${b.grade||""}</span>
+              <span style="font-weight:700;color:var(--navy);font-size:13px">${esc(b.subject)}</span>
+              <span style="font-size:11px;color:var(--muted);margin-right:6px">${esc(b.grade)||""}</span>
             </div>
-            <span style="font-size:11px;font-weight:700;color:${stageColor};background:${stageColor}15;padding:3px 10px;border-radius:99px">${stageName}</span>
+            <span style="font-size:11px;font-weight:700;color:${stageColor};background:${stageColor}15;padding:3px 10px;border-radius:99px">${esc(stageName)}</span>
             <span style="font-size:10px;color:var(--muted)">${b.count} ورقة</span>
           </div>`;
         }).join("")}
@@ -5534,7 +5534,7 @@ function renderPrincipalReport(el) {
         const color=isLast?"#10B981":isNew?"#64748B":"#3B82F6";
         return `<div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:12px;font-weight:700;color:var(--navy)">${isNew?"🆕 لم تبدأ":isLast?"✅ "+s.label:"⚙️ "+s.label}</span>
+            <span style="font-size:12px;font-weight:700;color:var(--navy)">${isNew?"🆕 لم تبدأ":isLast?"✅ "+esc(s.label):"⚙️ "+esc(s.label)}</span>
             <span style="font-size:12px;font-weight:800;color:${color}">${s.count} (${p2}%)</span>
           </div>
           ${bar(p2,color,8)}
@@ -5555,7 +5555,7 @@ function renderPrincipalReport(el) {
           return `<div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
               <div>
-                <span style="font-size:13px;font-weight:800;color:var(--navy)">${subj}</span>
+                <span style="font-size:13px;font-weight:800;color:var(--navy)">${esc(subj)}</span>
                 <span style="font-size:11px;color:var(--muted);margin-right:6px">${d.papers} ورقة</span>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
@@ -5569,7 +5569,7 @@ function renderPrincipalReport(el) {
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
               ${Object.entries(d.stages).sort((a,b3)=>Number(a[0])-Number(b3[0])).map(([sk,cnt])=>{
                 const isLast2=Number(sk)===stagesLen-1, isNew2=Number(sk)<0;
-                const lbl=isNew2?"🆕 لم تبدأ":isLast2?"✅ مكتمل":"⚙️ "+(state.stages[sk]||"—");
+                const lbl=isNew2?"🆕 لم تبدأ":isLast2?"✅ مكتمل":"⚙️ "+esc(state.stages[sk]||"—");
                 const col2=isLast2?"#10B981":isNew2?"#64748B":"#3B82F6";
                 return `<span style="font-size:10px;font-weight:700;color:${col2};background:${col2}15;padding:2px 9px;border-radius:99px">${lbl}: ${cnt}</span>`;
               }).join("")}
@@ -5635,7 +5635,7 @@ function renderPrincipalReport(el) {
         const col=pctColor(p2);
         return `<div style="background:var(--bg);border-radius:12px;padding:12px;border:2px solid ${col}30">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-size:12px;font-weight:800;color:var(--navy)">${grade}</span>
+            <span style="font-size:12px;font-weight:800;color:var(--navy)">${esc(grade)}</span>
             <span style="font-size:18px;font-weight:900;color:${col}">${p2}%</span>
           </div>
           ${bar(p2,col,8)}
@@ -5680,10 +5680,10 @@ function renderPrincipalReport(el) {
         const sn=b.stage<0?"🆕 لم تبدأ":"⚙️ "+(state.stages[b.stage]||"—");
         return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#FFF5F5;border-radius:9px;border:1px solid #FECACA">
           <div style="flex:1">
-            <p style="font-size:13px;font-weight:700;color:var(--navy)">${b.subject} <span style="color:var(--muted);font-weight:400">— ${b.grade||"—"}</span></p>
-            <p style="font-size:11px;color:#991B1B;font-weight:600;margin-top:1px">${sn}</p>
+            <p style="font-size:13px;font-weight:700;color:var(--navy)">${esc(b.subject)} <span style="color:var(--muted);font-weight:400">— ${esc(b.grade)||"—"}</span></p>
+            <p style="font-size:11px;color:#991B1B;font-weight:600;margin-top:1px">${esc(sn)}</p>
           </div>
-          <span style="font-size:10px;font-family:monospace;color:var(--muted);flex-shrink:0">${b.barcode}</span>
+          <span style="font-size:10px;font-family:monospace;color:var(--muted);flex-shrink:0">${esc(b.barcode)}</span>
         </div>`;
       }).join("")}
       ${incompleteBundles.length>8?`<p style="font-size:12px;color:var(--muted);text-align:center;padding:6px">... و ${incompleteBundles.length-8} مظروف آخر — اطلع على تقرير المتأخرات PDF</p>`:""}
@@ -5707,7 +5707,7 @@ function renderPrincipalReport(el) {
           </div>
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="font-size:12px;font-weight:700;color:var(--navy)">${d.name}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--navy)">${esc(d.name)}</span>
               <span style="font-size:11px;color:var(--muted)">${d.done}/${d.bundles} مظروف</span>
             </div>
             ${bar(p2,col,6)}
@@ -5716,7 +5716,7 @@ function renderPrincipalReport(el) {
                 const meta = it.bucket==="corrected" ? {icon:"✏️",label:"تصحيح",color:"#1E40AF",bg:"#DBEAFE"}
                            : it.bucket==="reviewed"  ? {icon:"🔍",label:"مراجعة",color:"#92400E",bg:"#FEF3C7"}
                            :                            {icon:"✅",label:"تدقيق",color:"#5B21B6",bg:"#EDE9FE"};
-                return `<span style="font-size:10px;font-weight:700;color:${meta.color};background:${meta.bg};padding:2px 8px;border-radius:99px">${meta.icon} ${it.subject} - ${meta.label}: ${it.papers}</span>`;
+                return `<span style="font-size:10px;font-weight:700;color:${meta.color};background:${meta.bg};padding:2px 8px;border-radius:99px">${meta.icon} ${esc(it.subject)} - ${meta.label}: ${it.papers}</span>`;
               }).join("")}
             </div>
           </div>
@@ -5976,12 +5976,12 @@ function generatePrincipalPDF() {
     const sName = b.stage<0?"جديد":state.stages[b.stage]||"—";
     const lastLog = b.log[b.log.length-1];
     return `<tr style="background:${i%2===0?"#fff":"#f8fafc"}">
-      <td style="font-family:monospace;font-size:11px">${b.barcode}</td>
-      <td style="font-weight:700">${b.subject}</td>
-      <td>${b.grade||"—"}</td>
+      <td style="font-family:monospace;font-size:11px">${esc(b.barcode)}</td>
+      <td style="font-weight:700">${esc(b.subject)}</td>
+      <td>${esc(b.grade)||"—"}</td>
       <td style="text-align:center">${b.count}</td>
-      <td>${corrT?corrT.name:"—"}</td>
-      <td style="font-weight:700;color:${b.stage===state.stages.length-1?"#059669":"#0D1F3C"}">${sName}</td>
+      <td>${corrT?esc(corrT.name):"—"}</td>
+      <td style="font-weight:700;color:${b.stage===state.stages.length-1?"#059669":"#0D1F3C"}">${esc(sName)}</td>
       <td style="font-size:10px;color:#64748b">${lastLog?new Date(lastLog.ts).toLocaleDateString("ar-SA-u-ca-islamic-umalqura"):"—"}</td>
     </tr>`;
   }).join("");
@@ -6014,7 +6014,7 @@ function generatePrincipalPDF() {
   <div class="page">
     <div class="header">
       <img src="${LOGO_SRC}" alt="شعار" style="width:110px;height:110px;object-fit:contain;flex-shrink:0"/>
-      <div style="flex:1"><h1>${state.schoolName}</h1><p class="sub">تقرير مدير المدرسة — ${printDate}</p></div>
+      <div style="flex:1"><h1>${esc(state.schoolName)}</h1><p class="sub">تقرير مدير المدرسة — ${printDate}</p></div>
       <div style="background:#0D1F3C;color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700">${total} مظروف</div>
     </div>
     <div class="kpi-row">
@@ -6031,7 +6031,7 @@ function generatePrincipalPDF() {
       <tbody>
       ${Object.entries(subjectRows).map(([s,d])=>{
         const p=d.total>0?Math.round((d.done/d.total)*100):0;
-        return `<tr><td style="font-weight:700">${s}</td><td>${d.total}</td><td>${d.papers}</td>
+        return `<tr><td style="font-weight:700">${esc(s)}</td><td>${d.total}</td><td>${d.papers}</td>
         <td style="color:#059669;font-weight:700">${d.done}</td><td style="color:#D97706">${d.inProg}</td>
         <td><div class="prog"><div class="prog-fill" style="width:${p}%;background:${p>=80?"#059669":p>=50?"#F59E0B":"#3B82F6"}"></div></div>${p}%</td></tr>`;
       }).join("")}
@@ -6043,7 +6043,7 @@ function generatePrincipalPDF() {
       <tbody>${bundleRows}</tbody>
     </table>
     <div class="footer">
-      <span>${state.schoolName} — نظام تتبع مظاريف الاختبارات</span>
+      <span>${esc(state.schoolName)} — نظام تتبع مظاريف الاختبارات</span>
       <span>طُبع بواسطة مدير المدرسة — ${printDate}</span>
     </div>
     <div class="no-print">
@@ -6078,14 +6078,14 @@ function renderMonitorCommittees(el) {
             <label for="mnSubj" class="lbl">المادة</label>
             <select class="inp" id="mnSubj">
               <option value="">-- اختر --</option>
-              ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+              ${state.subjects.map(s=>`<option>${esc(s)}</option>`).join("")}
             </select>
           </div>
           <div>
             <label for="mnGrade" class="lbl">الصف</label>
             <select class="inp" id="mnGrade">
               <option value="">-- اختر --</option>
-              ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+              ${state.grades.map(g=>`<option>${esc(g)}</option>`).join("")}
             </select>
           </div>
         </div>
@@ -6123,11 +6123,11 @@ function renderMonitorCommittees(el) {
             ${schedule.map((s,i) => {
               const examNotes = notes.filter(n => n.subject===s.subject && n.grade===s.grade && n.date===s.date);
               return `<tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
-                <td style="padding:9px 10px;font-weight:700;color:var(--navy)">${s.subject||"—"}</td>
-                <td style="padding:9px 10px;color:var(--mid)">${s.grade||"—"}</td>
+                <td style="padding:9px 10px;font-weight:700;color:var(--navy)">${esc(s.subject)||"—"}</td>
+                <td style="padding:9px 10px;color:var(--mid)">${esc(s.grade)||"—"}</td>
                 <td style="padding:9px 10px;color:var(--mid)">${inputDateToHijri(s.date)||"—"}</td>
                 <td style="padding:9px 10px;color:var(--mid);direction:ltr;text-align:right">${s.startTime||""}${s.endTime?" — "+s.endTime:""}</td>
-                <td style="padding:9px 10px;color:var(--mid)">${s.hall||"—"}</td>
+                <td style="padding:9px 10px;color:var(--mid)">${esc(s.hall)||"—"}</td>
                 <td style="padding:9px 10px;text-align:center">
                   ${examNotes.length > 0
                     ? `<span style="background:#FEF3C720;color:#92610A;border:1px solid #F59E0B50;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${examNotes.length} ملاحظة</span>`
@@ -6209,14 +6209,14 @@ function renderMonitorPapers(el) {
             <label for="ppSubj" class="lbl">المادة *</label>
             <select class="inp" id="ppSubj">
               <option value="">-- اختر --</option>
-              ${state.subjects.map(s=>`<option>${s}</option>`).join("")}
+              ${state.subjects.map(s=>`<option>${esc(s)}</option>`).join("")}
             </select>
           </div>
           <div>
             <label for="ppGrade" class="lbl">الصف *</label>
             <select class="inp" id="ppGrade" onchange="ppAutoFillStudents()">
               <option value="">-- اختر --</option>
-              ${state.grades.map(g=>`<option>${g}</option>`).join("")}
+              ${state.grades.map(g=>`<option>${esc(g)}</option>`).join("")}
             </select>
           </div>
         </div>
@@ -6225,7 +6225,7 @@ function renderMonitorPapers(el) {
             <label for="ppHall" class="lbl">رقم القاعة / اللجنة *</label>
             <select class="inp" id="ppHall" onchange="ppAutoFillStudents()">
               <option value="">-- اختر اللجنة --</option>
-              ${_sdbCommittees().map(c=>`<option value="${c}">${c}</option>`).join("")}
+              ${_sdbCommittees().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}
             </select>
           </div>
           <div>
@@ -6291,9 +6291,9 @@ function renderMonitorPapers(el) {
         <div style="background:var(--bg);border-radius:10px;padding:13px 16px;margin-bottom:8px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div style="width:40px;height:40px;background:linear-gradient(135deg,#3B82F6,#1D4ED8);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📄</div>
           <div style="flex:1;min-width:140px">
-            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${r.subject||"—"} — ${r.grade||"—"}</p>
-            <p style="font-size:11px;color:var(--muted)">${r.hall||""} · أسئلة: ${r.qCount||0} · إجابات: ${r.aCount||0}</p>
-            <p style="font-size:11px;color:${r.status==="سليمة"?"#059669":r.status==="ناقصة"?"#D97706":"#EF4444"};font-weight:700">${r.status||"—"}</p>
+            <p style="font-weight:800;color:var(--navy);font-size:13px;margin-bottom:2px">${esc(r.subject)||"—"} — ${esc(r.grade)||"—"}</p>
+            <p style="font-size:11px;color:var(--muted)">${esc(r.hall)||""} · أسئلة: ${r.qCount||0} · إجابات: ${r.aCount||0}</p>
+            <p style="font-size:11px;color:${r.status==="سليمة"?"#059669":r.status==="ناقصة"?"#D97706":"#EF4444"};font-weight:700">${esc(r.status)||"—"}</p>
             <p style="font-size:10px;color:var(--faint)">${fmt(r.savedAt)}</p>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -6513,8 +6513,8 @@ const WEEK_DAYS_AR = ["الأحد","الاثنين","الثلاثاء","الأر
 
 function renderMonitorDaily(el) {
   const reports = (state.monitorDailyReports||[]).filter(_monitorVisible).slice().reverse();
-  const gradeOptions = (state.grades||[]).map(g=>`<option value="${g}">${g}</option>`).join("");
-  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${s}">${s}</option>`).join("");
+  const gradeOptions = (state.grades||[]).map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
   const todayDay = WEEK_DAYS_AR[new Date().getDay()];
 
   el.innerHTML = `
@@ -6633,7 +6633,7 @@ function renderMonitorDaily(el) {
               <span style="font-weight:800;color:var(--navy);font-size:13px">📅 ${r.day} — ${inputDateToHijri(r.date)||r.date}</span>
               ${obsYes.length>0?`<span style="background:#FEE2E2;color:#991B1B;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">⚠️ ${obsYes.length} ملاحظة</span>`:`<span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px">✅ بدون مخالفات</span>`}
               ${apprBadge}
-              <span style="font-size:11px;color:var(--muted);margin-right:auto">${r.monitorName||""}</span>
+              <span style="font-size:11px;color:var(--muted);margin-right:auto">${esc(r.monitorName)}</span>
             </div>
             ${(r.rows||[]).length>0?`<div style="overflow-x:auto;margin-bottom:8px">
               <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -6645,15 +6645,15 @@ function renderMonitorDaily(el) {
                   <th style="padding:5px 8px;text-align:center;color:#EF4444;font-weight:700">غائب</th>
                 </tr></thead>
                 <tbody>${(r.rows||[]).map((row,i)=>`<tr style="background:${i%2===0?"#fff":"#F8FAFC"}">
-                  <td style="padding:5px 8px;font-weight:700">${row.grade||"—"}</td>
-                  <td style="padding:5px 8px">${row.subject||"—"}</td>
+                  <td style="padding:5px 8px;font-weight:700">${esc(row.grade)||"—"}</td>
+                  <td style="padding:5px 8px">${esc(row.subject)||"—"}</td>
                   <td style="padding:5px 8px;text-align:center">${row.total||0}</td>
                   <td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700">${row.present||0}</td>
                   <td style="padding:5px 8px;text-align:center;color:#EF4444;font-weight:700">${row.absent||0}</td>
                 </tr>`).join("")}</tbody>
               </table>
             </div>`:""}
-            ${obsYes.length>0?`<div style="margin-bottom:8px">${obsYes.map(o=>`<span style="display:inline-block;background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin:2px 2px 2px 0">⚠️ ${o.label}${o.note?" — "+o.note:""}</span>`).join("")}</div>`:""}
+            ${obsYes.length>0?`<div style="margin-bottom:8px">${obsYes.map(o=>`<span style="display:inline-block;background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin:2px 2px 2px 0">⚠️ ${esc(o.label)}${o.note?" — "+esc(o.note):""}</span>`).join("")}</div>`:""}
             <div style="display:flex;gap:8px;margin-top:8px">
               ${!appr||appr.status==="rejected"?`<button class="btn btn-sm" style="background:#7C3AED;color:#fff" onclick="submitForApproval('daily','${r.id}','${encodeURIComponent('تقرير يومي — '+r.day)}','${encodeURIComponent(inputDateToHijri(r.date)||r.date)}')">📨 اعتماد</button>`:""}
               <button class="btn btn-navy btn-sm" style="flex:1" onclick="printDailyReport('${r.id}')">🖨️ طباعة</button>
@@ -6699,8 +6699,8 @@ function _calcAbsent(idx) {
 }
 
 function _addDailyRow() {
-  const gradeOptions = (state.grades||[]).map(g=>`<option value="${g}">${g}</option>`).join("");
-  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${s}">${s}</option>`).join("");
+  const gradeOptions = (state.grades||[]).map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  const subjectOptions = (state.subjects||[]).map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
   const tbody = document.getElementById("dr_rows_body");
   if(!tbody) return;
   const tr = document.createElement("tr");
@@ -6933,12 +6933,12 @@ function renderStudentsDB(el) {
         <span style="margin-right:auto;font-size:12px;font-weight:700;color:var(--muted)">${total} طالب</span>
       </p>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <input class="inp" id="sdb_q" placeholder="بحث بالاسم / رقم الطالب / رقم الجوال..." value="${_sdbQ}"
+        <input class="inp" id="sdb_q" placeholder="بحث بالاسم / رقم الطالب / رقم الجوال..." value="${esc(_sdbQ)}"
           oninput="sdbUpdate('q', this.value)" style="font-size:14px">
         <div style="display:flex;gap:8px">
           <select class="inp" id="sdb_committee" onchange="sdbUpdate('committee', this.value)" style="flex:1">
             <option value="">كل اللجان</option>
-            ${committees.map(c=>`<option value="${c}"${c===_sdbCommittee?" selected":""}>لجنة ${c}</option>`).join("")}
+            ${committees.map(c=>`<option value="${esc(c)}"${c===_sdbCommittee?" selected":""}>لجنة ${esc(c)}</option>`).join("")}
           </select>
           <select class="inp" id="sdb_grade" onchange="sdbUpdate('grade', this.value)" style="flex:1"${grades.length===0?" disabled":""}>
             <option value="">${grades.length===0?"لا توجد مراحل مسجلة":"كل المراحل"}</option>
@@ -7008,10 +7008,10 @@ function _sdbRenderResults() {
         <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;border:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <p style="font-size:13px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)} ${isSpecialStudent(s)?`<span style="font-size:10px;font-weight:800;color:#92400E;background:#FEF3C7;padding:2px 7px;border-radius:99px">⚠ ${esc(s.specialNeeds||"احتياج خاص")}</span>`:""}</p>
-            <p style="font-size:11px;color:var(--muted);margin-top:2px">رقم الطالب: ${s.sid||"—"} ${s.grade?" | "+s.grade:""}</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:2px">رقم الطالب: ${esc(s.sid)||"—"} ${s.grade?" | "+esc(s.grade):""}</p>
           </div>
-          <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${s.committee||"—"}</span>
-          <a href="tel:+${s.phone}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${s.phone||"—"}</a>
+          <span style="font-size:11px;font-weight:800;color:#1E40AF;background:#DBEAFE;padding:4px 10px;border-radius:99px;flex-shrink:0">لجنة ${esc(s.committee)||"—"}</span>
+          <a href="tel:+${esc(s.phone)}" style="font-size:12px;font-weight:700;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:99px;flex-shrink:0;text-decoration:none">📱 ${esc(s.phone)||"—"}</a>
           ${isAdmin?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="sdbSetSpecialNeeds('${s.id}')" title="ملاحظة خاصة">🏷️</button>`:""}
           ${isAdmin&&(state.studentCustomFields||[]).length>0?`<button class="btn btn-outline btn-sm" style="padding:4px 9px;font-size:11px" onclick="sdbEditCustomFields('${s.id}')" title="الحقول المخصصة">🧩</button>`:""}
           ${isAdmin?`<button class="del-btn" onclick="sdbDelete('${s.id}')" title="حذف">×</button>`:""}
@@ -7326,9 +7326,9 @@ function renderMonitorStudents(el) {
         <div style="background:var(--bg);border-radius:10px;padding:11px 14px;border-right:4px solid #10B981;position:relative">
           <button class="del-btn" style="position:absolute;top:8px;left:8px" onclick="deleteStudentObs('${o.id}')">×</button>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-            <span style="font-weight:800;color:var(--navy);font-size:13px">${o.name||"—"}</span>
-            ${o.hall?`<span style="background:var(--border);color:var(--mid);font-size:10px;padding:2px 8px;border-radius:99px">لجنة ${o.hall}</span>`:""}
-            <span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${o.obsType||"—"}</span>
+            <span style="font-weight:800;color:var(--navy);font-size:13px">${esc(o.name)||"—"}</span>
+            ${o.hall?`<span style="background:var(--border);color:var(--mid);font-size:10px;padding:2px 8px;border-radius:99px">لجنة ${esc(o.hall)}</span>`:""}
+            <span style="background:#D1FAE5;color:#065F46;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${esc(o.obsType)||"—"}</span>
           </div>
           ${o.substitute?`<p style="font-size:12px;color:#059669;font-weight:700;margin-top:3px">👤 الملاحظ البديل: ${esc(o.substitute)}</p>`:""}
           ${o.note?`<p style="font-size:12px;color:var(--text);margin-top:4px">${esc(o.note)}</p>`:""}
@@ -7728,7 +7728,7 @@ function printMonitorReport(id) {
 
   const win = window.open("","_blank","width=900,height=700");
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
-  <title>${title}</title>
+  <title>${esc(title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
@@ -7752,11 +7752,11 @@ function printMonitorReport(id) {
   </style></head><body>
   <div class="header">
     <img src="${LOGO_SRC}" alt="" style="width:80px;height:80px;object-fit:contain;flex-shrink:0"/>
-    <div style="flex:1"><h1>${state.schoolName}</h1><p class="sub">مديرية التربية والتعليم</p></div>
+    <div style="flex:1"><h1>${esc(state.schoolName)}</h1><p class="sub">مديرية التربية والتعليم</p></div>
   </div>
 
-  <p class="main-title">${title}</p>
-  <p class="sub-title">${subTitle}</p>
+  <p class="main-title">${esc(title)}</p>
+  <p class="sub-title">${esc(subTitle)}</p>
 
   <!-- بيانات الطالب -->
   <table class="dt">
@@ -7764,18 +7764,18 @@ function printMonitorReport(id) {
       ${studentRows.map(([k])=>`<th style="padding:7px 11px;text-align:right;font-weight:800">${k}</th>`).join("")}
     </tr>
     <tr>
-      ${studentRows.map(([,v])=>`<td style="font-weight:700">${v}</td>`).join("")}
+      ${studentRows.map(([,v])=>`<td style="font-weight:700">${esc(v)}</td>`).join("")}
     </tr>
   </table>
 
   ${extraRows.length?`
   <table class="dt">
-    ${extraRows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}
+    ${extraRows.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}
   </table>`:""}
 
   ${pledgeText?`
   <div class="pledge-box">
-    <strong>أتعهد أنا الطالب / ${r.studentName||"..."}</strong><br/>
+    <strong>أتعهد أنا الطالب / ${esc(r.studentName)||"..."}</strong><br/>
     ${pledgeText}
   </div>`:""}
 
@@ -7785,32 +7785,32 @@ function printMonitorReport(id) {
     <div class="sig-box">
       <p class="lbl">توقيع الطالب</p>
       ${sigStHtml}
-      <p class="name">${r.studentName||"—"}</p>
+      <p class="name">${esc(r.studentName)||"—"}</p>
       <p class="name">${inputDateToHijri(r.date)||""}</p>
     </div>` : ""}
     ${pf && pf.hasMonitorSig ? `
     <div class="sig-box" style="border-color:${color}">
       <p class="lbl" style="color:${color}">مراقب اللجنة</p>
       ${sigMonHtml}
-      <p class="name">${r.monitorName||"—"}</p>
+      <p class="name">${esc(r.monitorName)||"—"}</p>
     </div>` : ""}
     ${d.st_observer_name ? `
     <div class="sig-box">
       <p class="lbl">ملاحظ اللجنة</p>
       <div style="height:55px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
-      <p class="name">${d.st_observer_name}</p>
+      <p class="name">${esc(d.st_observer_name)}</p>
     </div>` : ""}
     ${d.st_observer1 ? `
     <div class="sig-box">
       <p class="lbl">الملاحظ الأول</p>
       <div style="height:40px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
-      <p class="name">${d.st_observer1}</p>
+      <p class="name">${esc(d.st_observer1)}</p>
     </div>` : ""}
     ${d.st_supervisor ? `
     <div class="sig-box">
       <p class="lbl">المسؤول عن لجنة التحكم والضبط</p>
       <div style="height:40px;border-bottom:1.5px solid #333;margin:auto;width:80%"></div>
-      <p class="name">${d.st_supervisor}</p>
+      <p class="name">${esc(d.st_supervisor)}</p>
     </div>` : ""}
   </div>
 
@@ -7820,8 +7820,8 @@ function printMonitorReport(id) {
   </div>
 
   <div class="footer">
-    <span>${state.schoolName} — نظام متابعة الاختبارات الإلكتروني</span>
-    <span>طُبع: ${new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura")} · المراقب: ${r.monitorName||"—"}</span>
+    <span>${esc(state.schoolName)} — نظام متابعة الاختبارات الإلكتروني</span>
+    <span>طُبع: ${new Date().toLocaleDateString("ar-SA-u-ca-islamic-umalqura")} · المراقب: ${esc(r.monitorName)||"—"}</span>
   </div>
   <div class="no-print">
     <button onclick="window.print()" style="padding:9px 22px;background:${color};color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة / PDF</button>
@@ -8043,8 +8043,8 @@ function renderCtrlMinutes(el) {
 
   // Forms tabs
   const formTabs=md.forms.map((f,i)=>`
-    <button class="s-tab${i===fi?" active":""}" onclick="state.minutesData.activeFormIdx=${i};saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))" title="${f.label}">
-      ${f.label}
+    <button class="s-tab${i===fi?" active":""}" onclick="state.minutesData.activeFormIdx=${i};saveMinutes();renderCtrlMinutes(document.getElementById('pageContent'))" title="${esc(f.label)}">
+      ${esc(f.label)}
     </button>
   `).join("");
 
@@ -8378,11 +8378,11 @@ function printMinutes(fi) {
     const timeStr=r.time||":";
     return `<tr>
       <td style="text-align:center;padding:8px 5px">${i+1}</td>
-      <td style="padding:8px 7px;font-weight:700">${r.subject||"—"}</td>
-      <td style="padding:8px 7px">${r.grade||"—"}</td>
-      <td style="padding:8px 7px;direction:ltr;text-align:center">${timeStr}</td>
-      <td style="padding:8px 7px">${r.teacherName||"—"}</td>
-      <td style="padding:8px 7px">${r.notes||""}</td>
+      <td style="padding:8px 7px;font-weight:700">${esc(r.subject)||"—"}</td>
+      <td style="padding:8px 7px">${esc(r.grade)||"—"}</td>
+      <td style="padding:8px 7px;direction:ltr;text-align:center">${esc(timeStr)}</td>
+      <td style="padding:8px 7px">${esc(r.teacherName)||"—"}</td>
+      <td style="padding:8px 7px">${esc(r.notes)||""}</td>
       <td style="padding:5px;text-align:center">${sigImg}</td>
     </tr>`;
   }).join("");
@@ -8392,7 +8392,7 @@ function printMinutes(fi) {
       `<div style="width:140px;height:52px;border-bottom:1px solid #bbb;margin:auto"></div>`;
     return `<tr>
       <td style="text-align:center;padding:8px 5px">${i+1}</td>
-      <td style="padding:8px 10px;font-weight:700">${c.name||"—"}</td>
+      <td style="padding:8px 10px;font-weight:700">${esc(c.name)||"—"}</td>
       <td style="padding:5px;text-align:center">${sigImg}</td>
     </tr>`;
   }).join("");
@@ -8406,7 +8406,7 @@ function printMinutes(fi) {
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<title>${formLabel}</title>
+<title>${esc(formLabel)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;padding:28px 36px;color:#0B1D3A;font-size:13px}
@@ -8429,9 +8429,9 @@ function printMinutes(fi) {
 <div class="header">
   <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
   <div class="center-head">
-    <h1>${formLabel}</h1>
+    <h1>${esc(formLabel)}</h1>
     <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
-    <h2 style="margin-top:2px">${schoolName}</h2>
+    <h2 style="margin-top:2px">${esc(schoolName)}</h2>
   </div>
   <img src="${LOGO_SRC}" class="logo" alt="شعار" style="opacity:0.12"/>
 </div>
@@ -8468,8 +8468,8 @@ function printMinutes(fi) {
 
 <div class="footer-sig">
   <p>والله الموفق،،،</p>
-  <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
-  <p style="margin-top:3px">${principal}</p>
+  <p style="margin-top:6px">مدير ${esc(schoolName)} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
+  <p style="margin-top:3px">${esc(principal)}</p>
 </div>
 
 <br/>
@@ -8591,9 +8591,9 @@ function updateMsgPreview(){
       <span style="margin-right:auto;font-size:11px;color:var(--muted)">إلى: ${toStr}</span>
     </div>
     <div style="padding:13px 16px;background:#fff">
-      ${title?`<p style="font-weight:800;color:var(--navy);font-size:14px;margin-bottom:6px">${title}</p>`:""}
-      <p style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${body}</p>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px">من: ${currentUser?currentUser.name:""} · الآن</p>
+      ${title?`<p style="font-weight:800;color:var(--navy);font-size:14px;margin-bottom:6px">${esc(title)}</p>`:""}
+      <p style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${esc(body)}</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">من: ${currentUser?esc(currentUser.name):""} · الآن</p>
     </div>
   </div>`;
 }
@@ -8701,9 +8701,9 @@ function _adminNotifRenderResults(){
           const mt=_mtOf(m.type);
           return `<tr style="border-bottom:1px solid var(--border);background:${i%2===0?"#fff":"var(--bg)"}">
             <td style="padding:9px 10px"><span style="background:${mt.bg};color:${mt.color};font-weight:700;padding:3px 9px;border-radius:99px;font-size:11px;white-space:nowrap">${mt.icon} ${mt.label}</span></td>
-            <td style="padding:9px 10px;font-weight:700;color:var(--navy);white-space:nowrap">${m.from||"—"}</td>
-            <td style="padding:9px 10px;color:var(--mid);white-space:nowrap">${ROLE_LABEL[m.to]||m.to||"—"}</td>
-            <td style="padding:9px 10px;color:var(--text)">${m.title||m.body||"—"}</td>
+            <td style="padding:9px 10px;font-weight:700;color:var(--navy);white-space:nowrap">${esc(m.from)||"—"}</td>
+            <td style="padding:9px 10px;color:var(--mid);white-space:nowrap">${ROLE_LABEL[m.to]||esc(m.to)||"—"}</td>
+            <td style="padding:9px 10px;color:var(--text)">${esc(m.title||m.body)||"—"}</td>
             <td style="padding:9px 10px;color:var(--muted);white-space:nowrap">${fmt(m.ts)}</td>
             <td style="padding:9px 10px;text-align:center">${m.read?`<span style="color:var(--muted);font-size:11px">مقروء</span>`:`<span style="background:#EF4444;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px">جديد</span>`}</td>
           </tr>`;
@@ -9163,6 +9163,7 @@ html,body{width:100%;height:100vh;overflow:hidden;
 \x3cscript\x3e
 const COLORS=['#3B82F6','#8B5CF6','#06B6D4','#F59E0B','#EF4444','#10B981','#F97316','#22C55E','#A855F7','#6366F1'];
 const sc=i=>COLORS[i%COLORS.length];
+function dEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function loadD(){try{const r=localStorage.getItem('__dashData');return r?JSON.parse(r):null;}catch(e){return null;}}
 function tick(){
   const n=new Date();
@@ -9211,7 +9212,7 @@ function render(){
         <div class="tc-stages">\${pills}</div>
         <div class="tc-meta"><span>📄 \${b.count} ورقة</span>
           \${b.examStart?\`<span>🕐 \${b.examStart}\${b.examEnd?' — '+b.examEnd:''}</span>\`:''}
-          \${b.examHall?\`<span>🏫 \${b.examHall}</span>\`:''}
+          \${b.examHall?\`<span>🏫 \${dEsc(b.examHall)}</span>\`:''}
           <span class="tc-status" style="background:\${col}22;color:\${col};border:1px solid \${col}55">\${sn}</span></div></div>\`;}).join('');
     tEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📅</span><h2>اختبارات اليوم</h2><span class="panel-badge">\${todayB.length} مادة</span></div><div class="panel-body">\${cards}</div>\`;
   }
