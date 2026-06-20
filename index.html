@@ -4348,6 +4348,7 @@ function printArchivedMinutes(archiveIdx) {
   const dateStr=`${a.hijriDay||""} الموافق ${a.hijriDayNum?toArabicNum(a.hijriDayNum):".."}/${a.hijriMonth||".........."}/${a.hijriYear||"...."}`;
   const savedDate=new Date(a.savedAt).toLocaleString("ar-SA",{dateStyle:"long",timeStyle:"short"});
   const schoolName=state.schoolName||"مدرسة العلا الثانوية";
+  const appr=_approvalFor("minutes", a.id);
 
   const win=window.open("","_blank","width=960,height=780");
   win.document.write(`<!DOCTYPE html>
@@ -4418,7 +4419,8 @@ function printArchivedMinutes(archiveIdx) {
 <div class="footer-sig">
   <p>والله الموفق،،،</p>
   <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
-  <p style="margin-top:3px">${esc(a.principal)||""}</p>
+  ${appr && appr.principalSig ? `<img src="${appr.principalSig}" style="max-width:200px;max-height:70px;display:block;margin:8px auto"/>` : ""}
+  <p style="margin-top:3px">${esc((appr && appr.principalName) || a.principal || "")}</p>
 </div>
 
 <div class="no-print" style="text-align:center;margin-top:20px">
@@ -5300,6 +5302,10 @@ function _approvalDocExists(docType, docId) {
 // هل يوجد اعتماد معلّق (pending) مرتبط بهذا المستند؟ تُستخدم لتحذير المستخدم قبل حذف مستند بانتظار اعتماد المدير
 function _hasPendingApproval(docType, docId) {
   return (state.approvals||[]).some(a=>a.docType===docType && a.docId===docId && a.status==="pending");
+}
+// يجلب اعتماد مدير المدرسة (الموافق) المرتبط بهذا المستند، لاستخدام توقيعه الفعلي عند الطباعة/الأرشفة النهائية
+function _approvalFor(docType, docId) {
+  return (state.approvals||[]).find(a=>a.docType===docType && a.docId===docId && a.status==="approved");
 }
 
 function submitForApproval(docType, docId, title, subtitle) {
@@ -6333,6 +6339,7 @@ function printDailyReport(id) {
     </td>
     <td style="padding:8px 10px;color:#64748B;font-size:11px">${o.note||""}</td>
   </tr>`).join("");
+  const appr=_approvalFor("daily", r.id);
 
   const win=window.open("","_blank","width=900,height=800");
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>تقرير يومي — ${r.day}</title>
@@ -6399,7 +6406,7 @@ function printDailyReport(id) {
       <p style="font-size:11px;color:#64748B;margin-bottom:4px">مدير المدرسة ورئيس لجنة الاختبارات</p>
       <p style="font-size:13px;font-weight:800;color:#1E40AF">${state.schoolName}</p>
       <div style="height:55px;margin-top:8px;border-top:1px dashed #CBD5E1;display:flex;align-items:center;justify-content:center">
-        <span style="font-size:11px;color:#CBD5E1">الختم / التوقيع</span>
+        ${appr && appr.principalSig ? `<img src="${appr.principalSig}" style="max-height:50px;max-width:140px"/>` : `<span style="font-size:11px;color:#CBD5E1">الختم / التوقيع</span>`}
       </div>
     </div>
   </div>
@@ -7274,6 +7281,7 @@ function printMonitorReport(id) {
   const sigMonHtml = r.sigMonitor
     ? `<img src="${r.sigMonitor}" style="max-width:180px;max-height:70px;display:block;margin:auto;border:1px solid #ddd;border-radius:4px"/>`
     : (r.sig ? `<img src="${r.sig}" style="max-width:180px;max-height:70px;display:block;margin:auto;border:1px solid #ddd;border-radius:4px"/>` : `<div style="width:160px;height:55px;border-bottom:1.5px solid #333;margin:auto"></div>`);
+  const appr = _approvalFor("pledge", r.id);
 
   const win = window.open("","_blank","width=900,height=700");
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
@@ -7365,7 +7373,8 @@ function printMonitorReport(id) {
 
   <div style="margin-top:18px;font-size:11px;color:#64748b">
     <p>مدير المدرسة ورئيس لجنة الاختبارات</p>
-    <p style="margin-top:2px;font-weight:700">محمد بن طراد الرفدي</p>
+    ${appr && appr.principalSig ? `<img src="${appr.principalSig}" style="max-width:180px;max-height:65px;display:block;margin-top:6px;border:1px solid #ddd;border-radius:4px"/>` : ""}
+    <p style="margin-top:2px;font-weight:700">${esc((appr && appr.principalName) || "محمد بن طراد الرفدي")}</p>
   </div>
 
   <div class="footer">
