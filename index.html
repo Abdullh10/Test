@@ -785,6 +785,7 @@ async function _doSaveToCloud() {
   // Also save to localStorage as backup
   saveState();
   if(ok) { showSyncDot(true); _lastCloudUpdatedAt = updatedAt; }
+  else { showSyncDot(false); }
   return ok;
 }
 
@@ -1778,8 +1779,6 @@ function inputDateToHijri(val){
   }
   try{ return new Date(val).toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{year:"numeric",month:"long",day:"numeric"}); }catch(e){ return val; }
 }
-function todayHijri(){ return inputDateToHijri(hijriVal("__dummy__")||(() => { const c=currentHijriParts(); return `${c.y}-${String(c.m).padStart(2,"0")}-${String(c.d).padStart(2,"0")}هـ`; })()); }
-
 let _toastTimer;
 function toast(msg, type="ok") {
   const el = document.getElementById("toast");
@@ -1934,18 +1933,6 @@ function migrateMonitorAccounts() {
   if(changed) { saveState(); if(typeof saveToCloud==="function") saveToCloud(); }
 }
 
-// Wrap every state-mutating action with auto-save
-// We intercept via a Proxy so every assignment triggers save
-function makePersistent(obj) {
-  return new Proxy(obj, {
-    set(target, prop, value) {
-      target[prop] = value;
-      saveState();
-      return true;
-    }
-  });
-}
-
 // ═══════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════
@@ -1958,9 +1945,16 @@ async function doLogin() {
   const role = document.getElementById("loginRole").value;
   const u = document.getElementById("loginUser").value.trim();
   const p = document.getElementById("loginPass").value;
-  const candidate = state.users.find(x=>x.username===u && x.role===role);
-  const found = (await verifyUserPassword(candidate, p)) ? candidate : null;
   const errEl = document.getElementById("loginErr");
+  let found = null;
+  try {
+    const candidate = state.users.find(x=>x.username===u && x.role===role);
+    found = (await verifyUserPassword(candidate, p)) ? candidate : null;
+  } catch(e) {
+    errEl.textContent="تعذّر تسجيل الدخول — تأكد من اتصالك وحاول مرة أخرى";
+    errEl.style.display="block";
+    return;
+  }
   if(found) {
     currentUser = found; errEl.style.display="none";
     try{ var sData=JSON.stringify({username:found.username,role:found.role,lastPage:null,loggedAt:Date.now()}); sessionStorage.setItem("examSession",sData); localStorage.setItem("examSession_backup",sData); }catch(e){}
@@ -3716,6 +3710,8 @@ async function addUser() {
     toast("تم إضافة الحساب ✅");
     renderSTabContent();
     renderLoginDemos();
+  } catch(e) {
+    toast("تعذّر إضافة الحساب — حاول مرة أخرى","err");
   } finally {
     _addUserInFlight = false;
   }
@@ -4759,7 +4755,7 @@ async function processXlsxFile(file) {
         const role = ROLE_MAP[roleRaw];
         if(!name)  { errors.push(`صف ${i+1}: الاسم مفقود`); continue; }
         if(!role)  { errors.push(`صف ${i+1} (${esc(name)}): الدور "${esc(roleRaw)}" غير معروف — استخدم: مصحح 1 / مصحح 2 / مراجع 1 / مراجع 2 / مدقق 1 / مدقق 2`); continue; }
-        if(!phone) { errors.push(`صف ${i+1} (${name}): رقم الجوال مفقود`); continue; }
+        if(!phone) { errors.push(`صف ${i+1} (${esc(name)}): رقم الجوال مفقود`); continue; }
         const p = _normalizePhone(phone);
         const custom = {};
         extraCols.forEach(c=>{
@@ -4934,12 +4930,6 @@ function renderPrincipalReport(el) {
   function _apprStatus(docType,docId){
     const a=approvalsList.find(x=>x.docType===docType && x.docId===docId);
     return a?a.status:"none"; // none | pending | approved | rejected
-  }
-  function _docStatusBadge(st){
-    if(st==="approved") return `<span style="font-size:10px;font-weight:700;color:#065F46;background:#D1FAE5;padding:2px 8px;border-radius:99px">✅ معتمد</span>`;
-    if(st==="pending")  return `<span style="font-size:10px;font-weight:700;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:99px">⏳ بانتظار الاعتماد</span>`;
-    if(st==="rejected") return `<span style="font-size:10px;font-weight:700;color:#991B1B;background:#FEE2E2;padding:2px 8px;border-radius:99px">❌ مرفوض</span>`;
-    return `<span style="font-size:10px;font-weight:700;color:#64748B;background:#F1F5F9;padding:2px 8px;border-radius:99px">— لم يُرسل</span>`;
   }
   const pledgeCounts={approved:0,pending:0,rejected:0,none:0};
   pledgeList.forEach(r=>{ pledgeCounts[_apprStatus("pledge",r.id)]++; });
@@ -7537,14 +7527,6 @@ function saveMinutes() {
   saveState();
   clearTimeout(_minutesSyncTimer);
   _minutesSyncTimer = setTimeout(saveToCloud, 1000);
-}
-
-function getHijriDateStr() {
-  const md = state.minutesData;
-  const day = md.hijriDayNum ? toArabicNum(md.hijriDayNum) : "..";
-  const month = md.hijriMonth || "..........";
-  const year = md.hijriYear || "....";
-  return `${day}/${month}/${year}هـ`;
 }
 
 // — Signature Canvas Logic —
