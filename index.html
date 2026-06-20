@@ -686,7 +686,10 @@ function saveToCloud() {
 // حقول مشتركة بين عدة مستخدمين (تقارير، تعهدات، اعتمادات، إلخ) — يتم دمجها مع
 // آخر نسخة سحابية بدل استبدالها بالكامل، لتفادي حذف إضافات مستخدمين آخرين
 // تمت إضافتها بعد آخر تحميل لهذا التبويب (السبب الجذري لمشكلة حذف البيانات)
-var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers","formTemplates","studentCustomFields","teacherCustomFields"];
+var _MERGE_FIELDS = ["monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","inbox","principalMessages","minutesArchive","absenceLog","users","studentsDB","teachers","formTemplates","studentCustomFields","teacherCustomFields","examSchedule"];
+// حقول مصفوفات نصية بسيطة (بلا id) — تُدمج باتحاد القيم بدل استبدال المصفوفة بالكامل،
+// لمنع ضياع مادة/صف/مرحلة أضافها جهاز آخر قبل وصول هذا التحديث (نفس سبب مشكلة _MERGE_FIELDS أعلاه)
+var _MERGE_STRING_FIELDS = ["subjects","grades","stages"];
 // عدد النسخ السابقة المحفوظة في سجل الأرشيف السحابي (يُستخدم للاسترجاع عند الأخطاء)
 var _HISTORY_LIMIT = 20;
 
@@ -723,6 +726,16 @@ function _mergeById(cloudArr, localArr, deletedSet) {
   return result;
 }
 
+// يدمج مصفوفة نصية بسيطة (مواد/صفوف/مراحل) عبر اتحاد قيم السحابة والمحلي، مستثنياً
+// أي قيمة محذوفة ضمن deletedSet (نفس آلية tombstone المستخدمة في _mergeById، لكن المفتاح هنا هو النص نفسه)
+function _mergeStringArray(cloudArr, localArr, deletedSet) {
+  var seen = {}, result = [];
+  (cloudArr||[]).concat(localArr||[]).forEach(function(v){
+    if(v && !seen[v] && !deletedSet[v]) { seen[v]=true; result.push(v); }
+  });
+  return result;
+}
+
 async function _doSaveToCloud() {
   // قراءة آخر نسخة سحابية قبل الحفظ ثم دمجها مع البيانات المحلية بدل استبدالها بالكامل
   var cloudData = {};
@@ -738,6 +751,9 @@ async function _doSaveToCloud() {
 
   _MERGE_FIELDS.forEach(function(k){
     state[k] = _mergeById(cloudData[k], state[k], deletedSet);
+  });
+  _MERGE_STRING_FIELDS.forEach(function(k){
+    state[k] = _mergeStringArray(cloudData[k], state[k], deletedSet);
   });
   // ضمان وجود المستخدمين الافتراضيين دائماً (إلا إذا تم حذفهم عمداً)
   DEFAULT_USERS.forEach(function(du){
@@ -808,11 +824,14 @@ async function loadFromCloud(fullSync) {
       // للسحابة بعد عندما يصل تحديث ناتج عن تعديل غير متعلق من جهاز آخر (نفس منطق _doSaveToCloud)
       var deletedSet = {};
       (d._deletedIds||[]).concat(state._deletedIds||[]).forEach(function(id){ deletedSet[id]=true; });
-      ["schoolName","adminPhone","subjects","grades","stages","examSchedule","minutesData"].forEach(function(k){
+      ["schoolName","adminPhone","minutesData"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
       _MERGE_FIELDS.forEach(function(k){
         if(d[k] !== undefined) state[k] = _mergeById(d[k], state[k], deletedSet);
+      });
+      _MERGE_STRING_FIELDS.forEach(function(k){
+        if(d[k] !== undefined) state[k] = _mergeStringArray(d[k], state[k], deletedSet);
       });
       state._deletedIds = Object.keys(deletedSet);
       _lastCloudUpdatedAt = rows[0].updated_at || _lastCloudUpdatedAt;
@@ -3278,7 +3297,7 @@ function renderSSubjects(el) {
       ${state.subjects.map((s,i)=>`
       <div class="list-item">
         <span class="li-text">${esc(s)}</span>
-        <button class="del-btn" onclick="state.subjects.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
+        <button class="del-btn" onclick="_markDeleted(state.subjects[${i}]);state.subjects.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
@@ -3298,7 +3317,7 @@ function renderSGrades(el) {
       ${state.grades.map((g,i)=>`
       <div class="list-item">
         <span class="li-text">${esc(g)}</span>
-        <button class="del-btn" onclick="state.grades.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
+        <button class="del-btn" onclick="_markDeleted(state.grades[${i}]);state.grades.splice(${i},1);saveState();saveToCloud();renderSTabContent()">×</button>
       </div>`).join("")}
     </div>
     <div class="row" style="margin-top:10px">
@@ -3330,7 +3349,7 @@ function renderSStages(el) {
         const v=document.getElementById('newStage').value.trim();
         if(v){_editStages.push(v);renderSTabContent()}">إضافة</button>
     </div>
-    <button class="btn btn-green btn-full" onclick="state.stages=[..._editStages.filter(x=>x.trim())];saveState();saveToCloud();toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
+    <button class="btn btn-green btn-full" onclick="state.stages.forEach(s=>{if(!_editStages.includes(s))_markDeleted(s)});state.stages=[..._editStages.filter(x=>x.trim())];saveState();saveToCloud();toast('تم حفظ المراحل ✅')">💾 حفظ المراحل</button>
   </div>`;
 }
 
