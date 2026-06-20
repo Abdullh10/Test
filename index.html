@@ -4570,7 +4570,7 @@ function generatePDF(subjectFilter) {
   <!-- KPIs -->
   <div class="kpi-row">
     <div class="kpi"><div class="val">${bundles.length}</div><div class="lbl">إجمالي المظاريف</div></div>
-    <div class="kpi"><div class="val">${bundles.reduce((a,b)=>a+b.count,0)}</div><div class="lbl">إجمالي الأوراق</div></div>
+    <div class="kpi"><div class="val">${bundles.filter(b=>b.stage===state.stages.length-1).reduce((a,b)=>a+b.count,0)}</div><div class="lbl">إجمالي الأوراق المصححة</div></div>
     <div class="kpi"><div class="val">${bundles.filter(b=>b.stage===state.stages.length-1).length}</div><div class="lbl">مكتملة</div></div>
     <div class="kpi"><div class="val">${bundles.filter(b=>b.stage<0).length}</div><div class="lbl">جديدة</div></div>
     <div class="kpi"><div class="val">${bundles.filter(b=>b.stage>=0&&b.stage<state.stages.length-1).length}</div><div class="lbl">قيد التنفيذ</div></div>
