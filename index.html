@@ -698,6 +698,12 @@ function _markDeleted(id) {
   if(id && state._deletedIds.indexOf(id)===-1) state._deletedIds.push(id);
 }
 
+// عنوان الفصل الدراسي الموحّد، يُحسب من بيانات الإعدادات الأساسية بدل تكراره
+// كنص ثابت في كل نموذج/تقرير — تغييره من إعدادات مدير النظام ينعكس فوراً في كل مكان
+function _termTitle() {
+  return "اختبار نهاية الفصل الدراسي " + (state.semester||"الثاني") + " للعام الدراسي " + (state.academicYear||"١٤٤٧") + "هـ";
+}
+
 // يحدد ما إذا كان المراقب الحالي يملك صلاحية رؤية/التعامل مع سجل معيّن — يمنع
 // تداخل المراقبين في بيانات لجان غيرهم. غير المراقبين (admin/principal/controller) يرون كل شيء.
 function _monitorVisible(record) {
@@ -762,6 +768,7 @@ async function _doSaveToCloud() {
 
   var settings = {
     schoolName:state.schoolName, adminPhone:state.adminPhone,
+    academicYear:state.academicYear, semester:state.semester, principalName:state.principalName,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
     users:state.users, examSchedule:state.examSchedule||[], minutesData:state.minutesData||null, minutesArchive:state.minutesArchive||[], inbox:state.inbox||[], principalMessages:state.principalMessages||[],
@@ -825,7 +832,7 @@ async function loadFromCloud(fullSync) {
       // للسحابة بعد عندما يصل تحديث ناتج عن تعديل غير متعلق من جهاز آخر (نفس منطق _doSaveToCloud)
       var deletedSet = {};
       (d._deletedIds||[]).concat(state._deletedIds||[]).forEach(function(id){ deletedSet[id]=true; });
-      ["schoolName","adminPhone","minutesData"].forEach(function(k){
+      ["schoolName","adminPhone","minutesData","academicYear","semester","principalName"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
       _MERGE_FIELDS.forEach(function(k){
@@ -1599,6 +1606,9 @@ const DEFAULT_USERS = [
 let state = {
   schoolName: "متابعة سير الاختبارات الإلكتروني",
   adminPhone: "+966551121498",
+  academicYear: "١٤٤٧", // العام الدراسي — يظهر تلقائياً في عناوين التعهدات والنماذج المطبوعة (_termTitle)
+  semester: "الثاني", // الفصل الدراسي (الأول/الثاني) — يظهر تلقائياً في عناوين التعهدات والنماذج المطبوعة
+  principalName: "محمد بن طراد الرفدي", // اسم مدير المدرسة الافتراضي — يُستخدم كاسم مبدئي قبل اعتماد المستند فعلياً
   subjects: ["لغة إنجليزية","رياضيات","علم البيئة","فيزياء","الكفايات اللغوية","أحياء","كيمياء","علوم الأرض والفضاء"],
   grades:   ["أول ثانوي","ثاني ثانوي","ثالث ثانوي"],
   stages: [
@@ -3267,6 +3277,27 @@ function renderSGeneral(el) {
     <button class="btn" style="background:var(--red)" onclick="factoryReset()">🗑️ إعادة تعيين كامل</button>
   </div>
   </div>
+  <div class="card">
+    <p class="card-title">📋 البيانات الأساسية المشتركة</p>
+    <p style="font-size:13px;color:var(--mid);margin-bottom:14px">تُستخدم هذه البيانات تلقائياً في كل المحاضر والتعهدات والأوراق المطبوعة، بدلاً من تعديلها يدوياً في كل مستند.</p>
+    <label style="font-size:13px;color:var(--mid);display:block;margin-bottom:4px">العام الدراسي (هجري)</label>
+    <input class="inp" id="s_academicYear" value="${esc(state.academicYear||"")}" style="margin-bottom:12px"/>
+    <label style="font-size:13px;color:var(--mid);display:block;margin-bottom:4px">الفصل الدراسي</label>
+    <select class="inp" id="s_semester" style="margin-bottom:12px">
+      <option value="الأول" ${state.semester==="الأول"?"selected":""}>الفصل الدراسي الأول</option>
+      <option value="الثاني" ${state.semester==="الثاني"?"selected":""}>الفصل الدراسي الثاني</option>
+      <option value="الثالث" ${state.semester==="الثالث"?"selected":""}>الفصل الدراسي الثالث</option>
+    </select>
+    <label style="font-size:13px;color:var(--mid);display:block;margin-bottom:4px">اسم مدير المدرسة</label>
+    <input class="inp" id="s_principalName" value="${esc(state.principalName||"")}" style="margin-bottom:12px"/>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+    <button class="btn btn-navy" onclick="
+      state.academicYear=document.getElementById('s_academicYear').value||state.academicYear;
+      state.semester=document.getElementById('s_semester').value||state.semester;
+      state.principalName=document.getElementById('s_principalName').value||state.principalName;
+      saveState();saveToCloud();toast('تم الحفظ ✅')">💾 حفظ</button>
+    </div>
+  </div>
   <div class="card" style="border:2px solid var(--green);background:var(--greenBg, #ECFDF5)">
     <p class="card-title">💾 النسخ الاحتياطي</p>
     <p style="font-size:13px;color:var(--mid);margin-bottom:14px">يُنصح بتنزيل نسخة احتياطية بشكل دوري، خصوصاً قبل أي عملية حذف أو إعادة تعيين.</p>
@@ -3600,7 +3631,7 @@ async function restoreHistorySnapshot(idx) {
   const history = await loadCloudHistory();
   const snap = history[idx];
   if(!snap){ toast("تعذر العثور على النسخة","err"); return; }
-  var keys = ["schoolName","adminPhone","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","studentCustomFields","teacherCustomFields","_deletedIds"];
+  var keys = ["schoolName","adminPhone","academicYear","semester","principalName","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","studentCustomFields","teacherCustomFields","_deletedIds"];
   keys.forEach(function(k){ if(snap.data[k]!==undefined) state[k]=snap.data[k]; });
   saveState();
   await saveToCloud();
@@ -4403,7 +4434,7 @@ function printArchivedMinutes(archiveIdx) {
   <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
   <div class="center-head">
     <h1>${esc(a.label)}</h1>
-    <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
+    <h2>${_termTitle()}</h2>
     <h2 style="margin-top:2px">${schoolName}</h2>
     <span class="badge">📁 نسخة محفوظة — ${savedDate}</span>
   </div>
@@ -4444,7 +4475,7 @@ function printArchivedMinutes(archiveIdx) {
   <p>والله الموفق،،،</p>
   <p style="margin-top:6px">مدير ${schoolName} &nbsp;|&nbsp; رئيس لجنة الاختبارات</p>
   ${appr && appr.principalSig ? `<img src="${appr.principalSig}" style="max-width:200px;max-height:70px;display:block;margin:8px auto"/>` : ""}
-  <p style="margin-top:3px">${esc((appr && appr.principalName) || a.principal || "")}</p>
+  <p style="margin-top:3px">${esc((appr && appr.principalName) || a.principal || state.principalName || "")}</p>
 </div>
 
 <div class="no-print" style="text-align:center;margin-top:20px">
@@ -5906,7 +5937,6 @@ const PLEDGE_FORMS = [
   {
     key:"custom_open", icon:"🖊️", label:"نموذج مفتوح (تعهد/إقرار غير موجود)", color:"#0F172A", category:"نموذج مفتوح",
     title:"نموذج مفتوح", isCustomForm:true,
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>d.st_text||"",
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[
@@ -5917,7 +5947,6 @@ const PLEDGE_FORMS = [
   {
     key:"iqrar_general", icon:"📝", label:"إقرار", color:"#64748B", category:"إقرارات",
     title:"إقرار",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بأني ${d.st_text||"..."}`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[{id:"st_text",label:"نص الإقرار",type:"textarea",placeholder:"اكتب نص الإقرار هنا..."}]
@@ -5925,7 +5954,6 @@ const PLEDGE_FORMS = [
   {
     key:"absent_record", icon:"🚫", label:"محضر غياب طالب", color:"#DC2626", category:"غياب",
     title:"محضر غياب طالب",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     hasStudentFields:true, hasStudentSig:false, hasMonitorSig:true,
     extraFields:[
       {id:"st_observer1",label:"اسم الملاحظ الأول",type:"teacher_select"},
@@ -5936,14 +5964,12 @@ const PLEDGE_FORMS = [
   {
     key:"no_shading", icon:"✏️", label:"تعهد بعدم التظليل بالقلم الجاف أو الحبر", color:"#7C3AED", category:"مخالفات الكتابة",
     title:"تعهد بعدم التظليل بالقلم الجاف أو الحبر في ورقة الإجابة",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بأني قد استخدمت القلم الجاف أو الحبر في اختبار مادة ${d.subject||"..."} في تظليل الإجابة. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
   },
   {
     key:"general_rules", icon:"📋", label:"تعهد بالالتزام بالنظام العام", color:"#1D4ED8", category:"إقرارات",
     title:"تعهد بالالتزام بالنظام العام للاختبارات",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بالالتزام بالنظام العام للاختبارات، نتيجة ما حدث مني ${d.st_violation||"..."}`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[{id:"st_violation",label:"وصف ما حدث",type:"textarea",placeholder:"اذكر ما حدث بالتفصيل..."}]
@@ -5951,14 +5977,12 @@ const PLEDGE_FORMS = [
   {
     key:"no_cheating", icon:"🚨", label:"تعهد بعدم الغش", color:"#DC2626", category:"مخالفات الغش",
     title:"تعهد بعدم الغش",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: ()=>`بعدم الغش مرة أخرى، وإني أعلم جيداً أنه في حالة صدر مني ذلك مرة أخرى فسوف أكون عرضة لتطبيق ما ورد في دليل نظام وإجراءات الاختبارات. وعلى ذلك أوقع.`,
     hasStudentFields:true, hasMaterial:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
   },
   {
     key:"late_under15", icon:"⏰", label:"تعهد بعدم التأخر (أقل من ١٥ دقيقة)", color:"#D97706", category:"غياب وتأخر",
     title:"تعهد بعدم التأخر عن الاختبار ( لمدة لا تزيد عن ١٥ دقيقة )",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: ()=>`بعدم التأخر عن الموعد المحدد للاختبار مرة أخرى، وإني أعلم جيداً أنه في حالة تأخري مرة أخرى فسوف يتم تطبيق النظام المتبع للائحة الاختبارات، وعلى ذلك أوقع.`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[
@@ -5981,7 +6005,6 @@ const PLEDGE_FORMS = [
   {
     key:"general_rules_v2", icon:"⚖️", label:"تعهد بالالتزام بالنظام مع وصف المخالفة", color:"#0F172A", category:"إقرارات",
     title:"تعهد بالالتزام بالنظام العام للاختبارات",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بالالتزام بالنظام العام للاختبارات، نتيجة ما حدث مني ${d.st_violation||"..."}`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[
@@ -6009,7 +6032,6 @@ const PLEDGE_FORMS = [
   {
     key:"no_cheat_attempt", icon:"🚫", label:"تعهد بعدم محاولة الغش", color:"#9D174D", category:"مخالفات الغش",
     title:"تعهد بعدم محاولة الغش",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: ()=>`بعدم تكرار ما بدر مني من محاولة للغش وفي حالة تكرار المحاولة مرة أخرى فسوف يتم تطبيق النظام المتبع للائحة الاختبارات، وعلى ذلك أوقع.`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[
@@ -6022,7 +6044,6 @@ const PLEDGE_FORMS = [
   {
     key:"leave_essay", icon:"📝", label:"إقرار بترك الإجابة عن السؤال المقالي", color:"#0369A1", category:"إقرارات",
     title:"إقرار بترك الإجابة عن السؤال المقالي",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بأني اطلعت على الأسئلة المقالية كاملة وتم تركها دون حل بسبب: ${d.st_reason||"..."}`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true,
     extraFields:[{id:"st_reason",label:"سبب ترك الإجابة",type:"textarea",placeholder:"اذكر السبب..."}]
@@ -6030,14 +6051,12 @@ const PLEDGE_FORMS = [
   {
     key:"blue_pen", icon:"🖊️", label:"تعهد بالالتزام بالقلم الجاف الأزرق", color:"#1E40AF", category:"مخالفات الكتابة",
     title:"تعهد بالالتزام بالكتابة بالقلم الجاف الأزرق",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: d=>`بأني قد استخدمت قلماً غير القلم الجاف الأزرق في اختبار مادة ${d.subject||"..."}. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
   },
   {
     key:"no_tamper_auto", icon:"🖥️", label:"تعهد بعدم العبث بورقة الإجابة (الرصد الآلي)", color:"#059669", category:"مخالفات الكتابة",
     title:"تعهد بعدم العبث بورقة الإجابة ( الرصد الآلي )",
-    subTitle:"اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ",
     textTemplate: ()=>`بعدم العبث في ورقة الاجابة والمحافظة عليها والكتابة في المكان المخصص للإجابة فقط. وأتعهد بعد تكرار ذلك، وللمدرسة الحق في تطبيق النظام المتبع للائحة الاختبارات وعلى ذلك أوقع.`,
     hasStudentFields:true, hasStudentSig:true, hasMonitorSig:true, extraFields:[]
   },
@@ -7033,7 +7052,7 @@ function showPledgeForm(pledgeType) {
   document.getElementById("pledgeFormContainer").innerHTML = `
     <div style="background:${f.color}08;border:2px solid ${f.color}40;border-radius:14px;padding:18px;margin-top:8px">
       <p style="font-weight:900;color:${f.color};font-size:15px;margin-bottom:4px">${f.icon} ${f.title}</p>
-      ${f.subTitle?`<p style="font-size:11px;color:var(--muted);margin-bottom:14px">${f.subTitle}</p>`:""}
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px">${f.subTitle||_termTitle()}</p>
 
       <!-- بيانات الطالب -->
       <p style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">📌 بيانات الطالب</p>
@@ -7254,7 +7273,7 @@ function printMonitorReport(id) {
 
   const pf = PLEDGE_FORMS.find(x=>x.key===r.type);
   const title = r.pledgeTitle || (pf?pf.title:"تقرير مراقب اللجان");
-  const subTitle = pf && pf.subTitle ? pf.subTitle : "اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ";
+  const subTitle = (pf && pf.subTitle) || _termTitle();
   const color = pf ? pf.color : "#0D1F3C";
   const printDate = new Date(r.savedAt).toLocaleDateString("ar-SA-u-ca-islamic-umalqura",{year:"numeric",month:"long",day:"numeric"});
   const d = r.extraData || {};
@@ -7389,7 +7408,7 @@ function printMonitorReport(id) {
   <div style="margin-top:18px;font-size:11px;color:#64748b">
     <p>مدير المدرسة ورئيس لجنة الاختبارات</p>
     ${appr && appr.principalSig ? `<img src="${appr.principalSig}" style="max-width:180px;max-height:65px;display:block;margin-top:6px;border:1px solid #ddd;border-radius:4px"/>` : ""}
-    <p style="margin-top:2px;font-weight:700">${esc((appr && appr.principalName) || "محمد بن طراد الرفدي")}</p>
+    <p style="margin-top:2px;font-weight:700">${esc((appr && appr.principalName) || state.principalName || "محمد بن طراد الرفدي")}</p>
   </div>
 
   <div class="footer">
@@ -7503,7 +7522,7 @@ function defaultMinutesData() {
       }
     ],
     activeFormIdx: 0,
-    principal: "محمد بن طراد الرفدي",
+    principal: state.principalName || "محمد بن طراد الرفدي",
     committeeChief: "رئيس لجنة الاختبارات"
   };
 }
@@ -7998,7 +8017,7 @@ function printMinutes(fi) {
   <img src="${LOGO_SRC}" class="logo" alt="شعار"/>
   <div class="center-head">
     <h1>${esc(formLabel)}</h1>
-    <h2>اختبار نهاية الفصل الدراسي الثاني للعام الدراسي ١٤٤٧هـ</h2>
+    <h2>${_termTitle()}</h2>
     <h2 style="margin-top:2px">${esc(schoolName)}</h2>
   </div>
   <img src="${LOGO_SRC}" class="logo" alt="شعار" style="opacity:0.12"/>
