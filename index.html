@@ -767,7 +767,7 @@ async function _doSaveToCloud() {
   });
 
   var settings = {
-    schoolName:state.schoolName, adminPhone:state.adminPhone,
+    schoolName:state.schoolName, appTitle:state.appTitle, adminPhone:state.adminPhone,
     academicYear:state.academicYear, semester:state.semester, principalName:state.principalName,
     subjects:state.subjects, grades:state.grades,
     stages:state.stages, teachers:state.teachers,
@@ -832,7 +832,7 @@ async function loadFromCloud(fullSync) {
       // للسحابة بعد عندما يصل تحديث ناتج عن تعديل غير متعلق من جهاز آخر (نفس منطق _doSaveToCloud)
       var deletedSet = {};
       (d._deletedIds||[]).concat(state._deletedIds||[]).forEach(function(id){ deletedSet[id]=true; });
-      ["schoolName","adminPhone","minutesData","academicYear","semester","principalName"].forEach(function(k){
+      ["schoolName","appTitle","adminPhone","minutesData","academicYear","semester","principalName"].forEach(function(k){
         if(d[k] !== undefined) state[k] = d[k];
       });
       _MERGE_FIELDS.forEach(function(k){
@@ -1605,6 +1605,7 @@ const DEFAULT_USERS = [
 
 let state = {
   schoolName: "متابعة سير الاختبارات الإلكتروني",
+  appTitle: "متابعة سير الاختبارات الإلكتروني", // عنوان البرنامج المعروض في الواجهة وشاشة الدخول — مستقل عن اسم المدرسة المستخدم في المستندات المطبوعة
   adminPhone: "+966551121498",
   academicYear: "١٤٤٧", // العام الدراسي — يظهر تلقائياً في عناوين التعهدات والنماذج المطبوعة (_termTitle)
   semester: "الثاني", // الفصل الدراسي (الأول/الثاني) — يظهر تلقائياً في عناوين التعهدات والنماذج المطبوعة
@@ -1948,7 +1949,7 @@ function migrateMonitorAccounts() {
 // ═══════════════════════════════════════════════
 function renderLoginDemos() {
   const el = document.getElementById("loginSchoolName");
-  if(el) el.textContent = state.schoolName;
+  if(el) el.textContent = state.appTitle;
 }
 
 async function doLogin() {
@@ -1971,7 +1972,7 @@ async function doLogin() {
     document.getElementById("loginScreen").style.display="none";
     const shell = document.getElementById("appShell");
     shell.style.display="flex";
-    document.getElementById("hSchool").textContent = state.schoolName;
+    document.getElementById("hSchool").textContent = state.appTitle;
     const [col,bg] = ROLE_COLORS[found.role]||["#888","#eee"];
     const rIcons = {admin:"🔑",controller:"📋",notifier:"📲"};
     document.getElementById("hRole").textContent = (rIcons[found.role]||"") + " " + (ROLE_LABEL[found.role]||found.role);
@@ -1996,7 +1997,7 @@ function enterShell(found, page) {
   currentUser = found;
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("appShell").style.display    = "flex";
-  document.getElementById("hSchool").textContent = state.schoolName || "متابعة سير الاختبارات الإلكتروني";
+  document.getElementById("hSchool").textContent = state.appTitle || "متابعة سير الاختبارات الإلكتروني";
   var ROLE_COLORS_L = {admin:["#92610A","#FEF3C7"],controller:["#1E40AF","#DBEAFE"],notifier:["#5B21B6","#EDE9FE"],principal:["#065F46","#D1FAE5"],monitor:["#9D174D","#FCE7F3"]};
   var ROLE_LABELS_L = {admin:"مدير النظام",controller:"الكنترول",notifier:"مسؤول التنبيهات",principal:"مدير المدرسة",monitor:"مراقب اللجان"};
   var ROLE_ICONS_L  = {admin:"🔑",controller:"📋",notifier:"📲",principal:"🏫",monitor:"👁"};
@@ -3267,14 +3268,25 @@ function renderSGeneral(el) {
   el.innerHTML=`
   <div class="card">
     <p class="card-title">🏫 اسم المدرسة / المؤسسة</p>
+    <p style="font-size:13px;color:var(--mid);margin-bottom:10px">يظهر هذا الاسم في المستندات والتقارير المطبوعة (المحاضر، التعهدات، النماذج)، ولا يظهر في شاشة الدخول أو شريط الواجهة.</p>
     <input class="inp" id="s_school" value="${esc(state.schoolName)}" style="margin-bottom:12px"/>
     <div class="row" style="flex-wrap:wrap;gap:8px">
     <button class="btn btn-navy" onclick="
       state.schoolName=document.getElementById('s_school').value||state.schoolName;
-      document.getElementById('hSchool').textContent=state.schoolName;
-      document.getElementById('loginSchoolName').textContent=state.schoolName;
       saveState();saveToCloud();toast('تم الحفظ ✅')">💾 حفظ</button>
     <button class="btn" style="background:var(--red)" onclick="factoryReset()">🗑️ إعادة تعيين كامل</button>
+  </div>
+  </div>
+  <div class="card">
+    <p class="card-title">🏷️ عنوان البرنامج</p>
+    <p style="font-size:13px;color:var(--mid);margin-bottom:10px">يظهر هذا العنوان في شاشة تسجيل الدخول وشريط الواجهة العلوي فقط، ولا يؤثر على المستندات المطبوعة.</p>
+    <input class="inp" id="s_appTitle" value="${esc(state.appTitle||"")}" style="margin-bottom:12px"/>
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+    <button class="btn btn-navy" onclick="
+      state.appTitle=document.getElementById('s_appTitle').value||state.appTitle;
+      document.getElementById('hSchool').textContent=state.appTitle;
+      document.getElementById('loginSchoolName').textContent=state.appTitle;
+      saveState();saveToCloud();toast('تم الحفظ ✅')">💾 حفظ</button>
   </div>
   </div>
   <div class="card">
@@ -3631,7 +3643,7 @@ async function restoreHistorySnapshot(idx) {
   const history = await loadCloudHistory();
   const snap = history[idx];
   if(!snap){ toast("تعذر العثور على النسخة","err"); return; }
-  var keys = ["schoolName","adminPhone","academicYear","semester","principalName","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","studentCustomFields","teacherCustomFields","_deletedIds"];
+  var keys = ["schoolName","appTitle","adminPhone","academicYear","semester","principalName","subjects","grades","stages","teachers","users","examSchedule","minutesData","minutesArchive","inbox","principalMessages","monitorReports","monitorNotes","monitorStudentObs","monitorDailyReports","approvals","studentsDB","absenceLog","formTemplates","studentCustomFields","teacherCustomFields","_deletedIds"];
   keys.forEach(function(k){ if(snap.data[k]!==undefined) state[k]=snap.data[k]; });
   saveState();
   await saveToCloud();
