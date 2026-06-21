@@ -501,7 +501,6 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 .msg-type-btn{flex:1;min-width:110px;transition:all .18s}
 .msg-type-btn.active-type{transform:translateY(-1px);box-shadow:var(--sh2)}
 #bellBtn:hover{background:rgba(255,255,255,.2)!important}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:fixed;top:0;left:0;right:0;text-align:center;padding:40px}}
 
 /* ── RESPONSIVE ──────────────────────────────── */
 @media(max-width:520px){
@@ -575,7 +574,6 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 </div>
 
 <div id="toast"></div>
-<div id="printArea" style="display:none"></div>
 <div id="loadingMsg" style="position: fixed; inset: 0px; background: rgba(11, 29, 58, 0.65); z-index: 9998; display: none; align-items: center; justify-content: center; flex-direction: column;"><div style="width:48px;height:48px;border:3px solid rgba(255,255,255,.2);border-top-color:#F0B429;border-radius:50%;animation:spin .8s linear infinite"></div><p style="color:#fff;font-family:inherit;margin-top:14px;font-size:14px">جارٍ تحميل البيانات...</p></div>
 
 <script>
@@ -2310,19 +2308,90 @@ function printBundleById(id) {
 }
 
 async function printBundle(barcode, subject, count) {
-  const pa = document.getElementById("printArea");
-  pa.style.display="block";
-  pa.innerHTML = `
-    <div style="font-family:'Tajawal',Arial,sans-serif;direction:rtl;text-align:center">
-      <img src="${LOGO_SRC}" alt="شعار" style="width:100px;height:100px;object-fit:contain;margin:0 auto 8px;display:block"/>
-      <h2 style="margin-bottom:8px">${esc(state.schoolName)}</h2>
-      <p style="font-size:14px;margin-bottom:16px">${esc(subject)} · ${count} ورقة</p>
-      <div id="printQRBox" class="qr-wrap" style="margin:0 auto 10px"></div>
-      <p style="font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-top:10px">${esc(barcode)}</p>
+  let svg = `<p style="font-size:12px;color:#dc2626">⚠️ تعذّر إنشاء الباركود — تحقق من الاتصال بالإنترنت</p>`;
+  try {
+    await loadScriptOnce(CDN_QRGEN);
+    const qr = qrcode(0, "M");
+    qr.addData(barcode);
+    qr.make();
+    svg = qr.createSvgTag({ cellSize: 6, margin: 8 });
+  } catch(e) {}
+  const win = window.open("", "_blank");
+  if(!win) { toast("يرجى السماح بالنوافذ المنبثقة لطباعة الباركود","err"); return; }
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>طباعة باركود — ${esc(barcode)}</title>
+  <style>
+    @page{margin:0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{text-align:center;padding:24px}
+    .card svg{display:block;margin:0 auto}
+    h2{margin-bottom:6px;font-size:20px;color:#0B1D3A}
+    p.sub{font-size:14px;color:#475569;margin-bottom:18px}
+    p.code{font-family:monospace;font-size:24px;font-weight:900;letter-spacing:4px;margin-top:18px;color:#0B1D3A}
+    .no-print{margin-top:26px;display:flex;gap:8px;justify-content:center}
+    @media print{.no-print{display:none}}
+  </style></head><body>
+  <div class="card">
+    <img src="${LOGO_SRC}" alt="شعار" style="width:90px;height:90px;object-fit:contain;margin:0 auto 10px;display:block"/>
+    <h2>${esc(state.schoolName)}</h2>
+    <p class="sub">${esc(subject)} · ${count} ورقة</p>
+    ${svg}
+    <p class="code">${esc(barcode)}</p>
+    <div class="no-print">
+      <button onclick="window.print()" style="padding:8px 20px;background:#0B1D3A;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة</button>
+      <button onclick="window.close()" style="padding:8px 14px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+    </div>
+  </div>
+  </body></html>`);
+  win.document.close();
+}
+
+async function printAllBarcodes() {
+  if(!currentUser || currentUser.role!=="admin") { toast("هذا الإجراء مخصص لمدير النظام فقط","err"); return; }
+  if(!state.bundles.length) { toast("لا توجد مظاريف لطباعتها","err"); return; }
+  await loadScriptOnce(CDN_QRGEN).catch(()=>{});
+  const printDate = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+  const cards = state.bundles.map(b=>{
+    let svg = `<p style="font-size:10px;color:#dc2626">⚠️ تعذّر الإنشاء</p>`;
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(b.barcode);
+      qr.make();
+      svg = qr.createSvgTag({ cellSize: 4, margin: 4 });
+    } catch(e) {}
+    return `<div class="bc-card">
+      ${svg}
+      <p class="bc-sub">${esc(b.subject)}${b.grade?" — "+esc(b.grade):""}</p>
+      <p class="bc-code">${esc(b.barcode)}</p>
+      <p class="bc-count">${b.count} ورقة</p>
     </div>`;
-  await renderQRInto("printQRBox", barcode, 6, 8);
-  window.print();
-  setTimeout(()=>{ pa.style.display="none"; pa.innerHTML=""; }, 1000);
+  }).join("");
+  const win = window.open("", "_blank");
+  if(!win) { toast("يرجى السماح بالنوافذ المنبثقة لطباعة الباركودات","err"); return; }
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>طباعة جميع باركودات المظاريف</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',Arial,sans-serif;direction:rtl;color:#0D1F3C;padding:20px}
+    .header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0B1D3A;padding-bottom:10px;margin-bottom:16px}
+    h1{font-size:17px;color:#0B1D3A}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .bc-card{border:1px solid #CDD4E4;border-radius:10px;padding:12px 8px;text-align:center;break-inside:avoid;page-break-inside:avoid}
+    .bc-card svg{display:block;margin:0 auto 6px}
+    .bc-sub{font-size:11.5px;font-weight:700;color:#0B1D3A;margin-bottom:2px}
+    .bc-code{font-family:monospace;font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:2px}
+    .bc-count{font-size:10px;color:#64748B}
+    .no-print{margin-top:18px;display:flex;gap:8px;justify-content:center}
+    @media print{.no-print{display:none} .bc-card{border-color:#94a3b8}}
+  </style></head><body>
+  <div class="header"><h1>📦 طباعة جميع باركودات المظاريف — ${esc(state.schoolName)}</h1><span style="font-size:12px;color:#64748B">${printDate} · ${state.bundles.length} مظروف</span></div>
+  <div class="grid">${cards}</div>
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:8px 20px;background:#0B1D3A;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700">🖨️ طباعة</button>
+    <button onclick="window.close()" style="padding:8px 14px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit">إغلاق</button>
+  </div>
+  </body></html>`);
+  win.document.close();
 }
 
 // ═══════════════════════════════════════════════
@@ -2334,9 +2403,12 @@ function renderAdminList(el) {
     return;
   }
   el.innerHTML=`
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <p style="font-size:14px;font-weight:700;color:var(--navy)">${state.bundles.length} مظروف مسجّل</p>
-    <button class="btn btn-red btn-sm" onclick="adminDeleteAllBundles()">🗑️ حذف الكل</button>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-navy btn-sm" onclick="printAllBarcodes()">🖨️ طباعة جميع الباركودات</button>
+      <button class="btn btn-red btn-sm" onclick="adminDeleteAllBundles()">🗑️ حذف الكل</button>
+    </div>
   </div>
   <div id="adminBundleList"></div>`;
   renderAdminBundleList();
