@@ -386,6 +386,18 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 }
 .s-tab.active .s-tab-label{color:#fff}
 
+/* ── NOTIFICATION TYPE BUTTONS ──────────────────*/
+.ntypeBtn{
+  padding:9px 14px;border:1px solid var(--border);border-radius:var(--r12);
+  background:var(--white);color:var(--mid);cursor:pointer;font-weight:600;
+  font-size:12.5px;display:inline-flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+  box-shadow:var(--sh1);
+}
+.ntypeBtn .nt-icon{font-size:15px;line-height:1}
+.ntypeBtn:hover{border-color:var(--blueM);color:var(--navy);transform:translateY(-2px);box-shadow:var(--sh2)}
+.ntypeBtn.active{box-shadow:var(--sh2)}
+
 /* ── LIST ITEM ───────────────────────────────── */
 .list-item{
   display:flex;align-items:center;gap:9px;background:var(--bg);
@@ -2995,7 +3007,7 @@ function renderNotifSend(el) {
   const ntHTML=NOTIFY_TYPES.map(t=>`
     <button class="ntypeBtn${_selType===t.key?" active":""}" onclick="selNType('${t.key}')"
       style="${_selType===t.key?`border-color:${t.color};background:${t.color}15;color:${t.color};font-weight:800`:""}">
-      ${t.icon} ${t.label}
+      <span class="nt-icon">${t.icon}</span>${t.label}
     </button>`).join("");
 
   el.innerHTML=`
