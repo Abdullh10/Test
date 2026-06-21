@@ -363,17 +363,25 @@ label.lbl{font-size:12px;color:var(--mid);display:block;margin-bottom:5px;font-w
 
 /* ── SETTINGS TABS ───────────────────────────── */
 .s-tabs{
-  display:flex;gap:2px;background:var(--white);border-radius:var(--r10);
-  padding:4px;margin-bottom:16px;border:1px solid var(--border);
-  flex-wrap:wrap;box-shadow:var(--sh1);
+  display:flex;gap:8px;background:transparent;
+  padding:0;margin-bottom:18px;border:none;
+  flex-wrap:wrap;
 }
 .s-tab{
-  flex:1;min-width:44px;padding:8px 4px;border:none;border-radius:var(--r8);
-  background:transparent;color:var(--muted);cursor:pointer;font-size:12px;
-  font-weight:500;font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+  flex:1 1 76px;min-width:76px;padding:11px 6px;border:1px solid var(--border);
+  border-radius:var(--r12);background:var(--white);color:var(--mid);cursor:pointer;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  box-shadow:var(--sh1);
 }
-.s-tab:hover{color:var(--navy)}
-.s-tab.active{background:var(--navy);color:#fff;font-weight:700;box-shadow:var(--sh2)}
+.s-tab .s-tab-icon{font-size:21px;line-height:1}
+.s-tab .s-tab-label{font-size:11.5px;font-weight:600;white-space:nowrap}
+.s-tab:hover{border-color:var(--blueM);color:var(--navy);transform:translateY(-2px);box-shadow:var(--sh2)}
+.s-tab.active{
+  background:linear-gradient(135deg,var(--navy),var(--navy3));
+  border-color:var(--navy);color:#fff;box-shadow:var(--sh2);
+}
+.s-tab.active .s-tab-label{color:#fff}
 
 /* ── LIST ITEM ───────────────────────────────── */
 .list-item{
@@ -3239,8 +3247,8 @@ function renderSettings(el) {
   if(!_editStages) _editStages=[...state.stages];
   el.innerHTML=`
   <div class="s-tabs">
-    ${[["general","🏫 عام"],["subjects","📚 مواد"],["grades","🎓 صفوف"],["stages","🔄 مراحل"],["teachers","👨‍🏫 معلمون"],["customFields","🧩 حقول مخصصة"],["users","👥 حسابات"],["phone","📱 واتساب"],["history","🕓 النسخ السابقة"]].map(([k,l])=>`
-    <button class="sTab${_sTab===k?" active":""}" onclick="switchSTab('${k}')">${l}</button>`).join("")}
+    ${[["general","🏫","عام"],["subjects","📚","مواد"],["grades","🎓","صفوف"],["stages","🔄","مراحل"],["teachers","👨‍🏫","معلمون"],["customFields","🧩","حقول مخصصة"],["users","👥","حسابات"],["phone","📱","واتساب"],["history","🕓","النسخ السابقة"]].map(([k,icon,label])=>`
+    <button class="s-tab${_sTab===k?" active":""}" onclick="switchSTab('${k}')"><span class="s-tab-icon">${icon}</span><span class="s-tab-label">${label}</span></button>`).join("")}
   </div>
   <div id="sTabContent"></div>`;
   renderSTabContent();
