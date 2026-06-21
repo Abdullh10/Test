@@ -2281,7 +2281,7 @@ function renderBundleSuccess(el, b) {
     <div style="font-size:48px;margin-bottom:8px">✅</div>
     <h3 style="color:var(--green);font-size:18px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:22px">✓</span>تم إنشاء المظروف بنجاح</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:18px">${esc(b.subject)}${b.grade?" — "+esc(b.grade):""} · ${b.count} ورقة</p>
-    <div id="printArea" class="qr-wrap"></div>
+    <div id="qrPreviewArea" class="qr-wrap"></div>
     <p style="font-family:monospace;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--navy);margin:0 0 14px">${esc(b.barcode)}</p>
     <div style="background:var(--amberBg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;text-align:right">
       ${corrT?`✏️ مصحح 1: <strong>${esc(corrT.name)}</strong>&nbsp;&nbsp;`:""}
@@ -2299,7 +2299,7 @@ function renderBundleSuccess(el, b) {
       <button class="btn btn-mid" style="flex:1" onclick="_newBundleCreated=null;navigateTo(currentUser&&currentUser.role==='controller'?'ctrl_new':'admin_new')">➕ مظروف آخر</button>
     </div>
   </div>`;
-  renderQRInto("printArea", b.barcode, 5, 8);
+  renderQRInto("qrPreviewArea", b.barcode, 5, 8);
 }
 
 // يطبع باركود مظروف موجود مسبقاً (مثلاً لإعادة طباعة باركود ضائع أو تالف) بالبحث عنه عبر معرّفه
@@ -2441,7 +2441,7 @@ function adminEditBundle(id) {
   overlay.id="editOverlay";
   overlay.innerHTML=`
   <div class="modal">
-    <p class="modalTitle">✏️ تعديل المظروف — ${esc(b.barcode)}</p>
+    <p class="modal-title">✏️ تعديل المظروف — ${esc(b.barcode)}</p>
     <label for="eb_subject" class="lbl">المادة</label>
     <select class="inp" id="eb_subject" style="margin-bottom:10px">
       ${state.subjects.map(s=>`<option${s===b.subject?" selected":""}>${esc(s)}</option>`).join("")}
@@ -8826,16 +8826,16 @@ function render(){
     const cards=todayB.map((b,i)=>{
       const p=pct(b,st),col=b.stage<0?'#64748B':sc(b.stage),dn=isDone(b,st),sn=sName(b,st);
       const pills=st.map((s,si)=>{const a=si===b.stage,ps=si<b.stage,bg=(a||ps)?sc(si):'rgba(255,255,255,.07)',tx=(a||ps)?'#fff':'rgba(255,255,255,.22)';
-        return \`<span class="tc-pill \${a?'active':''}" style="background:\${bg};color:\${tx}">\${s}</span>\`;}).join('');
+        return \`<span class="tc-pill \${a?'active':''}" style="background:\${bg};color:\${tx}">\${dEsc(s)}</span>\`;}).join('');
       return \`<div class="today-card" style="border-right-color:\${col};animation-delay:\${i*90}ms">
-        <div class="tc-top"><div><div class="tc-subject">\${b.subject}</div>\${b.grade?\`<div class="tc-grade">\${b.grade}</div>\`:''}</div>
+        <div class="tc-top"><div><div class="tc-subject">\${dEsc(b.subject)}</div>\${b.grade?\`<div class="tc-grade">\${dEsc(b.grade)}</div>\`:''}</div>
           \${dn?\`<div class="done-badge">✅</div>\`:\`<div class="tc-pct" style="color:\${col}">\${p}%</div>\`}</div>
         <div class="tc-bar"><div class="tc-bar-fill" style="background:\${col};width:\${p}%"></div></div>
         <div class="tc-stages">\${pills}</div>
         <div class="tc-meta"><span>📄 \${b.count} ورقة</span>
           \${b.examStart?\`<span>🕐 \${b.examStart}\${b.examEnd?' — '+b.examEnd:''}</span>\`:''}
           \${b.examHall?\`<span>🏫 \${dEsc(b.examHall)}</span>\`:''}
-          <span class="tc-status" style="background:\${col}22;color:\${col};border:1px solid \${col}55">\${sn}</span></div></div>\`;}).join('');
+          <span class="tc-status" style="background:\${col}22;color:\${col};border:1px solid \${col}55">\${dEsc(sn)}</span></div></div>\`;}).join('');
     tEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📅</span><h2>اختبارات اليوم</h2><span class="panel-badge">\${todayB.length} مادة</span></div><div class="panel-body">\${cards}</div>\`;
   }
   const map={};bu.forEach(b=>{if(!map[b.subject])map[b.subject]={subject:b.subject,bundles:[]};map[b.subject].bundles.push(b);});
@@ -8848,17 +8848,17 @@ function render(){
             p=st.length?Math.max(0,Math.round(((mx+1)/st.length)*100)):0,
             col=mx<0?'#64748B':sc(mx),dn=bArr.every(b=>isDone(b,st))&&st.length>0,
             sn=mx<0?'لم تبدأ':(st[mx]||'—'),tp=bArr.reduce((a,b)=>a+b.count,0);
-      const dots=st.map((s,si)=>\`<div class="sr-dot" title="\${s}" style="background:\${si<=mx?sc(si):'rgba(255,255,255,.07)'}"></div>\`).join('');
+      const dots=st.map((s,si)=>\`<div class="sr-dot" title="\${dEsc(s)}" style="background:\${si<=mx?sc(si):'rgba(255,255,255,.07)'}"></div>\`).join('');
       return \`<div class="subj-row" style="border-right-color:\${col};animation-delay:\${i*55}ms">
-        <div class="sr-top"><div style="flex:1;min-width:0"><div class="sr-name">\${sm.subject}</div><div class="sr-meta">\${bArr.length} مظروف · \${tp} ورقة</div></div>
+        <div class="sr-top"><div style="flex:1;min-width:0"><div class="sr-name">\${dEsc(sm.subject)}</div><div class="sr-meta">\${bArr.length} مظروف · \${tp} ورقة</div></div>
           \${dn?\`<span class="sr-chip" style="background:#10B98120;color:#10B981;border:1px solid #10B98144">✅ مكتمل</span>\`
-              :\`<span class="sr-chip" style="background:\${col}20;color:\${col};border:1px solid \${col}44">\${sn}</span>\`}</div>
+              :\`<span class="sr-chip" style="background:\${col}20;color:\${col};border:1px solid \${col}44">\${dEsc(sn)}</span>\`}</div>
         <div class="sr-bar"><div class="sr-fill" style="background:\${col};width:\${p}%"></div></div>
         <div class="sr-dots">\${dots}</div></div>\`;}).join('');
     sEl.innerHTML=\`<div class="panel-hdr"><span style="font-size:18px">📊</span><h2>سير ورقة الاختبار</h2><span class="panel-badge">\${subjs.length} مادة</span></div><div class="panel-body">\${rows}</div>\`;
   }
   const tItems=bu.map(b=>{const col=b.stage<0?'#64748B':sc(b.stage);
-    return \`<span class="t-item"><span class="t-dot" style="background:\${col}"></span><strong>\${b.subject}</strong>\${b.grade?' ('+b.grade+')':''} — \${sName(b,st)} · \${b.count} ورقة</span><span style="color:rgba(255,255,255,.1)">◆</span>\`;}).join('');
+    return \`<span class="t-item"><span class="t-dot" style="background:\${col}"></span><strong>\${dEsc(b.subject)}</strong>\${b.grade?' ('+dEsc(b.grade)+')':''} — \${dEsc(sName(b,st))} · \${b.count} ورقة</span><span style="color:rgba(255,255,255,.1)">◆</span>\`;}).join('');
   document.getElementById('tkr').innerHTML=tItems+tItems;
 }
 render();
