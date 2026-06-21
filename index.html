@@ -120,20 +120,23 @@ body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;background:var(--bg);co
 
 /* NAV */
 #appNav{
-  background:var(--white);border-bottom:1px solid var(--border);
-  display:flex;padding:0 16px;gap:0;overflow-x:auto;flex-shrink:0;
-  box-shadow:var(--sh1);
+  background:var(--bg);border-bottom:1px solid var(--border);
+  display:flex;padding:8px 16px;gap:8px;overflow-x:auto;flex-shrink:0;
 }
 #appNav::-webkit-scrollbar{height:0}
 .nav-btn{
-  padding:10px 14px;border:none;border-bottom:3px solid transparent;
-  background:none;cursor:pointer;color:var(--muted);font-weight:500;
+  padding:9px 14px;border:1px solid var(--border);border-radius:var(--r12);
+  background:var(--white);cursor:pointer;color:var(--mid);font-weight:600;
   font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;white-space:nowrap;
-  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;min-width:64px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;transition:all .18s;min-width:68px;flex-shrink:0;
+  box-shadow:var(--sh1);
 }
-.nav-btn:hover{color:var(--navy);background:rgba(11,29,58,.04)}
-.nav-btn.active{color:var(--navy);font-weight:700;border-bottom-color:var(--gold)}
-.nav-icon{font-size:22px}
+.nav-btn:hover{border-color:var(--blueM);color:var(--navy);transform:translateY(-2px);box-shadow:var(--sh2)}
+.nav-btn.active{
+  background:linear-gradient(135deg,var(--navy),var(--navy3));
+  border-color:var(--navy);color:#fff;box-shadow:var(--sh2);transform:none;
+}
+.nav-icon{font-size:20px}
 
 /* MAIN */
 #appMain{flex:1;padding:20px 16px;overflow-y:auto;background:linear-gradient(180deg,var(--bg) 0%,#E5E9F4 100%);min-height:calc(100vh - 116px)}
@@ -2041,7 +2044,7 @@ function renderNav() {
     const btn = document.createElement("button");
     const unread = (p.k==="inbox") ? getUnreadCount() : 0;
     btn.className = "nav-btn" + (currentPage===p.k?" active":"");
-    btn.innerHTML = `<span style="position:relative;display:inline-block;font-size:24px;line-height:1">${p.icon}${unread>0?`<span style="position:absolute;top:-4px;left:-4px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 3px">${unread>9?"9+":unread}</span>`:""}</span><span style="font-size:11px">${p.label}</span>`;
+    btn.innerHTML = `<span class="nav-icon" style="position:relative;display:inline-block;line-height:1">${p.icon}${unread>0?`<span style="position:absolute;top:-4px;left:-4px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 3px">${unread>9?"9+":unread}</span>`:""}</span><span>${p.label}</span>`;
     btn.onclick = () => navigateTo(p.k);
     nav.appendChild(btn);
   });
